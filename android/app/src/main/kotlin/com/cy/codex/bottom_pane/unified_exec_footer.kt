@@ -2,7 +2,6 @@ package com.cy.codex.bottom_pane
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,6 +30,7 @@ import com.cy.codex.AppEvent
 import com.cy.codex.ButtonRole
 import com.cy.codex.CodexButton
 import com.cy.codex.CodexButtonSize
+import com.cy.codex.CodexDivider
 import com.cy.codex.EmptyState
 import com.cy.codex.R
 import com.cy.codex.SectionCard
@@ -262,14 +262,6 @@ private fun BackgroundTerminalRow(
 
 /** Hairline between two terminal rows, matching the dividers the rest of the app's cards use. */
 @Composable
-private fun BackgroundTerminalDivider() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = UiConsts.Space1)
-            .height(UiConsts.DividerThickness)
-            .background(MiuixTheme.colorScheme.dividerLine),
-    )
-}
+private fun BackgroundTerminalDivider() = CodexDivider()
 
 

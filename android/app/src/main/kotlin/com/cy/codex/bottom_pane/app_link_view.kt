@@ -2,7 +2,6 @@ package com.cy.codex.bottom_pane
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -277,12 +276,4 @@ private fun AppsBackButton(onBack: () -> Unit) {
 }
 
 @Composable
-private fun AppsDivider() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = UiConsts.Space1)
-            .height(UiConsts.DividerThickness)
-            .background(MiuixTheme.colorScheme.dividerLine),
-    )
-}
+private fun AppsDivider() = CodexDivider()

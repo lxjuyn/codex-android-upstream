@@ -3,7 +3,7 @@ package com.cy.codex
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -27,20 +28,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.CornerSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -80,9 +76,13 @@ import androidx.compose.ui.unit.sp
 import com.cy.codex.R
 import com.cy.codex.UiConsts
 import kotlin.math.roundToInt
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonColors
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.blur.Backdrop
@@ -91,11 +91,14 @@ import top.yukonga.miuix.kmp.blur.colorControls
 import top.yukonga.miuix.kmp.blur.drawBackdrop
 import top.yukonga.miuix.kmp.blur.highlight.Highlight
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.basic.Close
 import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
 import top.yukonga.miuix.kmp.icon.extended.ChevronForward
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.squircle.SquircleDefaults
 import top.yukonga.miuix.kmp.squircle.addSquircleRect
+import top.yukonga.miuix.kmp.squircle.squircleBackground
+import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
@@ -231,14 +234,16 @@ value class CodexButtonSize private constructor(private val rank: Int) {
 /**
  * The app's one button.
  *
- * It replaces four hand-rolled pills that had drifted to 34/38/40/44dp tall with three different
- * corner radii and three label sizes. Every button in the app is now this shape: a fully rounded
- * pill at one of [CodexButtonSize]'s two heights, with a press that scales and tints the same way
- * everywhere.
+ * It is a miuix [Button]: the library owns the squircle surface, the tab-stop semantics and the
+ * press highlight, so a button and a preference row cannot answer a press two different ways. What
+ * stays here is the app's decision about form — the two heights of [CodexButtonSize] and the pill
+ * corner that follows from them — and the role hierarchy, which miuix does not have a vocabulary
+ * for.
  *
  * The three roles are a hierarchy, not three colours:
- * - [ButtonRole.Primary] — the action the surface was opened for. Filled, the only filled one.
- * - [ButtonRole.Secondary] — the alternative ("this session only"), outlined.
+ * - [ButtonRole.Primary] — the action the surface was opened for. Filled with `primary`.
+ * - [ButtonRole.Secondary] — the alternative ("this session only"). Filled with the library's
+ *   `secondaryVariant`, which is exactly the colour the miuix example gives its default button.
  * - [ButtonRole.Destructive] — a refusal. Outlined with error-coloured text and *not* filled: a
  *   solid red button next to a solid accent one makes the refusal look like the primary action,
  *   which is exactly the wrong thing to make easy to hit by accident.
@@ -268,71 +273,59 @@ fun CodexButton(
     minWidth: Dp = 0.dp,
 ) {
     val colors = MiuixTheme.colorScheme
-    val shape = remember { RoundedCornerShape(percent = UiConsts.PillCorner) }
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val active = pressed && enabled
-
-    val container = when {
-        !enabled -> if (role == ButtonRole.Primary) {
-            colors.disabledPrimary
-        } else {
-            colors.disabledOnSurface.copy(alpha = 0.1f)
-        }
-
-        role == ButtonRole.Primary -> colors.primary
-        else -> Color.Transparent
-    }
+    // The pill is the button's own height as a squircle radius: miuix blends the corner to a circle
+    // once the radius reaches half the shorter side, so this is a capsule at both sizes.
+    val cornerRadius = size.height / 2
+    // Only the refusal is outlined. The two filled roles use the library's own button colours, so a
+    // CodexButton and a miuix TextButton in the same footer resolve to the same two fills.
     val outline = when {
+        role != ButtonRole.Destructive -> Color.Transparent
         !enabled -> colors.outline.copy(alpha = 0.18f)
-        role == ButtonRole.Destructive -> colors.error.copy(alpha = 0.5f)
-        role == ButtonRole.Secondary -> colors.outline.copy(alpha = 0.34f)
-        else -> Color.Transparent
+        else -> colors.error.copy(alpha = 0.5f)
     }
-    val content = when {
-        !enabled -> colors.disabledOnSurface
-        role == ButtonRole.Primary -> colors.onPrimary
-        role == ButtonRole.Destructive -> colors.error
-        else -> colors.onSurface
-    }
-    val overlay by animateColorAsState(
-        targetValue = if (active) colors.onBackground.copy(alpha = 0.12f) else Color.Transparent,
-        animationSpec = Motion.Tint,
-        label = "buttonPress",
-    )
-    val scale by animateFloatAsState(
-        targetValue = if (active) 0.97f else 1f,
-        animationSpec = Motion.Press,
-        label = "buttonScale",
-    )
+    val buttonColors = when (role) {
+        ButtonRole.Primary -> ButtonColors(
+            color = colors.primary,
+            disabledColor = colors.disabledPrimaryButton,
+            contentColor = colors.onPrimary,
+            disabledContentColor = colors.disabledOnPrimaryButton,
+        )
 
-    Box(
-        modifier = modifier
-            .height(size.height)
-            .widthIn(min = minWidth)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clip(shape)
-            .background(container, shape)
-            .background(overlay, shape)
-            .border(UiConsts.OutlineThickness, outline, shape)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                enabled = enabled,
-                onClick = onClick,
-            )
-            .padding(horizontal = size.paddingHorizontal),
-        contentAlignment = Alignment.Center,
+        ButtonRole.Secondary -> ButtonColors(
+            color = colors.secondaryVariant,
+            disabledColor = colors.disabledSecondaryVariant,
+            contentColor = colors.onSecondaryVariant,
+            disabledContentColor = colors.disabledOnSecondaryVariant,
+        )
+
+        ButtonRole.Destructive -> ButtonColors(
+            color = Color.Transparent,
+            disabledColor = colors.disabledOnSurface.copy(alpha = 0.1f),
+            contentColor = colors.error,
+            disabledContentColor = colors.disabledOnSurface,
+        )
+    }
+    Button(
+        onClick = onClick,
+        // miuix's Button has no border of its own; the two outlined roles take the library's
+        // squircle stroke so the outline follows the same silhouette as the fill.
+        modifier = if (outline == Color.Transparent) {
+            modifier
+        } else {
+            modifier.squircleBorder(UiConsts.OutlineThickness, outline, cornerRadius)
+        },
+        enabled = enabled,
+        cornerRadius = cornerRadius,
+        minWidth = minWidth,
+        minHeight = size.height,
+        colors = buttonColors,
+        insideMargin = PaddingValues(horizontal = size.paddingHorizontal, vertical = 0.dp),
     ) {
         Text(
             text = text,
             fontSize = UiType.Action,
             lineHeight = UiType.ActionLine,
             fontWeight = FontWeight.Medium,
-            color = content,
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
@@ -341,8 +334,14 @@ fun CodexButton(
 }
 
 /**
- * Row background with a pressed overlay, shared by selection rows in the sidebar, the agent list
- * and the file list.
+ * Row background with a selection fill and the theme's press highlight, shared by selection rows in
+ * the sidebar, the agent list and the file list.
+ *
+ * The press feedback is [LocalIndication] — the same miuix style highlight every preference row
+ * uses — instead of a hand-drawn overlay. The *fill* stays here because miuix has no selected-row
+ * container: every selection row in the app — the agent roster, the model and effort lists, the
+ * sidebar's session list, the status card's file rows — changes this fill when it becomes the
+ * selected one.
  *
  * [onLongClick] is optional and, when given, is what makes a row mean two things: the agents list
  * uses a tap to open the agent's session and a long press to open its details, the way a file row
@@ -358,19 +357,6 @@ fun Modifier.pressableRow(
     onLongClickLabel: String? = null,
 ): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val overlay by animateColorAsState(
-        targetValue = if (pressed) {
-            MiuixTheme.colorScheme.onBackground.copy(alpha = 0.08f)
-        } else {
-            Color.Transparent
-        },
-        animationSpec = Motion.Tint,
-        label = "rowPress",
-    )
-    // The container is animated too. Every selection row in the app — the agent roster, the model
-    // and effort lists, the sidebar's session list, the status card's file rows — changes this fill
-    // when it becomes the selected one, and they all used to repaint on a single frame.
     val fill by animateColorAsState(
         targetValue = container,
         animationSpec = Motion.Tint,
@@ -379,10 +365,9 @@ fun Modifier.pressableRow(
     return this
         .clip(shape)
         .background(fill, shape)
-        .background(overlay, shape)
         .combinedClickable(
             interactionSource = interactionSource,
-            indication = null,
+            indication = LocalIndication.current,
             onClickLabel = onClickLabel,
             onLongClickLabel = onLongClickLabel,
             onLongClick = onLongClick,
@@ -457,7 +442,14 @@ fun ExpandBar(
     )
 }
 
-/** Section card used by the status card and the settings pages. */
+/**
+ * Section card used by the status card and the settings pages.
+ *
+ * The fill is a miuix [Card]: the squircle silhouette, the corner radius and the content colour
+ * come from the library, so a section card and a settings card cannot resolve to two different
+ * surfaces. Only the header — an icon, a title, a value and an optional disclosure arrow — and the
+ * collapsing body are ours.
+ */
 @Composable
 fun SectionCard(
     title: String,
@@ -479,14 +471,12 @@ fun SectionCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = MiuixTheme.colorScheme
-    val shape = remember { RoundedCornerShape(UiConsts.SectionCorner) }
     val interactionSource = remember { MutableInteractionSource() }
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(raisedSurface())
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = horizontalPadding, vertical = verticalPadding),
+        colors = CardDefaults.defaultColors(color = raisedSurface(), contentColor = colors.onSurface),
     ) {
         Row(
             modifier = Modifier
@@ -932,13 +922,10 @@ fun CodexTextField(
             )
             Spacer(Modifier.height(UiConsts.Space4))
         }
-        val shape = remember { RoundedCornerShape(UiConsts.RowCorner) }
         TextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(shape),
+            modifier = Modifier.fillMaxWidth(),
             enabled = enabled,
             singleLine = singleLine,
             label = placeholder.orEmpty(),
@@ -954,11 +941,13 @@ fun CodexTextField(
 }
 
 /**
- * A switch with its own name and explanation.
+ * A switch with its own name and explanation, as a miuix [SwitchPreference].
  *
- * The whole row is the hit target, not the switch: a 40dp control at the far edge of a phone is the
- * worst place to have to aim. That is also why the explanation sits under the title rather than
- * beside it — a value the user cannot read is a value they cannot decide about.
+ * The library owns the row: the whole row is the hit target rather than the switch alone (a 40dp
+ * control at the far edge of a phone is the worst place to have to aim), the explanation sits under
+ * the title, and the press feedback is the same highlight every other miuix row uses. This used to
+ * be a hand-rolled row that re-implemented those three things slightly differently from the
+ * settings page, which was the one screen already using the real [SwitchPreference].
  */
 @Composable
 fun CodexSwitchRow(
@@ -969,40 +958,17 @@ fun CodexSwitchRow(
     subtitle: String? = null,
     enabled: Boolean = true,
 ) {
-    val colors = MiuixTheme.colorScheme
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .pressableRow(
-                shape = remember { RoundedCornerShape(UiConsts.RowCorner) },
-                container = Color.Transparent,
-                onClick = { if (enabled) onCheckedChange(!checked) },
-                onClickLabel = title,
-            )
-            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = UiType.RowTitle,
-                lineHeight = UiType.RowTitleLine,
-                fontWeight = FontWeight.Medium,
-                color = if (enabled) colors.onSurface else colors.disabledOnSurface,
-            )
-            if (subtitle != null) {
-                Spacer(Modifier.height(UiConsts.Space2))
-                Text(
-                    text = subtitle,
-                    fontSize = UiType.Meta,
-                    lineHeight = UiType.MetaLine,
-                    color = colors.onSurfaceVariantSummary,
-                )
-            }
-        }
-        Spacer(Modifier.width(UiConsts.Space10))
-        Switch(checked = checked, onCheckedChange = { if (enabled) onCheckedChange(it) }, enabled = enabled)
-    }
+    SwitchPreference(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        title = title,
+        modifier = modifier,
+        summary = subtitle,
+        // The same inside margin the rows of a section card use, so the title aligns with the
+        // value rows above and below it instead of inheriting the library's wider preference inset.
+        insideMargin = PaddingValues(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
+        enabled = enabled,
+    )
 }
 
 /**
@@ -1050,9 +1016,11 @@ fun ValueRow(
 /**
  * A row that does something: a page entry, a list item that opens a detail, a destructive action.
  *
- * [trailing] is the row's *state* ("3 servers", "已连接") and [subtitle] is its explanation. Both,
- * because a row that only names a thing makes the user open it to find out whether it is the thing
- * they wanted.
+ * It is a miuix [ArrowPreference]: the library owns the row height, the title/summary type ramp,
+ * the end-slot alignment and the disclosure arrow. [trailing] is the row's *state* ("3 servers",
+ * "已连接") and [subtitle] is its explanation — a row that only names a thing makes the user open
+ * it to find out whether it is the thing they wanted. [icon] is the leading glyph, tinted like a
+ * miuix preference row's start action.
  */
 @Composable
 fun ActionRow(
@@ -1062,85 +1030,49 @@ fun ActionRow(
     subtitle: String? = null,
     trailing: String? = null,
     icon: ImageVector? = null,
-    tint: Color? = null,
     enabled: Boolean = true,
 ) {
     val colors = MiuixTheme.colorScheme
-    val contentColor = tint ?: colors.onSurface
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .pressableRow(
-                shape = remember { RoundedCornerShape(UiConsts.RowCorner) },
-                container = Color.Transparent,
-                onClick = { if (enabled) onClick() },
-                onClickLabel = title,
-            )
-            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(UiConsts.IconLeading),
-                tint = if (enabled) colors.primary else colors.disabledOnSurface,
-            )
-            Spacer(Modifier.width(UiConsts.Space9))
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = UiType.RowTitle,
-                lineHeight = UiType.RowTitleLine,
-                fontWeight = FontWeight.Medium,
-                color = if (enabled) contentColor else colors.disabledOnSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (subtitle != null) {
-                Spacer(Modifier.height(UiConsts.Space2))
-                Text(
-                    text = subtitle,
-                    fontSize = UiType.Meta,
-                    lineHeight = UiType.MetaLine,
-                    color = colors.onSurfaceVariantSummary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+    ArrowPreference(
+        title = title,
+        modifier = modifier,
+        summary = subtitle,
+        startAction = if (icon == null) {
+            null
+        } else {
+            {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(UiConsts.IconPreference),
+                    tint = if (enabled) colors.primary else colors.disabledOnSurface,
                 )
             }
-        }
-        if (trailing != null) {
-            Spacer(Modifier.width(UiConsts.Space8))
-            Text(
-                text = trailing,
-                fontSize = UiType.Meta,
-                lineHeight = UiType.MetaLine,
-                color = colors.onSurfaceVariantSummary,
-                maxLines = 1,
-            )
-        }
-        Icon(
-            imageVector = MiuixIcons.ChevronForward,
-            contentDescription = null,
-            modifier = Modifier
-                .size(UiConsts.IconChevron)
-                .padding(start = UiConsts.Space6),
-            tint = colors.onSurfaceVariantSummary,
-        )
-    }
+        },
+        endActions = {
+            if (trailing != null) {
+                Text(
+                    text = trailing,
+                    style = MiuixTheme.textStyles.body2,
+                    // The end-slot role the miuix example gives preference end actions, so a
+                    // trailing state reads the same here and in the settings page.
+                    color = colors.onSurfaceVariantActions,
+                    maxLines = 1,
+                )
+            }
+        },
+        // The same inside margin the rows of a section card use, so the title aligns with the
+        // value rows above and below it instead of inheriting the library's wider preference inset.
+        insideMargin = PaddingValues(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
+        onClick = onClick,
+        enabled = enabled,
+    )
 }
 
-/** Hairline between two rows of a card. */
+/** Hairline between two rows of a card; the miuix divider with the row separation this app uses. */
 @Composable
 fun CodexDivider(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = UiConsts.Space1)
-            .height(UiConsts.DividerThickness)
-            .background(MiuixTheme.colorScheme.dividerLine),
-    )
+    HorizontalDivider(modifier = modifier.padding(vertical = UiConsts.Space1))
 }
 
 /**
@@ -1167,8 +1099,7 @@ fun EmptyState(
         Box(
             modifier = Modifier
                 .size(UiConsts.IconBoxLarge)
-                .clip(RoundedCornerShape(UiConsts.CornerCard))
-                .background(raisedSurface()),
+                .squircleBackground(color = raisedSurface(), cornerRadius = UiConsts.CornerCard),
             contentAlignment = Alignment.Center,
         ) {
             Icon(

@@ -635,7 +635,6 @@ private fun SectionsCard(
                 }
             }
         }
-        if (sections.isNotEmpty()) CodexDivider()
         ActionRow(
             title = stringResource(R.string.session_list_section_new),
             subtitle = stringResource(R.string.session_list_section_new_detail),

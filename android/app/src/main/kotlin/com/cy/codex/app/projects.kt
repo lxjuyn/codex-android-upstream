@@ -243,7 +243,6 @@ private fun ProjectsCard(
                 onOpen = { onOpen(project) },
             )
         }
-        CodexDivider()
         ActionRow(
             title = stringResource(R.string.projects_screen_import),
             subtitle = stringResource(R.string.projects_screen_import_detail),
@@ -350,15 +349,13 @@ private fun EnvironmentsCard(
                 detail = stringResource(R.string.projects_screen_no_environments_detail),
             )
         }
-        environments.forEachIndexed { index, id ->
-            if (index > 0) CodexDivider()
+        environments.forEach { id ->
             ActionRow(
                 title = id,
                 subtitle = stringResource(R.string.projects_screen_environment_detail),
                 onClick = { onOpen(id) },
             )
         }
-        CodexDivider()
         ActionRow(
             title = stringResource(R.string.projects_screen_add_environment),
             subtitle = stringResource(R.string.projects_screen_add_environment_detail),

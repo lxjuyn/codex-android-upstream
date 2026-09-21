@@ -231,7 +231,6 @@ private fun MemoriesSettingsCard(
             checked = useMemories,
             onCheckedChange = { onEvent(AppEvent.SetMemorySettings(it, generateMemories)) },
         )
-        CodexDivider()
         CodexSwitchRow(
             title = stringResource(R.string.memories_screen_generate),
             subtitle = stringResource(R.string.memories_screen_generate_detail),

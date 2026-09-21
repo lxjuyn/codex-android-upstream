@@ -525,15 +525,7 @@ private fun PluginsChip(text: String, tint: Color) {
 }
 
 @Composable
-private fun PluginsDivider() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = UiConsts.Space1)
-            .height(UiConsts.DividerThickness)
-            .background(MiuixTheme.colorScheme.dividerLine),
-    )
-}
+private fun PluginsDivider() = CodexDivider()
 
 /**
  * What one plugin actually contributes.
@@ -597,8 +589,7 @@ private fun PluginDetailSheet(
                 icon = MiuixIcons.Tasks,
                 trailing = detail.skills.size.toString(),
             ) {
-                detail.skills.forEachIndexed { index, skill ->
-                    if (index > 0) CodexDivider()
+                detail.skills.forEach { skill ->
                     ActionRow(
                         title = skill.name,
                         subtitle = skill.description.ifEmpty { null },

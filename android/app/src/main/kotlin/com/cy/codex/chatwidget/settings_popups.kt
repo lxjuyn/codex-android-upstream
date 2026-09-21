@@ -63,7 +63,6 @@ import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.DropdownItem
-import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
@@ -218,7 +217,13 @@ private fun SettingsBar(tab: SettingsTab, onSelect: (SettingsTab) -> Unit) {
     }
 }
 
-/** A titled group of preference rows, which is the shape every section on this page has. */
+/**
+ * A titled group of preference rows, which is the shape every section on this page has.
+ *
+ * No dividers between the rows: the miuix example lets a [Card]'s preferences separate themselves
+ * with their own 16dp inside margin, and a hairline between two 56dp rows would be a second
+ * separator where one already exists.
+ */
 @Composable
 private fun SettingsGroup(
     title: String,
@@ -253,7 +258,6 @@ private fun SettingsWorkspaceSection(cwd: String, roots: List<String>, onOpenWor
             onClick = onOpenWorkspacePicker,
         )
         if (roots.isEmpty()) {
-            HorizontalDivider()
             BasicComponent(
                 title = stringResource(R.string.settings_screen_no_writable_roots),
                 startAction = {
@@ -268,7 +272,6 @@ private fun SettingsWorkspaceSection(cwd: String, roots: List<String>, onOpenWor
             )
         } else {
             roots.forEach { root ->
-                HorizontalDivider()
                 BasicComponent(
                     title = root,
                     startAction = {
@@ -295,7 +298,6 @@ private fun SettingsConfigSourcesSection(catalog: CatalogState, configPath: Stri
 
     SettingsGroup(stringResource(R.string.settings_group_config_sources)) {
         BasicComponent(title = "CODEX_HOME/config.toml", summary = configPath)
-        HorizontalDivider()
         if (layers.isEmpty()) {
             BasicComponent(
                 title = stringResource(R.string.settings_screen_no_config_layers),
@@ -314,8 +316,7 @@ private fun SettingsConfigSourcesSection(catalog: CatalogState, configPath: Stri
 
         // Highest precedence first: that is the order the answer to "why is this value what it is"
         // is read in, and it matches the merge order in reverse.
-        layers.asReversed().forEachIndexed { index, layer ->
-            if (index > 0) HorizontalDivider()
+        layers.asReversed().forEach { layer ->
             BasicComponent(
                 title = layer.name.label(),
                 summary = listOfNotNull(
@@ -349,7 +350,6 @@ private fun SettingsConfigSourcesSection(catalog: CatalogState, configPath: Stri
         CatalogState.RenderedConfigKeys.forEach { key ->
             val value = response.displayValue(key) ?: return@forEach
             val origin = origins[key]
-            HorizontalDivider()
             BasicComponent(
                 title = key,
                 summary = buildString {
@@ -381,22 +381,19 @@ private fun SettingsConfigSourcesSection(catalog: CatalogState, configPath: Stri
 private fun SettingsAppearanceSection() {
     val context = LocalContext.current
     SettingsGroup(stringResource(R.string.settings_group_appearance)) {
-        ThemeOption.entries.forEachIndexed { index, option ->
-            if (index > 0) HorizontalDivider()
+        ThemeOption.entries.forEach { option ->
             RadioButtonPreference(
                 title = stringResource(option.labelRes),
                 selected = Appearance.themeMode == option.mode,
                 onClick = { Appearance.setThemeMode(context, option.mode) },
             )
         }
-        HorizontalDivider()
         SwitchPreference(
             title = stringResource(R.string.settings_reduce_motion),
             summary = stringResource(R.string.settings_reduce_motion_summary),
             checked = Appearance.reduceMotion,
             onCheckedChange = { Appearance.setReduceMotion(context, it) },
         )
-        HorizontalDivider()
         SwitchPreference(
             title = stringResource(R.string.settings_show_tooltips),
             summary = stringResource(R.string.settings_show_tooltips_summary),
@@ -437,14 +434,12 @@ private fun SettingsNotificationSection() {
             },
         )
         if (NotificationSettings.enabled && !agentNotificationsAllowed(context)) {
-            HorizontalDivider()
             BasicComponent(
                 title = stringResource(R.string.settings_notifications_permission_denied),
                 enabled = false,
             )
         }
         AgentNotification.entries.forEach { type ->
-            HorizontalDivider()
             SwitchPreference(
                 title = stringResource(type.labelRes),
                 checked = type in NotificationSettings.types,
@@ -507,8 +502,7 @@ private fun SettingsExperimentalSection(catalog: CatalogState, onEvent: (AppEven
             BasicComponent(title = stringResource(R.string.settings_screen_experimental_empty), enabled = false)
             return@SettingsGroup
         }
-        features.forEachIndexed { index, feature ->
-            if (index > 0) HorizontalDivider()
+        features.forEach { feature ->
             SwitchPreference(
                 title = feature.name,
                 summary = listOf(feature.stage, feature.description)
@@ -535,8 +529,7 @@ private fun SettingsModelSection(
             BasicComponent(title = stringResource(R.string.settings_screen_models_empty), enabled = false)
             return@SettingsGroup
         }
-        catalog.models.forEachIndexed { index, model ->
-            if (index > 0) HorizontalDivider()
+        catalog.models.forEach { model ->
             RadioButtonPreference(
                 title = model.displayName,
                 summary = listOfNotNull(
@@ -563,8 +556,7 @@ private fun SettingsModelSection(
                 ),
         )
         SettingsGroup(stringResource(R.string.settings_group_oss_provider)) {
-            providers.forEachIndexed { index, (id, labels) ->
-                if (index > 0) HorizontalDivider()
+            providers.forEach { (id, labels) ->
                 RadioButtonPreference(
                     title = labels.first,
                     summary = labels.second,
@@ -602,8 +594,7 @@ private fun SettingsApprovalSection(
     onEvent: (AppEvent) -> Unit,
 ) {
     SettingsGroup(stringResource(R.string.settings_group_approval)) {
-        AskForApproval.entries.forEachIndexed { index, option ->
-            if (index > 0) HorizontalDivider()
+        AskForApproval.entries.forEach { option ->
             RadioButtonPreference(
                 title = option.label(),
                 summary = option.description(),
@@ -611,13 +602,11 @@ private fun SettingsApprovalSection(
                 onClick = { onEvent(AppEvent.SetApprovalPolicy(option)) },
             )
         }
-        HorizontalDivider()
         BasicComponent(
             title = stringResource(R.string.runtime_android_sandbox),
             summary = stringResource(R.string.runtime_android_sandbox_detail),
             endActions = { MonoValue(stringResource(R.string.runtime_fixed)) },
         )
-        HorizontalDivider()
         BasicComponent(
             title = stringResource(R.string.settings_screen_network_access),
             endActions = {
@@ -633,8 +622,7 @@ private fun SettingsApprovalSection(
     SettingsGroup(stringResource(R.string.settings_group_reviewer)) {
         ApprovalsReviewer.entries
             .filter { it != ApprovalsReviewer.AutoReview || autoReviewAvailable }
-            .forEachIndexed { index, option ->
-            if (index > 0) HorizontalDivider()
+            .forEach { option ->
             RadioButtonPreference(
                 title = option.label(),
                 summary = option.description(),
@@ -656,8 +644,7 @@ private fun SettingsApprovalSection(
                 stringResource(R.string.settings_screen_granular_skills) to granular.skillApproval,
                 stringResource(R.string.settings_screen_granular_permissions) to granular.requestPermissions,
                 stringResource(R.string.settings_screen_granular_mcp) to granular.mcpElicitations,
-            ).forEachIndexed { index, (label, asks) ->
-                if (index > 0) HorizontalDivider()
+            ).forEach { (label, asks) ->
                 SwitchPreference(
                     title = label,
                     summary = if (asks) {
@@ -686,7 +673,6 @@ private fun SettingsSessionSection(config: ThreadSessionState, usage: ThreadToke
                 MonoValue(config.threadId.ifEmpty { stringResource(R.string.settings_screen_session_not_started) })
             },
         )
-        HorizontalDivider()
         BasicComponent(
             title = stringResource(R.string.settings_screen_branch),
             endActions = {
@@ -699,8 +685,7 @@ private fun SettingsSessionSection(config: ThreadSessionState, usage: ThreadToke
         if (config.instructionSourcePaths.isEmpty()) {
             BasicComponent(title = stringResource(R.string.settings_screen_no_agents_md), enabled = false)
         } else {
-            config.instructionSourcePaths.forEachIndexed { index, path ->
-                if (index > 0) HorizontalDivider()
+            config.instructionSourcePaths.forEach { path ->
                 BasicComponent(
                     title = path,
                     startAction = {
@@ -743,7 +728,6 @@ private fun SettingsSessionSection(config: ThreadSessionState, usage: ThreadToke
                 },
             )
             if (usage.total.cachedInputTokens > 0) {
-                HorizontalDivider()
                 BasicComponent(
                     title = stringResource(R.string.settings_screen_io_cached),
                     endActions = {
@@ -773,8 +757,7 @@ private fun SettingsLibrarySection(onOpenEntry: (String) -> Unit) {
         // Not `remember`ed: the titles are string resources, and a resource read is already cheap —
         // caching them in a remember block would freeze the locale the page happened to open in.
         val entries = SidebarModel.libraryEntries()
-        entries.forEachIndexed { index, entry ->
-            if (index > 0) HorizontalDivider()
+        entries.forEach { entry ->
             ArrowPreference(
                 title = entry.title,
                 startAction = {

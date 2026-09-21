@@ -30,6 +30,7 @@ import com.cy.codex.AppEvent
 import com.cy.codex.ButtonRole
 import com.cy.codex.CodexButton
 import com.cy.codex.CodexButtonSize
+import com.cy.codex.CodexDivider
 import com.cy.codex.R
 import com.cy.codex.protocol.protocol.v2.McpAuthStatus
 import com.cy.codex.protocol.protocol.v2.McpServerConnectionStatus
@@ -327,15 +328,7 @@ private fun McpChip(text: String, tint: Color) {
 }
 
 @Composable
-private fun McpDivider() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = UiConsts.Space1)
-            .height(UiConsts.DividerThickness)
-            .background(MiuixTheme.colorScheme.dividerLine),
-    )
-}
+private fun McpDivider() = CodexDivider()
 
 private val McpRowShape = RoundedCornerShape(UiConsts.RowCorner)
 

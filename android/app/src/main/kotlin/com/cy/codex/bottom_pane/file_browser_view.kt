@@ -464,8 +464,7 @@ private fun FileListingCard(
                 detail = stringResource(R.string.file_browser_empty_detail),
             )
 
-            else -> rows.forEachIndexed { index, entry ->
-                if (index > 0) CodexDivider()
+            else -> rows.forEach { entry ->
                 ActionRow(
                     title = entry.name,
                     subtitle = if (entry.isDirectory) {
@@ -616,7 +615,6 @@ private fun FolderActionsCard(
             icon = MiuixIcons.AddFolder,
             onClick = onNewFolder,
         )
-        CodexDivider()
         ActionRow(
             title = stringResource(R.string.file_browser_new_file),
             subtitle = stringResource(R.string.file_browser_new_file_detail),

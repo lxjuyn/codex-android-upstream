@@ -2,7 +2,6 @@ package com.cy.codex.bottom_pane
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.cy.codex.AppEvent
 import com.cy.codex.CatalogState
+import com.cy.codex.CodexDivider
 import com.cy.codex.R
 import com.cy.codex.SectionCard
 import com.cy.codex.SurfaceHeader
@@ -202,15 +202,7 @@ private fun SkillsBackButton(onBack: () -> Unit) {
 }
 
 @Composable
-private fun SkillsDivider() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = UiConsts.Space1)
-            .height(UiConsts.DividerThickness)
-            .background(MiuixTheme.colorScheme.dividerLine),
-    )
-}
+private fun SkillsDivider() = CodexDivider()
 
 private val SkillsRowShape = RoundedCornerShape(UiConsts.RowCorner)
 

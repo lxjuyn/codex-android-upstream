@@ -169,7 +169,6 @@ private fun ConnectionCard(
                 label = stringResource(R.string.remote_control_environment),
                 value = status.environmentId.orEmpty(),
             )
-            CodexDivider()
             CodexSwitchRow(
                 title = stringResource(R.string.remote_control_relay),
                 subtitle = stringResource(R.string.remote_control_relay_detail),

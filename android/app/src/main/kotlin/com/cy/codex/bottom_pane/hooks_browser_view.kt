@@ -28,6 +28,7 @@ import com.cy.codex.AppEvent
 import com.cy.codex.CatalogState
 import com.cy.codex.CodexButton
 import com.cy.codex.CodexButtonSize
+import com.cy.codex.CodexDivider
 import com.cy.codex.R
 import com.cy.codex.SectionCard
 import com.cy.codex.SurfaceHeader
@@ -329,14 +330,6 @@ private fun HooksChip(text: String, tint: Color) {
 }
 
 @Composable
-private fun HooksDivider() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = UiConsts.Space1)
-            .height(UiConsts.DividerThickness)
-            .background(MiuixTheme.colorScheme.dividerLine),
-    )
-}
+private fun HooksDivider() = CodexDivider()
 
 private val HooksRowShape = RoundedCornerShape(UiConsts.RowCorner)
