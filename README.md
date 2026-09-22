@@ -3,46 +3,61 @@
 把 [openai/codex](https://github.com/openai/codex) 的 Rust 内核以 JNI 库编进 Android Compose 应用：
 UI 通过上游 app-server 协议访问同进程内的 `codex-core`，命令交给 App 内置的 Android 工具链执行。
 
+整个仓库是一个 Gradle 工程：Kotlin UI、codex JNI（cargo）与 40 多个交叉编译的命令行工具
+（autotools / make / cmake / cargo / go）都由 Gradle 统一编排，一条命令直接产出 APK。
+各上游仓库保留自己的构建方式，Gradle 只负责取源码、配好 NDK 环境并按顺序调用。
+
 ## 目录
 
 ```text
-android/                 Gradle 项目，Android Studio 从这里打开
-  app/src/main/          Compose UI、协议客户端、Android 运行时
-  app/src/test/          JVM 协议、UI 状态和 manifest 测试
-  app/src/androidTest/   真机 JNI / RPC / 工具链集成验证
-native/                  JNI bridge、Codex helper 与 Rust 交叉编译入口
-  out/arm64-v8a/         构建生成的 JNI 库和可执行 helper
+settings.gradle.kts      Gradle 根：:app / :toolchain / :native
+build-logic/             约定插件：多语言工具构建、打包与 JNI 构建（Kotlin，无 shell 编译脚本）
+app/                     Compose UI、协议客户端、Android 运行时
+native/                  JNI bridge、codex-helper、Rust 交叉编译与补丁
+toolchain/               工具链声明（build.gradle.kts）、补丁、构建产物
+third_party/             上游源码仓库（git submodule，固定发布 tag）
 codex/                   上游 openai/codex Git submodule，固定提交
-toolchain/               bash/git/rg/python/bun 等交叉编译工具链
 docs/                    工具链说明与待办
 scripts/                 真机冒烟脚本
 ```
 
 ## 构建
 
-需要 JDK 21、Android SDK 37、NDK r30、Rust 1.95.0 的 `aarch64-linux-android` target 和 `rust-src`。
-当前支持 arm64-v8a，最低 Android API 36。首次克隆后执行
-`git submodule update --init --recursive`。
-
-Android 必要兼容补丁位于 `native/patches/`，构建时在 `native/build-upstream/` 独立工作树应用，
-`codex/` 保持上游原样。标准库补丁、helper 与运行时契约见 [native/README.md](native/README.md)。
+需要 JDK 21、Android SDK 37、NDK r30、Rust 1.95.0 与 1.97.1（`rustup`）及两者的
+`aarch64-linux-android` target、1.95.0 的 `rust-src` 组件，宿主还需要 `cmake`、`ninja`、
+Go 1.27（yq/shfmt/gofmt），以及 binutils 从 git 构建用的 `autoconf`/`bison`/`flex`。
+首次克隆后执行 `git submodule update --init --recursive`（`third_party/` 下 25 个上游仓库，
+其中 `llvm`/`binutils` 历史较大）。
 
 ```bash
-# 工具链已有产物时无需重复全量构建
-cd toolchain
-./build.sh
-./pack-jnilibs.sh arm64-v8a
-cd ..
-
-# Gradle 自动调用 native/build.sh，再打包工具链与 JNI 产物
-cd android
+# Kotlin + 工具链 + codex JNI + 打包，直接产出 APK
 ./gradlew :app:assembleDebug
+
+# 只迭代 Kotlin：跳过工具链与 JNI（要求产物已存在）
+./gradlew :app:testDebugUnitTest -PskipToolchainBuild -PskipNativeBuild
+
+# 只做工具链 / 只做 JNI
+./gradlew :toolchain:buildToolchain :toolchain:packJniLibs
+./gradlew :native:buildJni
 ```
 
-APK：`android/app/build/outputs/apk/debug/app-debug.apk`。应用 ID 与包名均为 `com.cy.codex`。
-`native/build.sh` 使用 Cargo 增量构建；修改 Kotlin 后，
-可在已有原生产物基础上用 `-PskipNativeBuild` 跳过 Rust 构建，缺少 JNI 或 helper 时打包会直接报错。
-`assemble*` 结束后还会执行 `verify*ToolchainAssets`，逐条核对 `native-manifest.txt` 里每个 `data`
+源码获取方式（Gradle 任务，详见 [docs/toolchain.md](docs/toolchain.md)）：
+
+- 需要编译、上游有仓库：`third_party/` 里的 git submodule 固定发布 tag，在
+  `toolchain/build/src/<tool>` 的 `git worktree` 里构建，子模块本身保持干净；补丁打在 worktree 上。
+  LLVM/Binutils 用 CERNET 的 git 镜像，其余为上游官方仓库。
+- GNU 工具与 Info-ZIP 下载 release tarball（git 树没有生成好的 `configure`）：默认走 CERNET 的
+  `gnu/` 镜像与 Debian pool 的 orig 包，失败回退 ftp.gnu.org / SourceForge；`-PgnuMirror=` 可换镜像。
+- 上游已提供 Android 二进制（bun）：直接下载解包；其余一概源码编译。
+- 每个工具构建进 `toolchain/build/prefix/<tool>/`，`:toolchain:packJniLibs` 再合并成
+  `toolchain/out/android/<abi>/`；已完成的工具按 fingerprint 跳过，删掉对应 prefix 即强制重建。
+
+Android 必要兼容补丁位于 `native/patches/`，`:native:prepareUpstream` 在
+`native/build-upstream/` 独立工作树应用，`codex/` 保持上游原样。标准库补丁、helper 与运行时契约见
+[native/README.md](native/README.md)。
+
+APK：`app/build/outputs/apk/debug/app-debug.apk`。应用 ID 与包名均为 `com.cy.codex`。
+`assemble*` 结束后会执行 `verify*ToolchainAssets`，逐条核对 `native-manifest.txt` 里每个 `data`
 条目确实进了 APK——工具链必须原样打包，资产合并静默丢文件会直接失败在构建期。
 
 ## 运行架构
@@ -100,9 +115,8 @@ cache/toolchain/         可清理的工具缓存
 ## 验证
 
 ```bash
-cd android
-./gradlew :app:testDebugUnitTest -PskipNativeBuild
-./gradlew :app:assembleDebug :app:assembleDebugAndroidTest -PskipNativeBuild
+./gradlew :app:testDebugUnitTest -PskipToolchainBuild -PskipNativeBuild
+./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell am instrument -w \
@@ -114,11 +128,12 @@ adb shell am instrument -w \
 登录需要有效账户及网络连接，不能由离线测试替代。
 
 `scripts/device-smoke-test.sh -PskipNativeBuild` 可执行同一套打包、安装和验证，报告写到
-`artifacts/device-smoke.txt`。`native/file-lock-smoke-test.sh` 单独验证 Android 标准库的互斥锁、
-共享锁、竞争和释放；`native/smoke-test.sh` 使用临时 CODEX_HOME 验证宿主机上的真实内核与 helper。
+`artifacts/device-smoke.txt`。`./gradlew :native:hostSmokeTest` 使用临时 CODEX_HOME 验证宿主机上的
+真实内核与 helper；`native/file-lock-smoke-test.sh` 在设备上验证 Android 标准库的互斥锁、共享锁、
+竞争和释放。工具链自身的真机冒烟见 `toolchain/device-smoke-test.sh`。
 
 仅修改 JVM 层时，可执行
-`./gradlew :app:testDebugUnitTest -x :app:stageRuntime -PskipNativeBuild`，
+`./gradlew :app:testDebugUnitTest -x :app:stageRuntime -PskipToolchainBuild -PskipNativeBuild`，
 该命令不产生可安装 APK，也不验证 JNI。
 
 ## 文档

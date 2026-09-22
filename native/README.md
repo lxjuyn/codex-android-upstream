@@ -10,12 +10,14 @@ argv0 execution entry points required when Codex launches a child process.
 
 ## Build
 
-The toolchain under `../toolchain` must already be built and packed. The Android
-build uses Rust 1.95.0 and the NDK configured by `toolchain/env.sh`.
+The toolchain dependencies (openssl/sqlite/libffi prefixes) are built by the same
+Gradle invocation. The Android build uses Rust 1.95.0 and the NDK selected from
+`ANDROID_NDK_HOME` or `local.properties`.
 
 ```sh
-bash native/build.sh
-bash native/smoke-test.sh
+./gradlew :native:buildJni                # JNI library + helper
+./gradlew :native:buildJni -PnativeSmoke  # also codex-smoke for the device smoke
+./gradlew :native:hostSmokeTest           # host kernel smoke, no model calls
 ANDROID_SERIAL=DEVICE_SERIAL bash native/file-lock-smoke-test.sh
 ```
 
@@ -27,7 +29,7 @@ by C dependencies and rejects unresolved symbols in both the JNI library and hel
 
 ## Isolated Patches
 
-`prepare-upstream.sh` creates `build-upstream/` from the checked-out Codex
+`:native:prepareUpstream` creates `build-upstream/` from the checked-out Codex
 submodule revision and applies `patches/android-runtime.patch`. It records and
 reverses only its own previous patch when preparing a new revision. The source
 submodule remains unchanged. This patch makes Android use the explicitly
@@ -39,9 +41,9 @@ for its installation ID, rollouts, OAuth coordination, and other state. The
 checked-in `patches/rust-std-android-flock.patch` enables Android for all five
 methods: `lock`, `lock_shared`, `try_lock`, `try_lock_shared`, and `unlock`.
 
-`prepare-rust-std.sh` copies rust-src to the generated `rust-sysroot/` directory.
+`:native:prepareRustStd` copies rust-src to the generated `rust-sysroot/` directory.
 Compiler binaries and prebuilt host libraries are linked from the pinned
-toolchain. `rustc-android.sh` selects that sysroot, and Cargo's
+toolchain. A generated `native/build/rustc-android.sh` selects that sysroot, and Cargo's
 `-Z build-std=std,panic_unwind` rebuilds the Android standard library. The build
 sets `RUSTC_BOOTSTRAP=1` because build-std is still unstable; it does not modify
 the globally installed rust-src or require changing Codex's file-lock calls.
@@ -84,6 +86,6 @@ execution under the application UID.
 For optional standalone core verification under the device's shell UID:
 
 ```sh
-NATIVE_BUILD_SMOKE=1 bash native/build.sh
+./gradlew :native:buildJni -PnativeSmoke
 ANDROID_SERIAL=DEVICE_SERIAL bash native/device-smoke-test.sh
 ```

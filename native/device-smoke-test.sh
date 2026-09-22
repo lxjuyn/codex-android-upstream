@@ -6,8 +6,8 @@ ABI="${1:-arm64-v8a}"
 PACKED="$NATIVE_ROOT/../toolchain/out/android/$ABI"
 SMOKE="$NATIVE_ROOT/target/aarch64-linux-android/release/codex-smoke"
 [[ "$ABI" == arm64-v8a ]] || { echo "Only arm64-v8a is supported" >&2; exit 1; }
-[[ -x "$SMOKE" ]] || { echo "Run NATIVE_BUILD_SMOKE=1 bash native/build.sh first" >&2; exit 1; }
-[[ -f "$PACKED/native-manifest.txt" ]] || { echo "Pack the toolchain first" >&2; exit 1; }
+[[ -x "$SMOKE" ]] || { echo "Run ./gradlew :native:buildJni -PnativeSmoke first" >&2; exit 1; }
+[[ -f "$PACKED/native-manifest.txt" ]] || { echo "Run ./gradlew :toolchain:packJniLibs first" >&2; exit 1; }
 
 remote="$(adb shell mktemp -d /data/local/tmp/codex-core-smoke.XXXXXX | tr -d '\r')"
 [[ "$remote" == /data/local/tmp/codex-core-smoke.* ]] || { echo "Invalid device scratch path" >&2; exit 1; }

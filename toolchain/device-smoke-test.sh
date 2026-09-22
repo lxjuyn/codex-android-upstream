@@ -6,6 +6,7 @@
 # curl, python, bun plus the analysis/edit tools: clang-format, diff/patch,
 # zstd, yq, shfmt, gofmt, ruff, ast-grep, fd).
 #
+# The APK toolchain package is produced by Gradle (`:toolchain:packJniLibs`).
 # Usage: ./device-smoke-test.sh [abi]
 set -euo pipefail
 
@@ -17,7 +18,7 @@ FARM=/data/local/tmp/codex-root
 
 command -v adb >/dev/null || { echo "adb not found" >&2; exit 1; }
 
-"$ROOT/pack-jnilibs.sh" "$ABI"
+(cd "$ROOT/.." && ./gradlew --console=plain :toolchain:packJniLibs)
 
 echo ">> push jniLibs/assets -> $NATIVE / $ASSETS"
 adb shell "rm -rf $NATIVE $ASSETS $FARM"

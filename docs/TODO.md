@@ -13,8 +13,8 @@
 方法集合），`scripts/device-smoke-test.sh` 在真机上验证工具链安装、JNI 启动、
 账户/配置/模型/会话读取、`command/exec`、apply_patch、shell 消息流与重启恢复（不发模型请求）。
 流式 delta 统一按 `Motion.StreamCommitIntervalMs` 提交，`Lagged` 会触发重同步，无响应的
-worker 由 `JsonRpcAppServerClient` 的看门狗摘掉；`pack-jnilibs.sh` 对进 jniLibs 的每个 ELF
-做 16 KB 页对齐门禁（`native/build.sh` 同样校验自己的两个 `.so`）。
+worker 由 `JsonRpcAppServerClient` 的看门狗摘掉；`:toolchain:packJniLibs` 对进 jniLibs 的每个 ELF
+做 16 KB 页对齐门禁（`:native:buildJni` 同样校验自己的两个 `.so`）。
 `AgentMessageItem.questions` 按 TUI 的内联问题编辑器处理（选项、自由文本、`> 问题` 框定、
 32 条/512 字节选项上限），答案本身是普通用户消息，不需要独立的 `request_user_input`
 结果 cell，见 `history_cell/async_questions.kt`。

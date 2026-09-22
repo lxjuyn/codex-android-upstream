@@ -1,3 +1,78 @@
 [submodule "codex"]
 	path = codex
 	url = https://github.com/openai/codex.git
+[submodule "third_party/bzip2"]
+	path = third_party/bzip2
+	url = https://sourceware.org/git/bzip2.git
+[submodule "third_party/curl"]
+	path = third_party/curl
+	url = https://github.com/curl/curl.git
+[submodule "third_party/file"]
+	path = third_party/file
+	url = https://github.com/file/file.git
+[submodule "third_party/git"]
+	path = third_party/git
+	url = https://github.com/git/git.git
+[submodule "third_party/jq"]
+	path = third_party/jq
+	url = https://github.com/jqlang/jq.git
+[submodule "third_party/libffi"]
+	path = third_party/libffi
+	url = https://github.com/libffi/libffi.git
+[submodule "third_party/openssh"]
+	path = third_party/openssh
+	url = https://github.com/openssh/openssh-portable.git
+[submodule "third_party/openssl"]
+	path = third_party/openssl
+	url = https://github.com/openssl/openssl.git
+[submodule "third_party/procps"]
+	path = third_party/procps
+	url = https://gitlab.com/procps-ng/procps.git
+[submodule "third_party/sqlite"]
+	path = third_party/sqlite
+	url = https://github.com/sqlite/sqlite.git
+[submodule "third_party/tree"]
+	path = third_party/tree
+	url = https://gitlab.com/OldManProgrammer/unix-tree.git
+[submodule "third_party/vim"]
+	path = third_party/vim
+	url = https://github.com/vim/vim.git
+[submodule "third_party/xz"]
+	path = third_party/xz
+	url = https://github.com/tukaani-project/xz.git
+[submodule "third_party/zstd"]
+	path = third_party/zstd
+	url = https://github.com/facebook/zstd.git
+[submodule "third_party/7zip"]
+	path = third_party/7zip
+	url = https://github.com/ip7z/7zip.git
+[submodule "third_party/ripgrep"]
+	path = third_party/ripgrep
+	url = https://github.com/BurntSushi/ripgrep.git
+[submodule "third_party/uv"]
+	path = third_party/uv
+	url = https://github.com/astral-sh/uv.git
+[submodule "third_party/ruff"]
+	path = third_party/ruff
+	url = https://github.com/astral-sh/ruff.git
+[submodule "third_party/ast-grep"]
+	path = third_party/ast-grep
+	url = https://github.com/ast-grep/ast-grep.git
+[submodule "third_party/fd"]
+	path = third_party/fd
+	url = https://github.com/sharkdp/fd.git
+[submodule "third_party/yq"]
+	path = third_party/yq
+	url = https://github.com/mikefarah/yq.git
+[submodule "third_party/shfmt"]
+	path = third_party/shfmt
+	url = https://github.com/mvdan/sh.git
+[submodule "third_party/llvm"]
+	path = third_party/llvm
+	url = https://mirrors.cernet.edu.cn/llvm-project.git
+[submodule "third_party/binutils"]
+	path = third_party/binutils
+	url = https://mirrors.cernet.edu.cn/binutils-gdb.git
+[submodule "third_party/python"]
+	path = third_party/python
+	url = https://github.com/python/cpython.git
