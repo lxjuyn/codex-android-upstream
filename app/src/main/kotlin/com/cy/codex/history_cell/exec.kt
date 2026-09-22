@@ -37,10 +37,10 @@ import com.cy.codex.protocol.protocol.v2.CommandExecutionStatus
 import com.cy.codex.CodeBlock
 import com.cy.codex.ToolCard
 import com.cy.codex.ThreadStatusTone
-import com.cy.codex.highlightShellCommand
+import com.cy.codex.render.highlightShellCommand
 import com.cy.codex.statusDotColor
 import com.cy.codex.statusPillSurface
-import com.cy.codex.syntaxPalette
+import com.cy.codex.render.syntaxPalette
 import com.cy.codex.UiType
 import com.cy.codex.UiConsts
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator

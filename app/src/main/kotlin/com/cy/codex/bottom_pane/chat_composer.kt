@@ -57,7 +57,10 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.cy.codex.MentionSuggestion
+import com.cy.codex.bottom_pane.mentions_v2.MentionSuggestion
+import com.cy.codex.bottom_pane.chat_composer.HistorySearchBar
+import com.cy.codex.bottom_pane.chat_composer.historySearchMatches
+import com.cy.codex.bottom_pane.chat_composer.nextHistoryMatch
 import com.cy.codex.Motion
 import com.cy.codex.R
 import com.cy.codex.UiConsts

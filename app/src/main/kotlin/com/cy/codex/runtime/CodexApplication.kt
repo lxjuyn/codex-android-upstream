@@ -5,10 +5,10 @@ import android.app.Application
 import android.content.Context
 import android.os.Bundle
 import com.cy.codex.CodexApp
-import com.cy.codex.ComposerHistory
-import com.cy.codex.NotificationSettings
+import com.cy.codex.bottom_pane.ComposerHistory
+import com.cy.codex.chatwidget.NotificationSettings
 import com.cy.codex.app.RecapSettings
-import com.cy.codex.ensureAgentNotificationChannel
+import com.cy.codex.chatwidget.ensureAgentNotificationChannel
 import com.cy.codex.protocol.AppServerClient
 import com.cy.codex.protocol.JsonRpcAppServerClient
 import java.io.File

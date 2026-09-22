@@ -44,6 +44,7 @@ import com.cy.codex.fileDiffOf
 import com.cy.codex.label
 import com.cy.codex.parseUnifiedDiff
 import com.cy.codex.protocol.ApprovalRequest
+import com.cy.codex.bottom_pane.request_user_input.RequestUserInputForm
 import com.cy.codex.protocol.ApprovalResponse
 import com.cy.codex.protocol.ElicitationAction
 import com.cy.codex.protocol.protocol.v2.CommandAction

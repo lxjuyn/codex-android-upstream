@@ -70,8 +70,19 @@ import com.cy.codex.bottom_pane.HooksScreen
 import com.cy.codex.bottom_pane.McpScreen
 import com.cy.codex.bottom_pane.McpToolboxScreen
 import com.cy.codex.bottom_pane.MemoriesScreen
+import com.cy.codex.bottom_pane.ComposerHistory
 import com.cy.codex.bottom_pane.SkillsScreen
+import com.cy.codex.bottom_pane.chat_composer.SlashInput
+import com.cy.codex.bottom_pane.chat_composer.classifySlashInput
+import com.cy.codex.bottom_pane.mentions_v2.MentionKind
+import com.cy.codex.bottom_pane.mentions_v2.MentionSuggestion
+import com.cy.codex.bottom_pane.mentions_v2.mentionMatches
 import com.cy.codex.chatwidget.ChatScreen
+import com.cy.codex.chatwidget.AgentNotice
+import com.cy.codex.chatwidget.AgentNotification
+import com.cy.codex.chatwidget.ApprovalNoticeKind
+import com.cy.codex.chatwidget.agentNotificationsAllowed
+import com.cy.codex.chatwidget.postAgentNotification
 import com.cy.codex.chatwidget.PluginSharesScreen
 import com.cy.codex.chatwidget.PluginsScreen
 import com.cy.codex.chatwidget.RealtimeScreen
@@ -1870,7 +1881,7 @@ class CodexApp(
                 client.startThread(
                     com.cy.codex.protocol.protocol.v2.ThreadStartParams(
                         cwd = targetCwd,
-                        dynamicTools = com.cy.codex.chatwidget.DynamicTools.specs(),
+                        dynamicTools = DynamicTools.specs(),
                     ),
                 )
                     .onSuccess { session ->

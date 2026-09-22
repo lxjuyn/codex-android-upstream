@@ -1,5 +1,14 @@
 package com.cy.codex
 
+import com.cy.codex.render.SyntaxLexer
+import com.cy.codex.render.SyntaxPalette
+import com.cy.codex.render.SyntaxHighlightMaxLineBytes
+import com.cy.codex.render.languageFromPath
+import com.cy.codex.render.languageSpec
+import com.cy.codex.render.syntaxPalette
+import com.cy.codex.markdown_render.displayDiffPath
+import com.cy.codex.markdown_render.runtimeHome
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable

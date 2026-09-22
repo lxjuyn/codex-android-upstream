@@ -24,6 +24,9 @@ scripts/                 真机冒烟脚本
 界面直接使用 [miuix](https://github.com/compose-miuix-ui/miuix) 的按钮、输入框、卡片、
 偏好行和弹层；复杂布局在业务页面组合这些组件。`app/src/main/kotlin/com/cy/codex/style.kt`
 只保留弹层与页面共用的边距计算，尺寸与颜色分别由 `UiConsts` 和主题提供。
+Compose UI 中有上游对应的移植文件按 `codex/codex-rs/tui/src/` 的模块路径和文件名放置，目录
+模块沿用 `mod.kt`；测试使用 snake_case 的 `<subject>_tests.kt` 并跟随同一模块。Android 专属
+页面、协议和运行时代码继续放在各自的现有目录。
 
 ## 构建
 

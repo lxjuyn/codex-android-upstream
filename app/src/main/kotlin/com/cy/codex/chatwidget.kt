@@ -5,7 +5,8 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.cy.codex.chatwidget.executeDynamicTool
+import com.cy.codex.chatwidget.AgentNotice
+import com.cy.codex.chatwidget.ApprovalNoticeKind
 import com.cy.codex.diff.TurnDiffAccumulator
 import com.cy.codex.protocol.AppServerClient
 import com.cy.codex.protocol.AppServerEvent
@@ -598,7 +599,7 @@ class ChatWidget(
             client.startThread(
                 com.cy.codex.protocol.protocol.v2.ThreadStartParams(
                     cwd = cwd,
-                    dynamicTools = com.cy.codex.chatwidget.DynamicTools.specs(),
+                    dynamicTools = DynamicTools.specs(),
                 ),
             )
                 .onSuccess { session ->
@@ -963,7 +964,7 @@ class ChatWidget(
     private fun maybeShowStartupTip() {
         if (!com.cy.codex.theme.Appearance.showTooltips) return
         if (state.items.isNotEmpty()) return
-        val tip = com.cy.codex.history_cell.Tooltips.random() ?: return
+        val tip = Tooltips.random() ?: return
         state.upsert(
             com.cy.codex.protocol.protocol.item.TipItem("tip-${state.threadId}", tip),
         )
@@ -1070,7 +1071,7 @@ class ChatWidget(
         if (threadId.isBlank() || cwd.isBlank()) return
         gitSummaryJob?.cancel()
         gitSummaryJob = scope.launch {
-            val summary = com.cy.codex.app.loadGitSummary(client, cwd)
+            val summary = loadGitSummary(client, cwd)
             if (state.threadId == threadId) state.applyGitSummary(summary)
         }
     }
@@ -1641,7 +1642,7 @@ class ChatWidget(
         }
         recapJob = scope.launch {
             try {
-                val result = com.cy.codex.app.structuredTurn(
+                val result = structuredTurn(
                     client = client,
                     cwd = state.config.cwd,
                     model = state.config.model,
@@ -1739,8 +1740,8 @@ class ChatWidget(
         state.markTitleGenerationPending(true)
         scope.launch {
             try {
-                val prompt = com.cy.codex.app.firstUserMessageText(state.items) ?: return@launch
-                val result = com.cy.codex.app.structuredTurn(
+                val prompt = firstUserMessageText(state.items) ?: return@launch
+                val result = structuredTurn(
                     client = client,
                     cwd = state.config.cwd,
                     model = state.config.model,

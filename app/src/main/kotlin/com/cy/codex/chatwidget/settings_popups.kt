@@ -32,16 +32,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.cy.codex.AgentNotification
 import com.cy.codex.AppEvent
 import com.cy.codex.BuildConfig
 import com.cy.codex.CatalogState
-import com.cy.codex.NotificationSettings
 import com.cy.codex.R
 import com.cy.codex.SessionState
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
-import com.cy.codex.agentNotificationsAllowed
 import com.cy.codex.app.RecapSettings
 import com.cy.codex.description
 import com.cy.codex.label

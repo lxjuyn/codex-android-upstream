@@ -28,6 +28,7 @@ import com.cy.codex.protocol.protocol.v2.DiagnosticSeverity
 import com.cy.codex.DiagnosticCode
 import com.cy.codex.MarkdownStream
 import com.cy.codex.SessionDiagnostic
+import com.cy.codex.TooltipCell
 
 /**
  * The transcript dispatcher.

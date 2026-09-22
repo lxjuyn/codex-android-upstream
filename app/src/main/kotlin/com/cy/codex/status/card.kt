@@ -55,6 +55,7 @@ import com.cy.codex.DiffBody
 import com.cy.codex.FileDiff
 import com.cy.codex.FileKindBadge
 import com.cy.codex.FileStatText
+import com.cy.codex.GitSummary
 import com.cy.codex.Motion
 import com.cy.codex.R
 import com.cy.codex.UiConsts
@@ -65,9 +66,9 @@ import com.cy.codex.app.statusLabel
 import com.cy.codex.app.tone
 import com.cy.codex.chatwidget.PlanTimeline
 import com.cy.codex.description
-import com.cy.codex.displayDiffPath
+import com.cy.codex.markdown_render.displayDiffPath
 import com.cy.codex.label
-import com.cy.codex.languageFromPath
+import com.cy.codex.render.languageFromPath
 import com.cy.codex.panelColor
 import com.cy.codex.protocol.protocol.item.ContextCompactionItem
 import com.cy.codex.protocol.protocol.item.ThreadItem
@@ -82,7 +83,7 @@ import com.cy.codex.protocol.protocol.v2.ThreadSessionState
 import com.cy.codex.protocol.protocol.v2.ThreadStatus
 import com.cy.codex.protocol.protocol.v2.ThreadTokenUsage
 import com.cy.codex.raisedSurface
-import com.cy.codex.runtimeHome
+import com.cy.codex.markdown_render.runtimeHome
 import com.cy.codex.shortenedParent
 import com.cy.codex.statusDotColor
 import com.cy.codex.tone
@@ -137,7 +138,7 @@ fun StatusCard(
     /** True while a hidden turn is generating this thread's automatic title. */
     titlePending: Boolean,
     /** Branch / PR / diff totals, or null while the probe has nothing to show. */
-    gitSummary: com.cy.codex.app.GitSummary?,
+    gitSummary: com.cy.codex.GitSummary?,
     status: ThreadStatus,
     usage: ThreadTokenUsage,
     turnDiff: List<FileDiff>,
@@ -249,7 +250,7 @@ private fun SectionsColumn(
     state: StatusPanelState,
     session: ThreadSessionState,
     titlePending: Boolean,
-    gitSummary: com.cy.codex.app.GitSummary?,
+    gitSummary: com.cy.codex.GitSummary?,
     status: ThreadStatus,
     usage: ThreadTokenUsage,
     turnDiff: List<FileDiff>,
@@ -435,7 +436,7 @@ private fun CardHeader(
     fileCount: Int,
     agentCount: Int,
     titlePending: Boolean,
-    gitSummary: com.cy.codex.app.GitSummary?,
+    gitSummary: com.cy.codex.GitSummary?,
     onOpenAgents: () -> Unit,
     headerPadding: PaddingValues = PaddingValues(horizontal = 2.dp),
     iconBoxSize: Dp = UiConsts.IconHeaderSmall,

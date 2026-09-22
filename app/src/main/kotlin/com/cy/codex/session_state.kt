@@ -104,10 +104,10 @@ class SessionState {
         private set
 
     /** Git branch / PR / diff totals of the session workspace, refreshed per turn. */
-    var gitSummary by mutableStateOf<com.cy.codex.app.GitSummary?>(null)
+    var gitSummary by mutableStateOf<com.cy.codex.GitSummary?>(null)
         private set
 
-    fun applyGitSummary(value: com.cy.codex.app.GitSummary?) {
+    fun applyGitSummary(value: com.cy.codex.GitSummary?) {
         gitSummary = value
     }
 

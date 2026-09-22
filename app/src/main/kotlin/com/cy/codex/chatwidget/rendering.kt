@@ -67,7 +67,7 @@ import androidx.core.content.FileProvider
 import com.cy.codex.AppEvent
 import com.cy.codex.CodexApp
 import com.cy.codex.CollapsibleSection
-import com.cy.codex.ComposerHistory
+import com.cy.codex.bottom_pane.ComposerHistory
 import com.cy.codex.MarkdownStream
 import com.cy.codex.Motion
 import com.cy.codex.R
