@@ -1,15 +1,20 @@
 package com.cy.codex.chatwidget
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,37 +27,41 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import com.cy.codex.ActionRow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.cy.codex.AppEvent
-import com.cy.codex.ButtonRole
 import com.cy.codex.CatalogState
-import com.cy.codex.CodexButton
-import com.cy.codex.CodexButtonSize
-import com.cy.codex.CodexDivider
-import com.cy.codex.CodexTextField
-import com.cy.codex.EmptyState
 import com.cy.codex.R
-import com.cy.codex.SectionCard
-import com.cy.codex.SurfaceBackButton
-import com.cy.codex.SurfaceHeader
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
-import com.cy.codex.ValueRow
-import com.cy.codex.pressableRow
 import com.cy.codex.protocol.protocol.v2.ThreadRealtimeAudioChunk
+import com.cy.codex.raisedSurface
 import com.cy.codex.warningColor
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Check
+import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
 import top.yukonga.miuix.kmp.icon.extended.Messages
 import top.yukonga.miuix.kmp.icon.extended.Mic
 import top.yukonga.miuix.kmp.icon.extended.Play
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Send
 import top.yukonga.miuix.kmp.icon.extended.Tune
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.squircle.squircleBackground
+import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -122,18 +131,32 @@ fun RealtimeScreen(
     LaunchedEffect(threadId) { onEvent(AppEvent.ReloadRealtimeVoices) }
 
     Column(modifier = modifier.fillMaxSize().background(colors.background)) {
-        SurfaceHeader(
+        BasicComponent(
             title = stringResource(R.string.realtime_page_title),
-            subtitle = stringResource(R.string.realtime_page_subtitle),
-            leading = { SurfaceBackButton(stringResource(R.string.realtime_page_back), onBack) },
+            summary = stringResource(R.string.realtime_page_subtitle),
+            startAction = {
+                IconButton(
+                    onClick = onBack,
+                    minWidth = UiConsts.IconButtonSize,
+                    minHeight = UiConsts.IconButtonSize,
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.ChevronBackward,
+                        contentDescription = stringResource(R.string.realtime_page_back),
+                        modifier = Modifier.size(UiConsts.IconHeader),
+                        tint = MiuixTheme.colorScheme.primary,
+                    )
+                }
+            },
+            insideMargin = PaddingValues(14.dp, 10.dp),
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = UiConsts.ScreenMargin)
-                .padding(bottom = UiConsts.PageBottomInset),
+            modifier =
+                Modifier.weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = UiConsts.ScreenMargin)
+                    .padding(bottom = UiConsts.PageBottomInset),
             verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
         ) {
             RealtimeSessionCard(
@@ -187,38 +210,89 @@ private fun RealtimeSessionCard(
     requested: Boolean,
     onToggle: (Boolean) -> Unit,
 ) {
-    SectionCard(
-        title = stringResource(R.string.realtime_session_title),
-        icon = MiuixIcons.Play,
-        trailing = if (requested) {
-            stringResource(R.string.realtime_session_state_requested)
-        } else {
-            stringResource(R.string.realtime_session_state_idle)
-        },
+    Card(
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
     ) {
-        ValueRow(
-            label = stringResource(R.string.realtime_session_thread),
-            value = threadId,
-            monospace = true,
-        )
-        CodexDivider()
-        CardNote(stringResource(R.string.realtime_session_transport_note))
-        CodexButton(
-            text = if (requested) {
-                stringResource(R.string.realtime_session_stop)
-            } else {
-                stringResource(R.string.realtime_session_start)
+        BasicComponent(
+            title = stringResource(R.string.realtime_session_title),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Play,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
             },
+            endActions = {
+                (if (requested) {
+                        stringResource(R.string.realtime_session_state_requested)
+                    } else {
+                        stringResource(R.string.realtime_session_state_idle)
+                    })
+                    ?.let {
+                        Text(
+                            text = it,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MiuixTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                        )
+                    }
+            },
+        )
+
+        BasicComponent(
+            title = stringResource(R.string.realtime_session_thread),
+            endActions = {
+                Text(
+                    text = threadId.ifEmpty { "—" },
+                    fontFamily = FontFamily.Monospace,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.End,
+                    fontSize = UiType.Detail,
+                )
+            },
+            insideMargin = PaddingValues(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
+        )
+        HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+        CardNote(stringResource(R.string.realtime_session_transport_note))
+        Button(
             onClick = { onToggle(!requested) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = UiConsts.Space4),
-            role = if (requested) ButtonRole.Secondary else ButtonRole.Primary,
-        )
+            colors =
+                if (requested) {
+                    ButtonDefaults.buttonColors()
+                } else {
+                    ButtonDefaults.buttonColorsPrimary()
+                },
+            cornerRadius = UiConsts.ButtonHeight / 2,
+            minHeight = UiConsts.ButtonHeight,
+            insideMargin =
+                PaddingValues(horizontal = UiConsts.ButtonPaddingHorizontal, vertical = 0.dp),
+        ) {
+            Text(
+                text =
+                    if (requested) {
+                        stringResource(R.string.realtime_session_stop)
+                    } else {
+                        stringResource(R.string.realtime_session_start)
+                    },
+                fontSize = UiType.Action,
+                lineHeight = UiType.ActionLine,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         CardNote(
             if (requested) {
                 stringResource(R.string.realtime_session_requested_note)
             } else {
                 stringResource(R.string.realtime_session_idle_note)
-            },
+            }
         )
     }
 }
@@ -227,41 +301,97 @@ private fun RealtimeSessionCard(
  * Where the captions would be, and why they are not here.
  *
  * The realtime transcript is a stream, not a snapshot: `thread/realtime/transcript/delta` and
- * `thread/realtime/item/transcript/delta` append to it while the session talks, and the page can
- * be popped at any point in that stream. That is what puts the transcript in the app-level reducer
+ * `thread/realtime/item/transcript/delta` append to it while the session talks, and the page can be
+ * popped at any point in that stream. That is what puts the transcript in the app-level reducer
  * rather than in a page's `remember` — a list held here would die on back and take the captions
- * with it — and it is the same reasoning that makes the TUI keep them in the chat widget instead
- * of a pane.
+ * with it — and it is the same reasoning that makes the TUI keep them in the chat widget instead of
+ * a pane.
  *
  * This page is not handed the client, so it cannot collect that flow, and `CodexApp` currently
  * folds none of the five notifications into the catalog it does hand over. [lines] is the fold
- * target that will render them the day it does; today nothing appends to it, and the card shows
- * the empty state that sends the user to the transcript rather than a blank list that reads as a
- * bug.
+ * target that will render them the day it does; today nothing appends to it, and the card shows the
+ * empty state that sends the user to the transcript rather than a blank list that reads as a bug.
  *
  * @param lines caption lines, in arrival order; empty in this build.
  */
 @Composable
 private fun RealtimeCaptionsCard(lines: List<String>) {
-    SectionCard(
-        title = stringResource(R.string.realtime_transcript_title),
-        icon = MiuixIcons.Messages,
-        trailing = lines.size.toString(),
+    Card(
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
     ) {
+        BasicComponent(
+            title = stringResource(R.string.realtime_transcript_title),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Messages,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            endActions = {
+                Text(
+                    text = lines.size.toString(),
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+            },
+        )
+
         if (lines.isEmpty()) {
-            EmptyState(
-                icon = MiuixIcons.Messages,
-                title = stringResource(R.string.realtime_transcript_empty),
-                detail = stringResource(R.string.realtime_transcript_empty_detail),
-            )
+            Column(
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .padding(vertical = UiConsts.Space24, horizontal = UiConsts.Space16),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    modifier =
+                        Modifier.size(UiConsts.IconBoxLarge)
+                            .squircleBackground(
+                                color = raisedSurface(),
+                                cornerRadius = UiConsts.CornerCard,
+                            ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.Messages,
+                        contentDescription = null,
+                        modifier = Modifier.size(UiConsts.IconHeader),
+                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
+                Spacer(Modifier.height(UiConsts.Space12))
+                Text(
+                    text = stringResource(R.string.realtime_transcript_empty),
+                    fontSize = UiType.RowTitle,
+                    lineHeight = UiType.RowTitleLine,
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(UiConsts.Space4))
+                Text(
+                    text = stringResource(R.string.realtime_transcript_empty_detail),
+                    fontSize = UiType.Meta,
+                    lineHeight = UiType.MetaLine,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    textAlign = TextAlign.Center,
+                )
+            }
         } else {
             lines.forEachIndexed { index, line ->
-                if (index > 0) CodexDivider()
+                if (index > 0)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
                 Text(
                     text = line,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
                     fontSize = UiType.Body,
                     lineHeight = UiType.BodyLine,
                     color = MiuixTheme.colorScheme.onSurface,
@@ -274,15 +404,14 @@ private fun RealtimeCaptionsCard(lines: List<String>) {
 /**
  * The voices the server offers, with a selection that goes nowhere.
  *
- * `thread/realtime/listVoices` enumerates the voices; there is no `setVoice` to go with it. A
- * voice is chosen as part of *starting* a session, and [AppEvent.StartRealtime] carries the thread
- * and an SDP offer and nothing else — so a tap on a row moves the tick on this page and is not
- * sent. The card is still worth its space: it is the only place the user can see what the server
- * supports, and the tick is the selection the start request would carry once it can. A card that
- * let the tap look like a saved setting would be worse than one that says it is local.
+ * `thread/realtime/listVoices` enumerates the voices; there is no `setVoice` to go with it. A voice
+ * is chosen as part of *starting* a session, and [AppEvent.StartRealtime] carries the thread and an
+ * SDP offer and nothing else — so a tap on a row moves the tick on this page and is not sent. The
+ * card is still worth its space: it is the only place the user can see what the server supports,
+ * and the tick is the selection the start request would carry once it can. A card that let the tap
+ * look like a saved setting would be worse than one that says it is local.
  *
- * The reload is a row inside the card rather than an icon in its header because [SectionCard]'s
- * header slot takes a string, not a composable; [ActionRow] is the app's row for an action that
+ * The reload stays inside the card alongside the voice choices, so it reads as an action that
  * relists something.
  *
  * @param voices [CatalogState.realtimeVoices]; empty until `thread/realtime/listVoices` answers.
@@ -297,27 +426,91 @@ private fun RealtimeVoicesCard(
     onSelect: (String) -> Unit,
     onEvent: (AppEvent) -> Unit,
 ) {
-    SectionCard(
-        title = stringResource(R.string.realtime_voices_title),
-        icon = MiuixIcons.Tune,
-        trailing = voices.size.toString(),
+    Card(
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
     ) {
-        ActionRow(
+        BasicComponent(
+            title = stringResource(R.string.realtime_voices_title),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Tune,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            endActions = {
+                Text(
+                    text = voices.size.toString(),
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+            },
+        )
+
+        ArrowPreference(
             title = stringResource(R.string.realtime_voices_refresh),
-            subtitle = stringResource(R.string.realtime_voices_refresh_detail),
-            icon = MiuixIcons.Refresh,
+            summary = stringResource(R.string.realtime_voices_refresh_detail),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(UiConsts.IconPreference),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
             onClick = { onEvent(AppEvent.ReloadRealtimeVoices) },
         )
-        CodexDivider()
+        HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
         if (voices.isEmpty()) {
-            EmptyState(
-                icon = MiuixIcons.Tune,
-                title = stringResource(R.string.realtime_voices_empty),
-                detail = stringResource(R.string.realtime_voices_empty_detail),
-            )
+            Column(
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .padding(vertical = UiConsts.Space24, horizontal = UiConsts.Space16),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    modifier =
+                        Modifier.size(UiConsts.IconBoxLarge)
+                            .squircleBackground(
+                                color = raisedSurface(),
+                                cornerRadius = UiConsts.CornerCard,
+                            ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.Tune,
+                        contentDescription = null,
+                        modifier = Modifier.size(UiConsts.IconHeader),
+                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
+                Spacer(Modifier.height(UiConsts.Space12))
+                Text(
+                    text = stringResource(R.string.realtime_voices_empty),
+                    fontSize = UiType.RowTitle,
+                    lineHeight = UiType.RowTitleLine,
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(UiConsts.Space4))
+                Text(
+                    text = stringResource(R.string.realtime_voices_empty_detail),
+                    fontSize = UiType.Meta,
+                    lineHeight = UiType.MetaLine,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    textAlign = TextAlign.Center,
+                )
+            }
         } else {
             voices.forEachIndexed { index, name ->
-                if (index > 0) CodexDivider()
+                if (index > 0)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
                 VoiceRow(
                     name = name,
                     selected = name == selected,
@@ -344,15 +537,14 @@ private fun RealtimeVoicesCard(
 private fun VoiceRow(name: String, selected: Boolean, onClick: () -> Unit) {
     val colors = MiuixTheme.colorScheme
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pressableRow(
-                shape = remember { RoundedCornerShape(UiConsts.RowCorner) },
-                container = if (selected) colors.primary.copy(alpha = 0.12f) else Color.Transparent,
-                onClick = onClick,
-                onClickLabel = name,
-            )
-            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
+        modifier =
+            Modifier.fillMaxWidth()
+                .squircleSurface(
+                    color = if (selected) colors.primary.copy(alpha = 0.12f) else Color.Transparent,
+                    cornerRadius = UiConsts.RowCorner,
+                )
+                .combinedClickable(onClick = onClick)
+                .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -369,9 +561,7 @@ private fun VoiceRow(name: String, selected: Boolean, onClick: () -> Unit) {
             Icon(
                 imageVector = MiuixIcons.Basic.Check,
                 contentDescription = stringResource(R.string.realtime_voices_selected),
-                modifier = Modifier
-                    .padding(start = UiConsts.Space8)
-                    .size(UiConsts.IconRow),
+                modifier = Modifier.padding(start = UiConsts.Space8).size(UiConsts.IconRow),
                 tint = colors.primary,
             )
         }
@@ -415,49 +605,124 @@ private fun RealtimeTextCard(threadId: String, onEvent: (AppEvent) -> Unit) {
         }
     }
 
-    SectionCard(
-        title = stringResource(R.string.realtime_inject_title),
-        icon = MiuixIcons.Send,
+    Card(
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
     ) {
-        CodexTextField(
-            value = typed,
-            onValueChange = { typed = it },
-            label = stringResource(R.string.realtime_inject_text_label),
-            placeholder = stringResource(R.string.realtime_inject_text_placeholder),
-            onImeAction = sendTyped,
+        BasicComponent(
+            title = stringResource(R.string.realtime_inject_title),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Send,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
         )
+
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.realtime_inject_text_label),
+                fontSize = UiType.Meta,
+                lineHeight = UiType.MetaLine,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+            )
+            Spacer(Modifier.height(UiConsts.Space4))
+            TextField(
+                value = typed,
+                onValueChange = { typed = it },
+                label = (stringResource(R.string.realtime_inject_text_placeholder)).orEmpty(),
+                useLabelAsPlaceholder = true,
+                keyboardActions =
+                    KeyboardActions(
+                        onDone = { sendTyped?.invoke() },
+                        onGo = { sendTyped?.invoke() },
+                        onSend = { sendTyped?.invoke() },
+                    ),
+                singleLine = true,
+            )
+        }
         CardNote(stringResource(R.string.realtime_inject_text_note))
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = UiConsts.Space4),
             horizontalArrangement = Arrangement.End,
         ) {
-            CodexButton(
-                text = stringResource(R.string.realtime_inject_text_send),
+            Button(
                 onClick = sendTyped,
-                size = CodexButtonSize.Compact,
                 enabled = typed.isNotBlank(),
+                colors = ButtonDefaults.buttonColorsPrimary(),
+                cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                minHeight = UiConsts.ButtonHeightCompact,
+                insideMargin =
+                    PaddingValues(
+                        horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                        vertical = 0.dp,
+                    ),
+            ) {
+                Text(
+                    text = stringResource(R.string.realtime_inject_text_send),
+                    fontSize = UiType.Action,
+                    lineHeight = UiType.ActionLine,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.realtime_inject_speech_label),
+                fontSize = UiType.Meta,
+                lineHeight = UiType.MetaLine,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+            )
+            Spacer(Modifier.height(UiConsts.Space4))
+            TextField(
+                value = speech,
+                onValueChange = { speech = it },
+                label = (stringResource(R.string.realtime_inject_speech_placeholder)).orEmpty(),
+                useLabelAsPlaceholder = true,
+                keyboardActions =
+                    KeyboardActions(
+                        onDone = { sendSpeech?.invoke() },
+                        onGo = { sendSpeech?.invoke() },
+                        onSend = { sendSpeech?.invoke() },
+                    ),
+                singleLine = true,
             )
         }
-        CodexDivider()
-        CodexTextField(
-            value = speech,
-            onValueChange = { speech = it },
-            label = stringResource(R.string.realtime_inject_speech_label),
-            placeholder = stringResource(R.string.realtime_inject_speech_placeholder),
-            onImeAction = sendSpeech,
-        )
         CardNote(stringResource(R.string.realtime_inject_speech_note))
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = UiConsts.Space4),
             horizontalArrangement = Arrangement.End,
         ) {
-            CodexButton(
-                text = stringResource(R.string.realtime_inject_speech_send),
+            Button(
                 onClick = sendSpeech,
-                size = CodexButtonSize.Compact,
-                role = ButtonRole.Secondary,
                 enabled = speech.isNotBlank(),
-            )
+                colors = ButtonDefaults.buttonColors(),
+                cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                minHeight = UiConsts.ButtonHeightCompact,
+                insideMargin =
+                    PaddingValues(
+                        horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                        vertical = 0.dp,
+                    ),
+            ) {
+                Text(
+                    text = stringResource(R.string.realtime_inject_speech_send),
+                    fontSize = UiType.Action,
+                    lineHeight = UiType.ActionLine,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -482,52 +747,122 @@ private fun RealtimeTextCard(threadId: String, onEvent: (AppEvent) -> Unit) {
  */
 @Composable
 private fun RealtimeMicrophoneCard(capturing: Boolean, onToggle: (Boolean) -> Unit) {
-    SectionCard(
-        title = stringResource(R.string.realtime_mic_title),
-        icon = MiuixIcons.Mic,
-        trailing = if (capturing) {
-            stringResource(R.string.realtime_mic_state_on)
-        } else {
-            stringResource(R.string.realtime_mic_state_off)
-        },
+    Card(
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
     ) {
+        BasicComponent(
+            title = stringResource(R.string.realtime_mic_title),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Mic,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            endActions = {
+                (if (capturing) {
+                        stringResource(R.string.realtime_mic_state_on)
+                    } else {
+                        stringResource(R.string.realtime_mic_state_off)
+                    })
+                    ?.let {
+                        Text(
+                            text = it,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MiuixTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                        )
+                    }
+            },
+        )
+
         CardNote(stringResource(R.string.realtime_mic_format_note))
-        ValueRow(
-            label = stringResource(R.string.realtime_mic_sample_rate),
-            value = stringResource(
-                R.string.realtime_mic_sample_rate_value,
-                CaptureFormat.sampleRate,
-            ),
+        BasicComponent(
+            title = stringResource(R.string.realtime_mic_sample_rate),
+            endActions = {
+                Text(
+                    text =
+                        stringResource(
+                                R.string.realtime_mic_sample_rate_value,
+                                CaptureFormat.sampleRate,
+                            )
+                            .ifEmpty { "—" },
+                    color = MiuixTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.End,
+                    fontSize = UiType.Detail,
+                )
+            },
+            insideMargin = PaddingValues(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
         )
-        CodexDivider()
-        ValueRow(
-            label = stringResource(R.string.realtime_mic_channels),
-            value = CaptureFormat.numChannels.toString(),
+        HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+        BasicComponent(
+            title = stringResource(R.string.realtime_mic_channels),
+            endActions = {
+                Text(
+                    text = CaptureFormat.numChannels.toString().ifEmpty { "—" },
+                    color = MiuixTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.End,
+                    fontSize = UiType.Detail,
+                )
+            },
+            insideMargin = PaddingValues(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
         )
-        CodexDivider()
-        // The dash is [ValueRow]'s own rendering of an empty value, and it is the exact answer: the
+        HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+        // A dash is the exact answer for an empty capture: the
         // chunk's optional item id is unset because this client never builds the chunk it would go
         // on. The row is here so the format the note describes is complete.
-        ValueRow(
-            label = stringResource(R.string.realtime_mic_item_id),
-            value = "",
-        )
-        CodexButton(
-            text = if (capturing) {
-                stringResource(R.string.realtime_mic_stop)
-            } else {
-                stringResource(R.string.realtime_mic_start)
+        BasicComponent(
+            title = stringResource(R.string.realtime_mic_item_id),
+            endActions = {
+                Text(
+                    text = "—",
+                    color = MiuixTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.End,
+                    fontSize = UiType.Detail,
+                )
             },
+            insideMargin = PaddingValues(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
+        )
+        Button(
             onClick = { onToggle(!capturing) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = UiConsts.Space4),
-            role = if (capturing) ButtonRole.Secondary else ButtonRole.Primary,
-        )
+            colors =
+                if (capturing) {
+                    ButtonDefaults.buttonColors()
+                } else {
+                    ButtonDefaults.buttonColorsPrimary()
+                },
+            cornerRadius = UiConsts.ButtonHeight / 2,
+            minHeight = UiConsts.ButtonHeight,
+            insideMargin =
+                PaddingValues(horizontal = UiConsts.ButtonPaddingHorizontal, vertical = 0.dp),
+        ) {
+            Text(
+                text =
+                    if (capturing) {
+                        stringResource(R.string.realtime_mic_stop)
+                    } else {
+                        stringResource(R.string.realtime_mic_start)
+                    },
+                fontSize = UiType.Action,
+                lineHeight = UiType.ActionLine,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         CardNote(
-            text = if (capturing) {
-                stringResource(R.string.realtime_mic_capturing_note)
-            } else {
-                stringResource(R.string.realtime_mic_idle_note)
-            },
+            text =
+                if (capturing) {
+                    stringResource(R.string.realtime_mic_capturing_note)
+                } else {
+                    stringResource(R.string.realtime_mic_idle_note)
+                },
             tint = if (capturing) warningColor() else null,
         )
     }
@@ -551,9 +886,9 @@ private fun RealtimeMicrophoneCard(capturing: Boolean, onToggle: (Boolean) -> Un
 private fun CardNote(text: String, tint: Color? = null) {
     Text(
         text = text,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space6),
+        modifier =
+            Modifier.fillMaxWidth()
+                .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space6),
         fontSize = UiType.Meta,
         lineHeight = UiType.MetaLine,
         color = tint ?: MiuixTheme.colorScheme.onSurfaceVariantSummary,

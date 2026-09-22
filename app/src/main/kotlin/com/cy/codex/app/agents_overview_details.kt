@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -30,23 +31,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.cy.codex.R
+import com.cy.codex.ThreadStatusTone
+import com.cy.codex.UiConsts
+import com.cy.codex.UiType
+import com.cy.codex.codeSurface
+import com.cy.codex.history_cell.collabCallTone
+import com.cy.codex.label
 import com.cy.codex.protocol.protocol.item.CollabAgentToolCallItem
 import com.cy.codex.protocol.protocol.item.SubAgentActivityItem
 import com.cy.codex.protocol.protocol.item.ThreadItem
 import com.cy.codex.protocol.protocol.v2.CollabAgentTool
 import com.cy.codex.protocol.protocol.v2.SubAgentActivityKind
-import com.cy.codex.history_cell.collabCallTone
-import com.cy.codex.label
-import com.cy.codex.app.AgentRole
-import com.cy.codex.app.AgentRosterEntry
-import com.cy.codex.app.deriveAgentRoster
-import com.cy.codex.SectionCard
-import com.cy.codex.SurfaceHeader
-import com.cy.codex.ThreadStatusTone
-import com.cy.codex.UiConsts
-import com.cy.codex.UiType
-import com.cy.codex.codeSurface
+import com.cy.codex.raisedSurface
 import com.cy.codex.statusDotColor
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
@@ -78,30 +78,31 @@ fun SubAgentScreen(
     val colors = MiuixTheme.colorScheme
     val mainAgentLabel = stringResource(R.string.agent_roster_main_label)
     val subAgentNameFormat = stringResource(R.string.agent_roster_sub_agent_name)
-    val entry = remember(items, threadId, mainThreadId, mainAgentLabel, subAgentNameFormat) {
-        deriveAgentRoster(items, mainThreadId, mainAgentLabel, subAgentNameFormat)
-            .firstOrNull { it.threadId == threadId }
-    }
+    val entry =
+        remember(items, threadId, mainThreadId, mainAgentLabel, subAgentNameFormat) {
+            deriveAgentRoster(items, mainThreadId, mainAgentLabel, subAgentNameFormat).firstOrNull {
+                it.threadId == threadId
+            }
+        }
     val timeline = remember(items, threadId) { deriveSubAgentTimeline(items, threadId) }
-    val name = entry?.name ?: stringResource(R.string.sub_agent_screen_fallback_name, threadId.takeLast(4))
+    val name =
+        entry?.name ?: stringResource(R.string.sub_agent_screen_fallback_name, threadId.takeLast(4))
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(colors.background),
-    ) {
-        SurfaceHeader(
+    Column(modifier = modifier.fillMaxSize().background(colors.background)) {
+        BasicComponent(
             title = name,
-            subtitle = if (entry == null) stringResource(R.string.sub_agent_screen_missing) else entry.statusLabel(),
-            leading = { SubAgentBackButton(onBack) },
+            summary =
+                if (entry == null) stringResource(R.string.sub_agent_screen_missing)
+                else entry.statusLabel(),
+            startAction = { SubAgentBackButton(onBack) },
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = UiConsts.ScreenMargin)
-                .padding(bottom = UiConsts.PageBottomInset),
+            modifier =
+                Modifier.weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = UiConsts.ScreenMargin)
+                    .padding(bottom = UiConsts.PageBottomInset),
             verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
         ) {
             SubAgentTaskCard(entry)
@@ -116,7 +117,28 @@ fun SubAgentScreen(
 private fun SubAgentTaskCard(entry: AgentRosterEntry?) {
     val colors = MiuixTheme.colorScheme
     val task = entry?.task?.takeIf { it.isNotBlank() }
-    SectionCard(title = stringResource(R.string.sub_agent_section_task), icon = MiuixIcons.Notes) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
+    ) {
+        BasicComponent(
+            title = stringResource(R.string.sub_agent_section_task),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Notes,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+        )
+
         if (task == null) {
             Text(
                 text = stringResource(R.string.sub_agent_screen_task_empty),
@@ -127,11 +149,11 @@ private fun SubAgentTaskCard(entry: AgentRosterEntry?) {
         } else {
             Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                 Box(
-                    modifier = Modifier
-                        .width(UiConsts.TimelineBarWidth)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(UiConsts.Space2))
-                        .background(colors.primary.copy(alpha = 0.45f)),
+                    modifier =
+                        Modifier.width(UiConsts.TimelineBarWidth)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(UiConsts.Space2))
+                            .background(colors.primary.copy(alpha = 0.45f))
                 )
                 Spacer(Modifier.width(UiConsts.Space10))
                 Text(
@@ -151,9 +173,35 @@ private fun SubAgentTaskCard(entry: AgentRosterEntry?) {
 private fun SubAgentRunCard(entry: AgentRosterEntry?, threadId: String, mainThreadId: String) {
     val colors = MiuixTheme.colorScheme
     val tone = entry?.tone() ?: ThreadStatusTone.Idle
-    SectionCard(title = stringResource(R.string.sub_agent_section_run), icon = MiuixIcons.Info) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
+    ) {
+        BasicComponent(
+            title = stringResource(R.string.sub_agent_section_run),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Info,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+        )
+
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(MiuixIcons.Community, null, Modifier.size(UiConsts.IconHeader), statusDotColor(tone))
+            Icon(
+                MiuixIcons.Community,
+                null,
+                Modifier.size(UiConsts.IconHeader),
+                statusDotColor(tone),
+            )
             Spacer(Modifier.width(UiConsts.Space9))
             Text(
                 text = entry?.statusLabel() ?: stringResource(R.string.sub_agent_screen_not_found),
@@ -164,14 +212,15 @@ private fun SubAgentRunCard(entry: AgentRosterEntry?, threadId: String, mainThre
                 color = statusDotColor(tone),
             )
             Text(
-                text = stringResource(
-                    R.string.sub_agent_screen_role_badge,
-                    (entry?.role ?: AgentRole.Sub).tag,
-                ),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(UiConsts.BadgeCorner))
-                    .background(colors.primary.copy(alpha = 0.14f))
-                    .padding(horizontal = UiConsts.Space5, vertical = UiConsts.Space1),
+                text =
+                    stringResource(
+                        R.string.sub_agent_screen_role_badge,
+                        (entry?.role ?: AgentRole.Sub).tag,
+                    ),
+                modifier =
+                    Modifier.clip(RoundedCornerShape(UiConsts.BadgeCorner))
+                        .background(colors.primary.copy(alpha = 0.14f))
+                        .padding(horizontal = UiConsts.Space5, vertical = UiConsts.Space1),
                 fontSize = UiType.Badge,
                 lineHeight = UiType.BadgeLine,
                 fontWeight = FontWeight.Medium,
@@ -179,8 +228,16 @@ private fun SubAgentRunCard(entry: AgentRosterEntry?, threadId: String, mainThre
             )
         }
         Spacer(Modifier.height(UiConsts.Space8))
-        SubAgentInfoLine(stringResource(R.string.sub_agent_screen_agent_thread), threadId, mono = true)
-        SubAgentInfoLine(stringResource(R.string.sub_agent_screen_main_thread), mainThreadId, mono = true)
+        SubAgentInfoLine(
+            stringResource(R.string.sub_agent_screen_agent_thread),
+            threadId,
+            mono = true,
+        )
+        SubAgentInfoLine(
+            stringResource(R.string.sub_agent_screen_main_thread),
+            mainThreadId,
+            mono = true,
+        )
         if (entry?.model != null) {
             SubAgentInfoLine(stringResource(R.string.sub_agent_screen_model), entry.model)
         }
@@ -188,7 +245,11 @@ private fun SubAgentRunCard(entry: AgentRosterEntry?, threadId: String, mainThre
             SubAgentInfoLine(stringResource(R.string.sub_agent_screen_effort), entry.effort.label())
         }
         if (entry?.itemId != null) {
-            SubAgentInfoLine(stringResource(R.string.sub_agent_screen_source_item), entry.itemId, mono = true)
+            SubAgentInfoLine(
+                stringResource(R.string.sub_agent_screen_source_item),
+                entry.itemId,
+                mono = true,
+            )
         }
     }
 }
@@ -197,11 +258,36 @@ private fun SubAgentRunCard(entry: AgentRosterEntry?, threadId: String, mainThre
 @Composable
 private fun SubAgentTimelineCard(events: List<SubAgentEvent>) {
     val colors = MiuixTheme.colorScheme
-    SectionCard(
-        title = stringResource(R.string.sub_agent_section_activity),
-        icon = MiuixIcons.Tasks,
-        trailing = stringResource(R.string.sub_agent_screen_activity_count, events.size),
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
+        BasicComponent(
+            title = stringResource(R.string.sub_agent_section_activity),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Tasks,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            endActions = {
+                Text(
+                    text = stringResource(R.string.sub_agent_screen_activity_count, events.size),
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+            },
+        )
+
         if (events.isEmpty()) {
             Text(
                 text = stringResource(R.string.sub_agent_screen_activity_empty),
@@ -209,17 +295,17 @@ private fun SubAgentTimelineCard(events: List<SubAgentEvent>) {
                 lineHeight = UiType.BodyLine,
                 color = colors.onSurfaceVariantSummary,
             )
-            return@SectionCard
+            return@Card
         }
         Column(verticalArrangement = Arrangement.spacedBy(UiConsts.Space9)) {
             events.forEach { event ->
                 Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                     Box(
-                        modifier = Modifier
-                            .width(UiConsts.TimelineBarWidth)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(UiConsts.Space2))
-                            .background(statusDotColor(event.tone).copy(alpha = 0.5f)),
+                        modifier =
+                            Modifier.width(UiConsts.TimelineBarWidth)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(UiConsts.Space2))
+                                .background(statusDotColor(event.tone).copy(alpha = 0.5f))
                     )
                     Spacer(Modifier.width(UiConsts.Space10))
                     Column(modifier = Modifier.weight(1f)) {
@@ -260,7 +346,12 @@ private fun SubAgentTimelineCard(events: List<SubAgentEvent>) {
 }
 
 @Composable
-private fun SubAgentInfoLine(label: String, value: String, mono: Boolean = false, labelWidth: Dp = 78.dp) {
+private fun SubAgentInfoLine(
+    label: String,
+    value: String,
+    mono: Boolean = false,
+    labelWidth: Dp = 78.dp,
+) {
     val colors = MiuixTheme.colorScheme
     Row(
         Modifier.fillMaxWidth().padding(vertical = UiConsts.Space4),
@@ -275,11 +366,11 @@ private fun SubAgentInfoLine(label: String, value: String, mono: Boolean = false
         )
         Text(
             text = value,
-            modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(UiConsts.RowCorner))
-                .background(codeSurface())
-                .padding(horizontal = UiConsts.Space7, vertical = UiConsts.Space3),
+            modifier =
+                Modifier.weight(1f)
+                    .clip(RoundedCornerShape(UiConsts.RowCorner))
+                    .background(codeSurface())
+                    .padding(horizontal = UiConsts.Space7, vertical = UiConsts.Space3),
             fontSize = UiType.Value,
             lineHeight = UiType.ValueLine,
             fontFamily = if (mono) FontFamily.Monospace else null,
@@ -292,7 +383,11 @@ private fun SubAgentInfoLine(label: String, value: String, mono: Boolean = false
 
 @Composable
 private fun SubAgentBackButton(onBack: () -> Unit) {
-    IconButton(onClick = onBack, minWidth = UiConsts.IconButtonSize, minHeight = UiConsts.IconButtonSize) {
+    IconButton(
+        onClick = onBack,
+        minWidth = UiConsts.IconButtonSize,
+        minHeight = UiConsts.IconButtonSize,
+    ) {
         Icon(
             MiuixIcons.ChevronBackward,
             stringResource(R.string.sub_agent_screen_back),
@@ -319,12 +414,14 @@ data class SubAgentEvent(
 /** The row's title: the collab tool that was called, or the activity kind that was reported. */
 @Composable
 @ReadOnlyComposable
-private fun SubAgentEvent.title(): String = when {
-    tool != null -> stringResource(R.string.sub_agent_screen_collab_call, tool.label())
-    activity != null -> activity.timelineLabel()
-    // A fold that names neither is a bug, not a state; the id keeps the row readable either way.
-    else -> id
-}
+private fun SubAgentEvent.title(): String =
+    when {
+        tool != null -> stringResource(R.string.sub_agent_screen_collab_call, tool.label())
+        activity != null -> activity.timelineLabel()
+        // A fold that names neither is a bug, not a state; the id keeps the row readable either
+        // way.
+        else -> id
+    }
 
 /**
  * Fold the parent transcript down to everything that names [threadId].
@@ -349,8 +446,9 @@ fun deriveSubAgentTimeline(items: List<ThreadItem>, threadId: String): List<SubA
                         id = item.id,
                         tool = item.tool,
                         activity = null,
-                        detail = state?.message?.takeIf { it.isNotBlank() }
-                            ?: item.prompt?.takeIf { it.isNotBlank() },
+                        detail =
+                            state?.message?.takeIf { it.isNotBlank() }
+                                ?: item.prompt?.takeIf { it.isNotBlank() },
                         tone = collabCallTone(item.status),
                     )
                 }
@@ -376,18 +474,20 @@ fun deriveSubAgentTimeline(items: List<ThreadItem>, threadId: String): List<SubA
 
 @Composable
 @ReadOnlyComposable
-private fun SubAgentActivityKind.timelineLabel(): String = stringResource(
-    when (this) {
-        SubAgentActivityKind.Started -> R.string.sub_agent_screen_started
-        SubAgentActivityKind.Interacted -> R.string.sub_agent_screen_interacted
-        SubAgentActivityKind.Interrupted -> R.string.sub_agent_screen_interrupted
-        SubAgentActivityKind.Completed -> R.string.sub_agent_screen_completed
-    },
-)
+private fun SubAgentActivityKind.timelineLabel(): String =
+    stringResource(
+        when (this) {
+            SubAgentActivityKind.Started -> R.string.sub_agent_screen_started
+            SubAgentActivityKind.Interacted -> R.string.sub_agent_screen_interacted
+            SubAgentActivityKind.Interrupted -> R.string.sub_agent_screen_interrupted
+            SubAgentActivityKind.Completed -> R.string.sub_agent_screen_completed
+        }
+    )
 
-private fun SubAgentActivityKind.timelineTone(): ThreadStatusTone = when (this) {
-    SubAgentActivityKind.Started -> ThreadStatusTone.Running
-    SubAgentActivityKind.Interacted -> ThreadStatusTone.Running
-    SubAgentActivityKind.Interrupted -> ThreadStatusTone.Waiting
-    SubAgentActivityKind.Completed -> ThreadStatusTone.Done
-}
+private fun SubAgentActivityKind.timelineTone(): ThreadStatusTone =
+    when (this) {
+        SubAgentActivityKind.Started -> ThreadStatusTone.Running
+        SubAgentActivityKind.Interacted -> ThreadStatusTone.Running
+        SubAgentActivityKind.Interrupted -> ThreadStatusTone.Waiting
+        SubAgentActivityKind.Completed -> ThreadStatusTone.Done
+    }

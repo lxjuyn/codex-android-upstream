@@ -7,17 +7,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -35,30 +33,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cy.codex.AgentNotification
+import com.cy.codex.AppEvent
 import com.cy.codex.BuildConfig
+import com.cy.codex.CatalogState
 import com.cy.codex.NotificationSettings
 import com.cy.codex.R
+import com.cy.codex.SessionState
+import com.cy.codex.UiConsts
+import com.cy.codex.UiType
 import com.cy.codex.agentNotificationsAllowed
 import com.cy.codex.app.RecapSettings
+import com.cy.codex.description
+import com.cy.codex.label
 import com.cy.codex.protocol.protocol.v2.ApprovalsReviewer
 import com.cy.codex.protocol.protocol.v2.AskForApproval
 import com.cy.codex.protocol.protocol.v2.ModelPreset
 import com.cy.codex.protocol.protocol.v2.ReasoningEffort
 import com.cy.codex.protocol.protocol.v2.ThreadSessionState
 import com.cy.codex.protocol.protocol.v2.ThreadTokenUsage
-import com.cy.codex.AppEvent
-import com.cy.codex.CatalogState
-import com.cy.codex.SessionState
-import com.cy.codex.chatwidget.SidebarModel
-import com.cy.codex.description
-import com.cy.codex.label
-import com.cy.codex.SurfaceHeader
-import com.cy.codex.UiConsts
 import com.cy.codex.status.formatTokens
 import com.cy.codex.theme.Appearance
-import com.cy.codex.UiType
 import com.cy.codex.usageColor
-import top.yukonga.miuix.kmp.theme.ColorSchemeMode
+import kotlin.math.roundToInt
+import kotlinx.serialization.json.JsonPrimitive
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -86,10 +83,8 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlaySpinnerPreference
 import top.yukonga.miuix.kmp.preference.RadioButtonPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import java.util.Locale
-import kotlinx.serialization.json.JsonPrimitive
-import kotlin.math.roundToInt
 
 /**
  * Full-screen settings page.
@@ -101,8 +96,8 @@ import kotlin.math.roundToInt
  *
  * The rows are `miuix-preference` components ([SwitchPreference], [RadioButtonPreference],
  * [ArrowPreference], [OverlaySpinnerPreference]) inside `miuix-ui` [Card]s. They were hand-rolled
- * card rows before, which meant every one of them re-implemented the same four things — the
- * press feedback, the title/summary type ramp, the end-slot alignment and the switch — slightly
+ * card rows before, which meant every one of them re-implemented the same four things — the press
+ * feedback, the title/summary type ramp, the end-slot alignment and the switch — slightly
  * differently from the library, and the settings page was the only place in the app where a miuix
  * control was *not* the real thing.
  *
@@ -126,17 +121,20 @@ fun SettingsScreen(
     val preset = catalog.modelPreset(config.model) ?: catalog.models.firstOrNull { it.isDefault }
     var tab by remember { mutableStateOf(SettingsTab.General) }
 
-    BoxWithConstraints(modifier = modifier.fillMaxSize().background(MiuixTheme.colorScheme.background)) {
+    BoxWithConstraints(
+        modifier = modifier.fillMaxSize().background(MiuixTheme.colorScheme.background)
+    ) {
         // Rail or bar, decided by the window rather than by the device: the same build runs on a
         // phone and on a tablet in a split screen.
         val wide = maxWidth >= UiConsts.WideContentBreakpoint
         val content: @Composable (Modifier) -> Unit = { contentModifier ->
             Column(
-                modifier = contentModifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = UiConsts.ScreenMargin)
-                    .padding(top = UiConsts.Space4, bottom = UiConsts.PageBottomInset),
+                modifier =
+                    contentModifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = UiConsts.ScreenMargin)
+                        .padding(top = UiConsts.Space4, bottom = UiConsts.PageBottomInset),
                 verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
             ) {
                 when (tab) {
@@ -144,13 +142,24 @@ fun SettingsScreen(
                         SettingsAppearanceSection()
                         SettingsNotificationSection()
                         SettingsRecapSection()
-                        SettingsWorkspaceSection(config.cwd, config.workspaceRoots, onOpenWorkspacePicker)
+                        SettingsWorkspaceSection(
+                            config.cwd,
+                            config.workspaceRoots,
+                            onOpenWorkspacePicker,
+                        )
                         SettingsConfigSourcesSection(catalog, configPath)
                         SettingsExperimentalSection(catalog, onEvent)
                         SettingsAboutSection()
                     }
 
-                    SettingsTab.Model -> SettingsModelSection(catalog, preset, config.model, config.reasoningEffort, onEvent)
+                    SettingsTab.Model ->
+                        SettingsModelSection(
+                            catalog,
+                            preset,
+                            config.model,
+                            config.reasoningEffort,
+                            onEvent,
+                        )
                     SettingsTab.Approval -> {
                         SettingsApprovalSection(config, catalog.autoReviewAvailable, onEvent)
                     }
@@ -162,10 +171,11 @@ fun SettingsScreen(
         }
 
         Column(modifier = Modifier.fillMaxSize()) {
-            SurfaceHeader(
+            BasicComponent(
                 title = stringResource(R.string.settings_screen_title),
-                subtitle = stringResource(tab.labelRes),
-                leading = { SettingsBackButton(onBack) },
+                summary = stringResource(tab.labelRes),
+                startAction = { SettingsBackButton(onBack) },
+                insideMargin = PaddingValues(14.dp, 10.dp),
             )
             if (wide) {
                 Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -242,7 +252,11 @@ private fun SettingsGroup(
 
 /** 1. 工作目录: the current `cwd`, the writable roots, and the way to the picker. */
 @Composable
-private fun SettingsWorkspaceSection(cwd: String, roots: List<String>, onOpenWorkspacePicker: () -> Unit) {
+private fun SettingsWorkspaceSection(
+    cwd: String,
+    roots: List<String>,
+    onOpenWorkspacePicker: () -> Unit,
+) {
     SettingsGroup(stringResource(R.string.settings_group_workspace)) {
         ArrowPreference(
             title = stringResource(R.string.settings_screen_current_directory),
@@ -319,17 +333,20 @@ private fun SettingsConfigSourcesSection(catalog: CatalogState, configPath: Stri
         layers.asReversed().forEach { layer ->
             BasicComponent(
                 title = layer.name.label(),
-                summary = listOfNotNull(
-                    layer.disabledReason ?: layer.name.description(),
-                    layer.sourcePath,
-                    layer.version.ifEmpty { null },
-                ).joinToString(" · "),
+                summary =
+                    listOfNotNull(
+                            layer.disabledReason ?: layer.name.description(),
+                            layer.sourcePath,
+                            layer.version.ifEmpty { null },
+                        )
+                        .joinToString(" · "),
                 startAction = {
                     Icon(
                         MiuixIcons.ConvertFile,
                         null,
                         Modifier.size(UiConsts.IconPreference),
-                        if (layer.disabledReason == null) colors.primary else colors.disabledOnSurface,
+                        if (layer.disabledReason == null) colors.primary
+                        else colors.disabledOnSurface,
                     )
                 },
                 endActions = {
@@ -338,7 +355,7 @@ private fun SettingsConfigSourcesSection(catalog: CatalogState, configPath: Stri
                             stringResource(R.string.settings_screen_config_active)
                         } else {
                             stringResource(R.string.settings_screen_config_disabled)
-                        },
+                        }
                     )
                 },
             )
@@ -352,11 +369,14 @@ private fun SettingsConfigSourcesSection(catalog: CatalogState, configPath: Stri
             val origin = origins[key]
             BasicComponent(
                 title = key,
-                summary = buildString {
-                    append(origin?.name?.label() ?: stringResource(R.string.config_layer_unknown))
-                    append(" · ")
-                    append(origin?.version.orEmpty())
-                },
+                summary =
+                    buildString {
+                        append(
+                            origin?.name?.label() ?: stringResource(R.string.config_layer_unknown)
+                        )
+                        append(" · ")
+                        append(origin?.version.orEmpty())
+                    },
                 startAction = {
                     Icon(
                         MiuixIcons.Tune,
@@ -413,11 +433,10 @@ private fun SettingsAppearanceSection() {
 @Composable
 private fun SettingsNotificationSection() {
     val context = LocalContext.current
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        NotificationSettings.setEnabled(context, granted)
-    }
+    val permissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            NotificationSettings.setEnabled(context, granted)
+        }
     SettingsGroup(stringResource(R.string.settings_group_notifications)) {
         SwitchPreference(
             title = stringResource(R.string.settings_notifications),
@@ -426,7 +445,8 @@ private fun SettingsNotificationSection() {
             onCheckedChange = { enabled ->
                 when {
                     !enabled -> NotificationSettings.setEnabled(context, false)
-                    agentNotificationsAllowed(context) -> NotificationSettings.setEnabled(context, true)
+                    agentNotificationsAllowed(context) ->
+                        NotificationSettings.setEnabled(context, true)
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
                         permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     else -> NotificationSettings.setEnabled(context, true)
@@ -491,23 +511,29 @@ private enum class ThemeOption(@StringRes val labelRes: Int, val mode: ColorSche
     Dark(R.string.settings_theme_dark, ColorSchemeMode.Dark),
 }
 
-/** 3. 实验特性: `experimentalFeature/list`, written back through `SetExperimentalFeature`. */@Composable
+/** 3. 实验特性: `experimentalFeature/list`, written back through `SetExperimentalFeature`. */
+@Composable
 private fun SettingsExperimentalSection(catalog: CatalogState, onEvent: (AppEvent) -> Unit) {
     // The Android runtime fixes these features off, regardless of the persisted config.
-    val features = catalog.experimentalFeatures.filterNot {
-        it.id == "shell_snapshot" || it.id == "shell_zsh_fork"
-    }
+    val features =
+        catalog.experimentalFeatures.filterNot {
+            it.id == "shell_snapshot" || it.id == "shell_zsh_fork"
+        }
     SettingsGroup(stringResource(R.string.settings_group_experimental)) {
         if (features.isEmpty()) {
-            BasicComponent(title = stringResource(R.string.settings_screen_experimental_empty), enabled = false)
+            BasicComponent(
+                title = stringResource(R.string.settings_screen_experimental_empty),
+                enabled = false,
+            )
             return@SettingsGroup
         }
         features.forEach { feature ->
             SwitchPreference(
                 title = feature.name,
-                summary = listOf(feature.stage, feature.description)
-                    .filter { it.isNotBlank() }
-                    .joinToString(" · "),
+                summary =
+                    listOf(feature.stage, feature.description)
+                        .filter { it.isNotBlank() }
+                        .joinToString(" · "),
                 checked = feature.enabled,
                 onCheckedChange = { onEvent(AppEvent.SetExperimentalFeature(feature.id, it)) },
             )
@@ -526,16 +552,23 @@ private fun SettingsModelSection(
 ) {
     SettingsGroup(stringResource(R.string.settings_group_model)) {
         if (catalog.models.isEmpty()) {
-            BasicComponent(title = stringResource(R.string.settings_screen_models_empty), enabled = false)
+            BasicComponent(
+                title = stringResource(R.string.settings_screen_models_empty),
+                enabled = false,
+            )
             return@SettingsGroup
         }
         catalog.models.forEach { model ->
             RadioButtonPreference(
                 title = model.displayName,
-                summary = listOfNotNull(
-                    model.description.ifEmpty { model.model },
-                    stringResource(R.string.settings_screen_model_default).takeIf { model.isDefault },
-                ).joinToString(" · "),
+                summary =
+                    listOfNotNull(
+                            model.description.ifEmpty { model.model },
+                            stringResource(R.string.settings_screen_model_default).takeIf {
+                                model.isDefault
+                            },
+                        )
+                        .joinToString(" · "),
                 selected = model.model == currentModel,
                 onClick = { onEvent(AppEvent.SetModel(model.model)) },
             )
@@ -545,16 +578,15 @@ private fun SettingsModelSection(
     // The local provider choice, shown only when the config says the provider is `oss` — the same
     // place `oss_selection.rs` offers it, because the value means nothing for a hosted provider.
     if (catalog.config.snapshot.modelProvider == "oss") {
-        val providers = listOf(
-            "lmstudio" to (
-                stringResource(R.string.settings_oss_lmstudio) to
-                    stringResource(R.string.settings_oss_lmstudio_summary)
-                ),
-            "ollama" to (
-                stringResource(R.string.settings_oss_ollama) to
-                    stringResource(R.string.settings_oss_ollama_summary)
-                ),
-        )
+        val providers =
+            listOf(
+                "lmstudio" to
+                    (stringResource(R.string.settings_oss_lmstudio) to
+                        stringResource(R.string.settings_oss_lmstudio_summary)),
+                "ollama" to
+                    (stringResource(R.string.settings_oss_ollama) to
+                        stringResource(R.string.settings_oss_ollama_summary)),
+            )
         SettingsGroup(stringResource(R.string.settings_group_oss_provider)) {
             providers.forEach { (id, labels) ->
                 RadioButtonPreference(
@@ -616,20 +648,22 @@ private fun SettingsApprovalSection(
     }
 
     // A reviewer, not a policy: the policy decides *whether* a request is raised, and the reviewer
-    // decides who answers it. Upstream pairs the two in the permissions popup; a separate group here
-    // keeps each choice a single question. AutoReview is offered only when `guardian_approval` is on
+    // decides who answers it. Upstream pairs the two in the permissions popup; a separate group
+    // here
+    // keeps each choice a single question. AutoReview is offered only when `guardian_approval` is
+    // on
     // and `configRequirements/read` allows it; a value selected under a looser policy stays shown.
     SettingsGroup(stringResource(R.string.settings_group_reviewer)) {
         ApprovalsReviewer.entries
             .filter { it != ApprovalsReviewer.AutoReview || autoReviewAvailable }
             .forEach { option ->
-            RadioButtonPreference(
-                title = option.label(),
-                summary = option.description(),
-                selected = option == config.approvalsReviewer,
-                onClick = { onEvent(AppEvent.SetApprovalsReviewer(option)) },
-            )
-        }
+                RadioButtonPreference(
+                    title = option.label(),
+                    summary = option.description(),
+                    selected = option == config.approvalsReviewer,
+                    onClick = { onEvent(AppEvent.SetApprovalsReviewer(option)) },
+                )
+            }
     }
 
     if (config.approvalPolicy == AskForApproval.Granular) {
@@ -639,26 +673,32 @@ private fun SettingsApprovalSection(
             // write path for the individual classes, and a switch that silently does nothing is
             // worse than one that says it cannot be moved here.
             listOf(
-                stringResource(R.string.settings_screen_granular_sandbox) to granular.sandboxApproval,
-                stringResource(R.string.settings_screen_granular_rules) to granular.rules,
-                stringResource(R.string.settings_screen_granular_skills) to granular.skillApproval,
-                stringResource(R.string.settings_screen_granular_permissions) to granular.requestPermissions,
-                stringResource(R.string.settings_screen_granular_mcp) to granular.mcpElicitations,
-            ).forEach { (label, asks) ->
-                SwitchPreference(
-                    title = label,
-                    summary = if (asks) {
-                        stringResource(R.string.settings_screen_granular_ask)
-                    } else {
-                        stringResource(R.string.settings_screen_granular_auto)
-                    },
-                    checked = asks,
-                    // `enabled = false` already stops the row; the no-op keeps the switch's own
-                    // toggle from reporting a change it is not allowed to make.
-                    onCheckedChange = {},
-                    enabled = false,
+                    stringResource(R.string.settings_screen_granular_sandbox) to
+                        granular.sandboxApproval,
+                    stringResource(R.string.settings_screen_granular_rules) to granular.rules,
+                    stringResource(R.string.settings_screen_granular_skills) to
+                        granular.skillApproval,
+                    stringResource(R.string.settings_screen_granular_permissions) to
+                        granular.requestPermissions,
+                    stringResource(R.string.settings_screen_granular_mcp) to
+                        granular.mcpElicitations,
                 )
-            }
+                .forEach { (label, asks) ->
+                    SwitchPreference(
+                        title = label,
+                        summary =
+                            if (asks) {
+                                stringResource(R.string.settings_screen_granular_ask)
+                            } else {
+                                stringResource(R.string.settings_screen_granular_auto)
+                            },
+                        checked = asks,
+                        // `enabled = false` already stops the row; the no-op keeps the switch's own
+                        // toggle from reporting a change it is not allowed to make.
+                        onCheckedChange = {},
+                        enabled = false,
+                    )
+                }
         }
     }
 }
@@ -670,7 +710,11 @@ private fun SettingsSessionSection(config: ThreadSessionState, usage: ThreadToke
         BasicComponent(
             title = stringResource(R.string.settings_screen_session_id),
             endActions = {
-                MonoValue(config.threadId.ifEmpty { stringResource(R.string.settings_screen_session_not_started) })
+                MonoValue(
+                    config.threadId.ifEmpty {
+                        stringResource(R.string.settings_screen_session_not_started)
+                    }
+                )
             },
         )
         BasicComponent(
@@ -683,7 +727,10 @@ private fun SettingsSessionSection(config: ThreadSessionState, usage: ThreadToke
 
     SettingsGroup(stringResource(R.string.settings_group_instructions)) {
         if (config.instructionSourcePaths.isEmpty()) {
-            BasicComponent(title = stringResource(R.string.settings_screen_no_agents_md), enabled = false)
+            BasicComponent(
+                title = stringResource(R.string.settings_screen_no_agents_md),
+                enabled = false,
+            )
         } else {
             config.instructionSourcePaths.forEach { path ->
                 BasicComponent(
@@ -709,20 +756,23 @@ private fun SettingsSessionSection(config: ThreadSessionState, usage: ThreadToke
             // describes instead of floating in a section of its own.
             BasicComponent(
                 title = stringResource(R.string.settings_screen_context_window),
-                summary = stringResource(
-                    R.string.settings_screen_context_usage,
-                    formatTokens(usage.total.totalTokens),
-                    formatTokens(window),
-                    (fraction * 100).roundToInt(),
-                ),
+                summary =
+                    stringResource(
+                        R.string.settings_screen_context_usage,
+                        formatTokens(usage.total.totalTokens),
+                        formatTokens(window),
+                        (fraction * 100).roundToInt(),
+                    ),
                 bottomAction = {
                     LinearProgressIndicator(
                         progress = fraction,
                         modifier = Modifier.fillMaxWidth().padding(top = UiConsts.Space6),
-                        colors = ProgressIndicatorDefaults.progressIndicatorColors(
-                            foregroundColor = usageColor(fraction),
-                            backgroundColor = MiuixTheme.colorScheme.onBackground.copy(alpha = 0.08f),
-                        ),
+                        colors =
+                            ProgressIndicatorDefaults.progressIndicatorColors(
+                                foregroundColor = usageColor(fraction),
+                                backgroundColor =
+                                    MiuixTheme.colorScheme.onBackground.copy(alpha = 0.08f),
+                            ),
                         height = UiConsts.ProgressHeight,
                     )
                 },
@@ -734,7 +784,7 @@ private fun SettingsSessionSection(config: ThreadSessionState, usage: ThreadToke
                         MonoValue(
                             "${formatTokens(usage.total.inputTokens)} / " +
                                 "${formatTokens(usage.total.outputTokens)} / " +
-                                formatTokens(usage.total.cachedInputTokens),
+                                formatTokens(usage.total.cachedInputTokens)
                         )
                     },
                 )
@@ -747,9 +797,9 @@ private fun SettingsSessionSection(config: ThreadSessionState, usage: ThreadToke
  * 7. 库与集成: everything the drawer used to list below 添加工作区, as rows on one page.
  *
  * These were drawer entries, which made the drawer do two jobs at once — navigate this session, and
- * configure the app. As rows here they get their full names (MCP 服务器 instead of MCP, 已归档会话
- * instead of 已归档) and the drawer goes back to being navigation. The ids are the ones the drawer
- * used, so a row opens exactly the page the old entry opened.
+ * configure the app. As rows here they get their full names (MCP 服务器 instead of MCP, 已归档会话 instead
+ * of 已归档) and the drawer goes back to being navigation. The ids are the ones the drawer used, so a
+ * row opens exactly the page the old entry opened.
  */
 @Composable
 private fun SettingsLibrarySection(onOpenEntry: (String) -> Unit) {
@@ -792,7 +842,11 @@ private fun MonoValue(text: String) {
 
 @Composable
 private fun SettingsBackButton(onBack: () -> Unit) {
-    IconButton(onClick = onBack, minWidth = UiConsts.IconButtonSize, minHeight = UiConsts.IconButtonSize) {
+    IconButton(
+        onClick = onBack,
+        minWidth = UiConsts.IconButtonSize,
+        minHeight = UiConsts.IconButtonSize,
+    ) {
         Icon(
             MiuixIcons.ChevronBackward,
             stringResource(R.string.settings_screen_back),
@@ -809,7 +863,7 @@ private val unusedFontWeight = FontWeight.Medium
 private val unusedSpacerHeight = 0.dp
 
 /** Kept for the unused-import sweep. */
-private val unusedBox = @Composable { }
+private val unusedBox = @Composable {}
 
 /** Kept for the unused-import sweep. */
 private val unusedAlignment = Alignment.Center

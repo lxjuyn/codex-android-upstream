@@ -5,7 +5,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -13,17 +17,25 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
-import com.cy.codex.CodexButton
-import com.cy.codex.ButtonRole
-import com.cy.codex.CodexTextField
-import com.cy.codex.ModalSheet
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import com.cy.codex.R
 import com.cy.codex.UiConsts
+import com.cy.codex.UiType
+import com.cy.codex.sheetColor
+import com.cy.codex.sheetSideMargin
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.preference.RadioButtonPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * One field of a [FormSheet].
@@ -74,84 +86,136 @@ fun FormSheet(
     destructive: Boolean = false,
 ) {
     val colors = MiuixTheme.colorScheme
-    val values = remember(fields) { mutableStateMapOf<String, String>().apply {
-        fields.forEach { put(it.key, it.initial) }
-    } }
+    val values =
+        remember(fields) {
+            mutableStateMapOf<String, String>().apply {
+                fields.forEach { put(it.key, it.initial) }
+            }
+        }
     var touched by remember(fields) { mutableStateOf(false) }
     val complete = fields.all { !it.required || values[it.key].orEmpty().isNotBlank() }
 
-    ModalSheet(
+    WindowBottomSheet(
         show = true,
-        onDismiss = onDismiss,
+        onDismissRequest = onDismiss,
         onDismissFinished = onDismiss,
         title = title,
-        subtitle = subtitle,
+        backgroundColor = sheetColor(),
+        cornerRadius = UiConsts.SheetCorner,
+        sheetMaxWidth = UiConsts.SheetMaxWidth,
+        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
+        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
     ) {
         Column(
-            modifier = modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(UiConsts.Space12),
+            modifier =
+                Modifier.fillMaxWidth()
+                    .heightIn(
+                        max =
+                            LocalWindowInfo.current.containerDpSize.height *
+                                UiConsts.SheetHeightFraction
+                    )
         ) {
-            fields.forEach { field ->
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    if (field.choices != null) {
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    fontSize = UiType.RowDetail,
+                    lineHeight = UiType.RowDetailLine,
+                    color = colors.onSurfaceVariantSummary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(UiConsts.Space6))
+            }
+            Column(
+                modifier =
+                    modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(bottom = UiConsts.SheetPadding),
+                verticalArrangement = Arrangement.spacedBy(UiConsts.Space12),
+            ) {
+                fields.forEach { field ->
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
                             text = field.label,
-                            fontSize = com.cy.codex.UiType.Meta,
-                            lineHeight = com.cy.codex.UiType.MetaLine,
+                            fontSize = UiType.Meta,
+                            lineHeight = UiType.MetaLine,
                             color = colors.onSurfaceVariantSummary,
                         )
-                        field.choices.forEach { (value, label) ->
-                            RadioButtonPreference(
-                                title = label,
-                                selected = values[field.key] == value,
-                                onClick = { values[field.key] = value },
+                        if (field.choices != null) {
+                            field.choices.forEach { (value, label) ->
+                                RadioButtonPreference(
+                                    title = label,
+                                    selected = values[field.key] == value,
+                                    onClick = { values[field.key] = value },
+                                )
+                            }
+                        } else {
+                            Spacer(Modifier.height(UiConsts.Space4))
+                            TextField(
+                                value = values[field.key].orEmpty(),
+                                onValueChange = { values[field.key] = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = field.placeholder.orEmpty(),
+                                useLabelAsPlaceholder = true,
+                                singleLine = true,
+                                keyboardOptions =
+                                    KeyboardOptions(keyboardType = field.keyboardType),
+                                visualTransformation =
+                                    if (field.masked) {
+                                        androidx.compose.ui.text.input
+                                            .PasswordVisualTransformation()
+                                    } else {
+                                        androidx.compose.ui.text.input.VisualTransformation.None
+                                    },
                             )
                         }
-                    } else {
-                        CodexTextField(
-                            value = values[field.key].orEmpty(),
-                            onValueChange = { values[field.key] = it },
-                            label = field.label,
-                            placeholder = field.placeholder,
-                            keyboardOptions = KeyboardOptions(keyboardType = field.keyboardType),
-                            visualTransformation = if (field.masked) {
-                                androidx.compose.ui.text.input.PasswordVisualTransformation()
-                            } else {
-                                androidx.compose.ui.text.input.VisualTransformation.None
-                            },
-                        )
-                    }
-                    val note = field.help ?: if (touched && field.required && values[field.key].isNullOrBlank()) {
-                        stringResource(R.string.form_field_required)
-                    } else {
-                        null
-                    }
-                    if (note != null) {
-                        Spacer(Modifier.height(UiConsts.Space4))
-                        Text(
-                            text = note,
-                            fontSize = com.cy.codex.UiType.Meta,
-                            lineHeight = com.cy.codex.UiType.MetaLine,
-                            color = if (touched && values[field.key].isNullOrBlank()) {
-                                colors.error
-                            } else {
-                                colors.onSurfaceVariantSummary
-                            },
-                        )
+                        val note =
+                            field.help
+                                ?: if (
+                                    touched && field.required && values[field.key].isNullOrBlank()
+                                ) {
+                                    stringResource(R.string.form_field_required)
+                                } else {
+                                    null
+                                }
+                        if (note != null) {
+                            Spacer(Modifier.height(UiConsts.Space4))
+                            Text(
+                                text = note,
+                                fontSize = UiType.Meta,
+                                lineHeight = UiType.MetaLine,
+                                color =
+                                    if (touched && values[field.key].isNullOrBlank()) {
+                                        colors.error
+                                    } else {
+                                        colors.onSurfaceVariantSummary
+                                    },
+                            )
+                        }
                     }
                 }
+                Spacer(Modifier.height(UiConsts.Space4))
+                Button(
+                    onClick = {
+                        touched = true
+                        if (complete) onSubmit(values.toMap())
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = complete,
+                    colors =
+                        if (destructive) {
+                            ButtonDefaults.buttonColors(
+                                color = Color.Transparent,
+                                contentColor = colors.error,
+                            )
+                        } else {
+                            ButtonDefaults.buttonColorsPrimary()
+                        },
+                ) {
+                    Text(text = confirmLabel, maxLines = 1)
+                }
             }
-            Spacer(Modifier.height(UiConsts.Space4))
-            CodexButton(
-                text = confirmLabel,
-                onClick = {
-                    touched = true
-                    if (complete) onSubmit(values.toMap())
-                },
-                modifier = Modifier.fillMaxWidth(),
-                role = if (destructive) ButtonRole.Destructive else ButtonRole.Primary,
-                enabled = complete,
-            )
         }
     }
 }
@@ -166,21 +230,22 @@ fun ProjectFormSheet(
 ) {
     FormSheet(
         title = title,
-        fields = listOf(
-            FormField(
-                key = "name",
-                label = stringResource(R.string.projects_form_name),
-                placeholder = stringResource(R.string.projects_form_name_placeholder),
-                initial = initial?.name.orEmpty(),
+        fields =
+            listOf(
+                FormField(
+                    key = "name",
+                    label = stringResource(R.string.projects_form_name),
+                    placeholder = stringResource(R.string.projects_form_name_placeholder),
+                    initial = initial?.name.orEmpty(),
+                ),
+                FormField(
+                    key = "path",
+                    label = stringResource(R.string.projects_form_path),
+                    placeholder = stringResource(R.string.projects_form_path_placeholder),
+                    initial = initial?.path.orEmpty(),
+                    help = stringResource(R.string.projects_form_path_help),
+                ),
             ),
-            FormField(
-                key = "path",
-                label = stringResource(R.string.projects_form_path),
-                placeholder = stringResource(R.string.projects_form_path_placeholder),
-                initial = initial?.path.orEmpty(),
-                help = stringResource(R.string.projects_form_path_help),
-            ),
-        ),
         confirmLabel = stringResource(R.string.projects_form_save),
         onDismiss = onDismiss,
         onSubmit = { onSubmit(it["name"].orEmpty().trim(), it["path"].orEmpty().trim()) },
@@ -201,14 +266,15 @@ fun PathSheet(
 ) {
     FormSheet(
         title = title,
-        fields = listOf(
-            FormField(
-                key = "path",
-                label = label,
-                initial = initial,
-                help = help,
+        fields =
+            listOf(
+                FormField(
+                    key = "path",
+                    label = label,
+                    initial = initial,
+                    help = help,
+                )
             ),
-        ),
         confirmLabel = confirm,
         onDismiss = onDismiss,
         onSubmit = { onSubmit(it["path"].orEmpty().trim()) },
@@ -231,20 +297,21 @@ fun EnvironmentFormSheet(
     FormSheet(
         title = stringResource(R.string.projects_screen_add_environment),
         subtitle = stringResource(R.string.projects_screen_add_environment_detail),
-        fields = listOf(
-            FormField(
-                key = "id",
-                label = stringResource(R.string.environment_form_id),
-                placeholder = stringResource(R.string.environment_form_id_placeholder),
+        fields =
+            listOf(
+                FormField(
+                    key = "id",
+                    label = stringResource(R.string.environment_form_id),
+                    placeholder = stringResource(R.string.environment_form_id_placeholder),
+                ),
+                FormField(
+                    key = "url",
+                    label = stringResource(R.string.environment_form_url),
+                    placeholder = stringResource(R.string.environment_form_url_placeholder),
+                    help = stringResource(R.string.environment_form_url_help),
+                    keyboardType = KeyboardType.Uri,
+                ),
             ),
-            FormField(
-                key = "url",
-                label = stringResource(R.string.environment_form_url),
-                placeholder = stringResource(R.string.environment_form_url_placeholder),
-                help = stringResource(R.string.environment_form_url_help),
-                keyboardType = KeyboardType.Uri,
-            ),
-        ),
         confirmLabel = stringResource(R.string.environment_form_add),
         onDismiss = onDismiss,
         onSubmit = { onSubmit(it["id"].orEmpty().trim(), it["url"].orEmpty().trim()) },

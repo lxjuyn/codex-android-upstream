@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -56,16 +57,13 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.cy.codex.MentionSuggestion
-import com.cy.codex.R
-import com.cy.codex.chatwidget.SlashCommand
 import com.cy.codex.Motion
-import com.cy.codex.SquircleShape
+import com.cy.codex.R
 import com.cy.codex.UiConsts
+import com.cy.codex.UiType
+import com.cy.codex.chatwidget.SlashCommand
 import com.cy.codex.codeSurface
-import com.cy.codex.fileName
-import com.cy.codex.floatingSurface
 import com.cy.codex.glassTint
 import com.cy.codex.keymap.KeyAction
 import com.cy.codex.keymap.KeyContext
@@ -73,32 +71,34 @@ import com.cy.codex.keymap.LocalChatKeyFocus
 import com.cy.codex.keymap.LocalShortcutsHelp
 import com.cy.codex.keymap.codexHardwareKeys
 import com.cy.codex.parentPath
-import com.cy.codex.pressableRow
 import com.cy.codex.raisedSurface
-import com.cy.codex.UiType
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.Backdrop
+import top.yukonga.miuix.kmp.blur.blur
+import top.yukonga.miuix.kmp.blur.drawBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
-import top.yukonga.miuix.kmp.icon.extended.Send
 import top.yukonga.miuix.kmp.icon.extended.Pause
+import top.yukonga.miuix.kmp.icon.extended.Send
+import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * The bottom composer.
  *
- * A direct port of the prompt bar this file replaced — same stacked layout, same spring corner, same
- * glass surface — plus the three things the port of `bottom_pane/chat_composer.rs` needs on top:
- * a running turn turns the trailing button into an interrupt, queued messages are announced above
- * the field, and a leading `/` opens the slash-command popup.
+ * A direct port of the prompt bar this file replaced — same stacked layout, same spring corner,
+ * same glass surface — plus the three things the port of `bottom_pane/chat_composer.rs` needs on
+ * top: a running turn turns the trailing button into an interrupt, queued messages are announced
+ * above the field, and a leading `/` opens the slash-command popup.
  *
- * Hardware keys are read here rather than at the chat root because the popups and the caret are this
- * widget's own state: the host only hears about [KeyAction.Submit], [KeyAction.InterruptTurn] and the
- * global chords, while Enter/Shift+Enter and the popup cursor are resolved against the live draft.
+ * Hardware keys are read here rather than at the chat root because the popups and the caret are
+ * this widget's own state: the host only hears about [KeyAction.Submit], [KeyAction.InterruptTurn]
+ * and the global chords, while Enter/Shift+Enter and the popup cursor are resolved against the live
+ * draft.
  */
-
 private val ButtonSize = 42.dp
 
 /** Glyph of the leading button and of the idle send button. */
@@ -151,7 +151,6 @@ private val InputRowMinHeight = ButtonSize + 2.dp
  * doing, and it amplified whatever low-frequency colour the blur left behind.
  */
 private val ComposerBlurRadius = 14.dp
-private val NoBlurRadius = 0.dp
 private val ComposerElevation = 12.dp
 
 /** Room the two buttons and their paddings take out of the inline width of the field. */
@@ -169,11 +168,12 @@ private val SuggestionRowGap = 4.dp
 private val SuggestionCommandWidth = 104.dp
 private val SuggestionCommandGap = 10.dp
 
-private fun PromptTextStyle(color: Color) = TextStyle(
-    color = color,
-    fontSize = PromptFontSize,
-    lineHeight = PromptLineHeight,
-)
+private fun PromptTextStyle(color: Color) =
+    TextStyle(
+        color = color,
+        fontSize = PromptFontSize,
+        lineHeight = PromptLineHeight,
+    )
 
 @Composable
 fun Composer(
@@ -193,7 +193,9 @@ fun Composer(
     onMentionPicked: (String) -> Unit = {},
     /** Called with the trailing `@` token, or `null` when it is gone; drives the search session. */
     onMentionQueryChange: (String?) -> Unit = {},
-    /** Enabled skill names, offered behind the `$` trigger the way the TUI's mentions popup does. */
+    /**
+     * Enabled skill names, offered behind the `$` trigger the way the TUI's mentions popup does.
+     */
     skillCandidates: List<String> = emptyList(),
     onSkillPicked: (String) -> Unit = {},
     /** Called on every text edit, so the host can defer an approval dialog while the user types. */
@@ -224,7 +226,8 @@ fun Composer(
     var focused by remember { mutableStateOf(false) }
     var inlineWidthPx by remember { mutableFloatStateOf(0f) }
     val measurer = rememberTextMeasurer()
-    // The caret-carrying mirror of [value]. The host owns the draft as plain text, but a newline has
+    // The caret-carrying mirror of [value]. The host owns the draft as plain text, but a newline
+    // has
     // to land where the caret is and a String cannot say where that is.
     var field by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
     LaunchedEffect(value) {
@@ -246,73 +249,88 @@ fun Composer(
     var searchIndex by remember { mutableIntStateOf(-1) }
     var searchOriginal by remember { mutableStateOf("") }
     val searchFocusRequester = remember { FocusRequester() }
-    val searchMatches = remember(history, searchQuery, searchActive) {
-        if (searchActive) historySearchMatches(history, searchQuery) else emptyList()
-    }
+    val searchMatches =
+        remember(history, searchQuery, searchActive) {
+            if (searchActive) historySearchMatches(history, searchQuery) else emptyList()
+        }
     LaunchedEffect(searchActive) {
         // The bar owns typing while it is up; without focus a hardware keyboard would keep editing
         // the matched entry.
         if (searchActive) runCatching { searchFocusRequester.requestFocus() }
     }
-    val stacked = remember(value, inlineWidthPx, measurer) {
-        if (value.isEmpty()) {
-            false
-        } else if (value.contains('\n')) {
-            true
-        } else if (inlineWidthPx <= 0f) {
-            false
-        } else {
-            val measured = measurer.measure(
-                text = AnnotatedString(value),
-                style = PromptTextStyle(colors.onSurface),
-                maxLines = 1,
-                softWrap = false,
-            )
-            measured.size.width > inlineWidthPx
+    val stacked =
+        remember(value, inlineWidthPx, measurer) {
+            if (value.isEmpty()) {
+                false
+            } else if (value.contains('\n')) {
+                true
+            } else if (inlineWidthPx <= 0f) {
+                false
+            } else {
+                val measured =
+                    measurer.measure(
+                        text = AnnotatedString(value),
+                        style = PromptTextStyle(colors.onSurface),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                measured.size.width > inlineWidthPx
+            }
         }
-    }
-    val showSuggestions = !searchActive && !popupDismissed && slashSuggestions.isNotEmpty() && value.startsWith("/")
+    val showSuggestions =
+        !searchActive && !popupDismissed && slashSuggestions.isNotEmpty() && value.startsWith("/")
     // A mention is the trailing `@token`: everything after the last `@` counts as the query, and a
     // whitespace ends it. Mirrors the trigger rule in `bottom_pane/mentions_v2/filter.rs`.
-    val mentionQuery = remember(value) {
-        val at = value.lastIndexOf('@')
-        when {
-            at < 0 -> null
-            value.substring(at + 1).any { it.isWhitespace() } -> null
-            else -> value.substring(at + 1)
+    val mentionQuery =
+        remember(value) {
+            val at = value.lastIndexOf('@')
+            when {
+                at < 0 -> null
+                value.substring(at + 1).any { it.isWhitespace() } -> null
+                else -> value.substring(at + 1)
+            }
         }
-    }
     // The host already narrowed the list: files come scored from the search session, plugins and
     // tasks from a local match. Re-filtering here would drop matches the server weighted highly.
-    val mentionRows = remember(mentionQuery, mentionSuggestions) {
-        if (mentionQuery == null) emptyList() else mentionSuggestions.take(MaxPopupRows)
-    }
+    val mentionRows =
+        remember(mentionQuery, mentionSuggestions) {
+            if (mentionQuery == null) emptyList() else mentionSuggestions.take(MaxPopupRows)
+        }
     val commandRows = remember(slashSuggestions) { slashSuggestions.take(MaxPopupRows) }
     // A skill is the trailing `$token`, same trigger rule as `@`: `$` is not part of the query when
     // a whitespace follows it, so an ordinary dollar amount never opens the popup.
-    val skillQuery = remember(value) {
-        val dollar = value.lastIndexOf('$')
+    val skillQuery =
+        remember(value) {
+            val dollar = value.lastIndexOf('$')
+            when {
+                dollar < 0 -> null
+                value.substring(dollar + 1).any { it.isWhitespace() } -> null
+                else -> value.substring(dollar + 1)
+            }
+        }
+    val skillRows =
+        remember(skillQuery, skillCandidates) {
+            if (skillQuery == null) {
+                emptyList()
+            } else {
+                filterPaths(skillQuery, skillCandidates).take(MaxPopupRows)
+            }
+        }
+    val showMentions =
+        !searchActive && !popupDismissed && !showSuggestions && mentionRows.isNotEmpty()
+    val showSkills =
+        !searchActive &&
+            !popupDismissed &&
+            !showSuggestions &&
+            !showMentions &&
+            skillRows.isNotEmpty()
+    val popupCount =
         when {
-            dollar < 0 -> null
-            value.substring(dollar + 1).any { it.isWhitespace() } -> null
-            else -> value.substring(dollar + 1)
+            showSuggestions -> commandRows.size
+            showMentions -> mentionRows.size
+            showSkills -> skillRows.size
+            else -> 0
         }
-    }
-    val skillRows = remember(skillQuery, skillCandidates) {
-        if (skillQuery == null) {
-            emptyList()
-        } else {
-            filterPaths(skillQuery, skillCandidates).take(MaxPopupRows)
-        }
-    }
-    val showMentions = !searchActive && !popupDismissed && !showSuggestions && mentionRows.isNotEmpty()
-    val showSkills = !searchActive && !popupDismissed && !showSuggestions && !showMentions && skillRows.isNotEmpty()
-    val popupCount = when {
-        showSuggestions -> commandRows.size
-        showMentions -> mentionRows.size
-        showSkills -> skillRows.size
-        else -> 0
-    }
     val popupSelection = if (popupCount == 0) 0 else popupIndex.coerceIn(0, popupCount - 1)
 
     // `command_popup.rs` re-selects the first match when the filtered list changes, so a keystroke
@@ -413,113 +431,117 @@ fun Composer(
         runCatching { focusRequester.requestFocus() }
     }
 
-    fun handle(action: KeyAction): Boolean = when (action) {
-        KeyAction.Submit -> {
-            if (searchActive) {
-                acceptHistorySearch()
-            } else if (enabled && value.isNotBlank()) {
-                onActivity()
-                onSubmit()
-                leaveField()
-            }
-            true
-        }
-
-        KeyAction.InsertNewline -> {
-            if (enabled) insertNewline()
-            true
-        }
-
-        KeyAction.PopupNext -> {
-            if (popupCount > 0) popupIndex = (popupSelection + 1) % popupCount
-            popupCount > 0
-        }
-
-        KeyAction.PopupPrev -> {
-            if (popupCount > 0) popupIndex = (popupSelection - 1 + popupCount) % popupCount
-            popupCount > 0
-        }
-
-        KeyAction.PopupAccept -> {
-            if (popupCount > 0) pickSuggestion(popupSelection)
-            popupCount > 0
-        }
-
-        KeyAction.PopupDismiss -> {
-            if (popupCount > 0) popupDismissed = true
-            popupCount > 0
-        }
-
-        // `?` is the composer binding for `toggle_shortcuts`; it must never eat a printable
-        // character the user is typing, so it only acts on an empty field.
-        KeyAction.ShowShortcuts -> {
-            val help = shortcutsHelp
-            if (value.isEmpty() && help != null) {
-                help.toggle()
-                // The overlay is modal: leaving the caret here would let a soft keyboard keep
-                // typing into the field behind it.
-                leaveField()
-                true
-            } else {
-                false
-            }
-        }
-
-        KeyAction.ClearFocus -> {
-            if (searchActive) cancelHistorySearch() else leaveField()
-            true
-        }
-
-        // `history_search_previous` / `history_search_next`: Ctrl+R begins the search on the newest
-        // entry, Ctrl+S only moves while a search is already up (it is not a "newest entry" key).
-        KeyAction.HistoryOlder -> {
-            if (!enabled) {
-                false
-            } else {
-                if (searchActive) moveHistorySearch(older = true) else beginHistorySearch()
+    fun handle(action: KeyAction): Boolean =
+        when (action) {
+            KeyAction.Submit -> {
+                if (searchActive) {
+                    acceptHistorySearch()
+                } else if (enabled && value.isNotBlank()) {
+                    onActivity()
+                    onSubmit()
+                    leaveField()
+                }
                 true
             }
-        }
 
-        KeyAction.HistoryNewer -> {
-            if (enabled && searchActive) {
-                moveHistorySearch(older = false)
+            KeyAction.InsertNewline -> {
+                if (enabled) insertNewline()
                 true
-            } else {
-                false
             }
-        }
 
-        KeyAction.CopyLastResponse -> {
-            val copy = onCopyLastResponse
-            if (enabled && copy != null) {
-                copy()
+            KeyAction.PopupNext -> {
+                if (popupCount > 0) popupIndex = (popupSelection + 1) % popupCount
+                popupCount > 0
+            }
+
+            KeyAction.PopupPrev -> {
+                if (popupCount > 0) popupIndex = (popupSelection - 1 + popupCount) % popupCount
+                popupCount > 0
+            }
+
+            KeyAction.PopupAccept -> {
+                if (popupCount > 0) pickSuggestion(popupSelection)
+                popupCount > 0
+            }
+
+            KeyAction.PopupDismiss -> {
+                if (popupCount > 0) popupDismissed = true
+                popupCount > 0
+            }
+
+            // `?` is the composer binding for `toggle_shortcuts`; it must never eat a printable
+            // character the user is typing, so it only acts on an empty field.
+            KeyAction.ShowShortcuts -> {
+                val help = shortcutsHelp
+                if (value.isEmpty() && help != null) {
+                    help.toggle()
+                    // The overlay is modal: leaving the caret here would let a soft keyboard keep
+                    // typing into the field behind it.
+                    leaveField()
+                    true
+                } else {
+                    false
+                }
+            }
+
+            KeyAction.ClearFocus -> {
+                if (searchActive) cancelHistorySearch() else leaveField()
                 true
-            } else {
-                false
             }
-        }
 
-        KeyAction.OpenExternalEditor -> {
-            val editor = onOpenExternalEditor
-            if (enabled && editor != null) {
-                editor()
-                true
-            } else {
-                false
+            // `history_search_previous` / `history_search_next`: Ctrl+R begins the search on the
+            // newest
+            // entry, Ctrl+S only moves while a search is already up (it is not a "newest entry"
+            // key).
+            KeyAction.HistoryOlder -> {
+                if (!enabled) {
+                    false
+                } else {
+                    if (searchActive) moveHistorySearch(older = true) else beginHistorySearch()
+                    true
+                }
             }
-        }
 
-        else -> false
-    }
+            KeyAction.HistoryNewer -> {
+                if (enabled && searchActive) {
+                    moveHistorySearch(older = false)
+                    true
+                } else {
+                    false
+                }
+            }
+
+            KeyAction.CopyLastResponse -> {
+                val copy = onCopyLastResponse
+                if (enabled && copy != null) {
+                    copy()
+                    true
+                } else {
+                    false
+                }
+            }
+
+            KeyAction.OpenExternalEditor -> {
+                val editor = onOpenExternalEditor
+                if (enabled && editor != null) {
+                    editor()
+                    true
+                } else {
+                    false
+                }
+            }
+
+            else -> false
+        }
 
     val tint = glassTint(alpha = 0.86f)
-    val cornerRadius by animateDpAsState(
-        targetValue = if (stacked) stackedCornerRadius else inlineCornerRadius,
-        animationSpec = tween(durationMillis = CornerAnimationMs),
-        label = "promptCorner",
-    )
-    val shape = remember(cornerRadius) { SquircleShape(cornerRadius) }
+    val cornerRadius by
+        animateDpAsState(
+            targetValue = if (stacked) stackedCornerRadius else inlineCornerRadius,
+            animationSpec = tween(durationMillis = CornerAnimationMs),
+            label = "promptCorner",
+        )
+    val shape = remember(cornerRadius) { RoundedCornerShape(cornerRadius) }
 
     val leading: @Composable () -> Unit = {
         // The attachment button opens the system picker. `rememberLauncherForActivityResult` is
@@ -542,11 +564,12 @@ fun Composer(
     val trailing: @Composable () -> Unit = {
         when {
             running && value.isBlank() -> {
-                val background by animateColorAsState(
-                    targetValue = colors.error,
-                    animationSpec = tween(durationMillis = TintAnimationMs),
-                    label = "interruptColor",
-                )
+                val background by
+                    animateColorAsState(
+                        targetValue = colors.error,
+                        animationSpec = tween(durationMillis = TintAnimationMs),
+                        label = "interruptColor",
+                    )
                 IconButton(
                     onClick = onInterrupt,
                     backgroundColor = background,
@@ -563,25 +586,27 @@ fun Composer(
                 }
             }
 
-            value.isBlank() || !enabled -> IconButton(
-                onClick = {},
-                minWidth = buttonSize,
-                minHeight = buttonSize,
-            ) {
-                Icon(
-                    imageVector = MiuixIcons.Send,
-                    contentDescription = stringResource(R.string.composer_send),
-                    modifier = Modifier.size(IdleGlyphSize),
-                    tint = colors.onSurfaceSecondary,
-                )
-            }
+            value.isBlank() || !enabled ->
+                IconButton(
+                    onClick = {},
+                    minWidth = buttonSize,
+                    minHeight = buttonSize,
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.Send,
+                        contentDescription = stringResource(R.string.composer_send),
+                        modifier = Modifier.size(IdleGlyphSize),
+                        tint = colors.onSurfaceSecondary,
+                    )
+                }
 
             else -> {
-                val background by animateColorAsState(
-                    targetValue = if (focused) colors.primary else colors.primaryVariant,
-                    animationSpec = tween(durationMillis = TintAnimationMs),
-                    label = "sendColor",
-                )
+                val background by
+                    animateColorAsState(
+                        targetValue = if (focused) colors.primary else colors.primaryVariant,
+                        animationSpec = tween(durationMillis = TintAnimationMs),
+                        label = "sendColor",
+                    )
                 IconButton(
                     onClick = {
                         onActivity()
@@ -605,49 +630,58 @@ fun Composer(
     }
 
     Column(
-        modifier = modifier
-            // Preview, not bubble: while a suggestion list is open the same arrow keys move its
-            // cursor, and otherwise the field below keeps them for caret movement.
-            .codexHardwareKeys(
-                if (popupCount > 0 && !searchActive) KeyContext.Popup else KeyContext.Composer,
-                ::handle,
-            )
-            .floatingSurface(
-                shape = shape,
-                tint = tint,
-                backdrop = backdrop,
-                blurRadius = if (backdrop != null) ComposerBlurRadius else NoBlurRadius,
-                // No saturation boost: it amplifies exactly the low-frequency colour the blur left
-                // behind, which is what the blotches were.
-                saturation = 1f,
-                elevation = ComposerElevation,
-            )
-            .clip(shape)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = { focusRequester.requestFocus() },
-            )
-            .onSizeChanged { coords ->
-                inlineWidthPx = coords.width - with(density) {
-                    (buttonSize * 2 + InlineChromeWidth).toPx()
+        modifier =
+            modifier
+                // Preview, not bubble: while a suggestion list is open the same arrow keys move its
+                // cursor, and otherwise the field below keeps them for caret movement.
+                .codexHardwareKeys(
+                    if (popupCount > 0 && !searchActive) KeyContext.Popup else KeyContext.Composer,
+                    ::handle,
+                )
+                .shadow(elevation = ComposerElevation, shape = shape, clip = false)
+                .then(
+                    if (backdrop != null) {
+                        Modifier.drawBackdrop(
+                            backdrop = backdrop,
+                            shape = { shape },
+                            effects = { blur(ComposerBlurRadius.toPx()) },
+                            onDrawSurface = { drawRect(tint) },
+                        )
+                    } else {
+                        Modifier
+                    }
+                )
+                .squircleSurface(
+                    color = if (backdrop == null) tint else Color.Transparent,
+                    cornerRadius = cornerRadius,
+                )
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = { focusRequester.requestFocus() },
+                )
+                .onSizeChanged { coords ->
+                    inlineWidthPx =
+                        coords.width -
+                            with(density) {
+                                (buttonSize * 2 + InlineChromeWidth).toPx()
+                            }
                 }
-            }
-            .padding(
-                horizontal = ComposerPaddingHorizontal,
-                vertical = ComposerPaddingVertical,
-            ),
+                .padding(
+                    horizontal = ComposerPaddingHorizontal,
+                    vertical = ComposerPaddingVertical,
+                )
     ) {
         if (queuedCount > 0) {
             Text(
                 text = stringResource(R.string.composer_queued_count, queuedCount),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = QueuedPaddingHorizontal,
-                        end = QueuedPaddingHorizontal,
-                        bottom = QueuedPaddingBottom,
-                    ),
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .padding(
+                            start = QueuedPaddingHorizontal,
+                            end = QueuedPaddingHorizontal,
+                            bottom = QueuedPaddingBottom,
+                        ),
                 fontSize = QueuedFontSize,
                 lineHeight = QueuedLineHeight,
                 color = colors.onSurfaceVariantSummary,
@@ -694,9 +728,7 @@ fun Composer(
             }
         }
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = InputRowMinHeight),
+            modifier = Modifier.fillMaxWidth().heightIn(min = InputRowMinHeight),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AnimatedVisibility(
@@ -707,9 +739,7 @@ fun Composer(
                 leading()
             }
             Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = FieldPaddingHorizontal),
+                modifier = Modifier.weight(1f).padding(horizontal = FieldPaddingHorizontal),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 if (value.isEmpty() && !searchActive) {
@@ -735,21 +765,22 @@ fun Composer(
                         onActivity()
                         onValueChange(next.text)
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester)
-                        .onFocusChanged { focused = it.isFocused },
+                    modifier =
+                        Modifier.fillMaxWidth().focusRequester(focusRequester).onFocusChanged {
+                            focused = it.isFocused
+                        },
                     textStyle = PromptTextStyle(colors.onSurface),
                     cursorBrush = SolidColor(colors.primary),
                     maxLines = maxInputLines,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(
-                        onSend = {
-                            onActivity()
-                            onSubmit()
-                            leaveField()
-                        },
-                    ),
+                    keyboardActions =
+                        KeyboardActions(
+                            onSend = {
+                                onActivity()
+                                onSubmit()
+                                leaveField()
+                            }
+                        ),
                     interactionSource = interactionSource,
                 )
             }
@@ -767,9 +798,7 @@ fun Composer(
             exit = fadeOut(tween(PopupFadeOutMs)),
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = StackedRowGap),
+                modifier = Modifier.fillMaxWidth().padding(top = StackedRowGap),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 leading()
@@ -778,15 +807,18 @@ fun Composer(
             }
         }
         if (searchActive) {
-            val searchStatus = when {
-                history.isEmpty() -> stringResource(R.string.composer_history_search_empty)
-                searchMatches.isEmpty() -> stringResource(R.string.composer_history_search_no_match)
-                else -> stringResource(
-                    R.string.composer_history_search_position,
-                    searchMatches.indexOf(searchIndex) + 1,
-                    searchMatches.size,
-                )
-            }
+            val searchStatus =
+                when {
+                    history.isEmpty() -> stringResource(R.string.composer_history_search_empty)
+                    searchMatches.isEmpty() ->
+                        stringResource(R.string.composer_history_search_no_match)
+                    else ->
+                        stringResource(
+                            R.string.composer_history_search_position,
+                            searchMatches.indexOf(searchIndex) + 1,
+                            searchMatches.size,
+                        )
+                }
             HistorySearchBar(
                 query = searchQuery,
                 status = searchStatus,
@@ -802,9 +834,7 @@ fun Composer(
     }
 }
 
-/**
- * Corner radius of the popup card; it is a card of rows, so it takes the shared row corner.
- */
+/** Corner radius of the popup card; it is a card of rows, so it takes the shared row corner. */
 private val PopupCorner = RoundedCornerShape(UiConsts.RowCorner)
 
 /** Corner radius of one popup row, shared by the slash and `@`-mention lists. */
@@ -826,10 +856,8 @@ private fun PopupShell(
     rows: @Composable () -> Unit,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(codeSurface(), PopupCorner)
-            .padding(PopupPadding),
+        modifier =
+            modifier.fillMaxWidth().background(codeSurface(), PopupCorner).padding(PopupPadding),
         verticalArrangement = Arrangement.spacedBy(PopupRowGap),
         content = { rows() },
     )
@@ -840,7 +868,7 @@ private fun PopupShell(
  *
  * The first row is only highlighted when the cursor points at it; a hardware keyboard needs the
  * highlight to move, so this draws rows with the cursor on whichever row Enter would take. Row
- * style is shared through [PopupShell], [PopupRowCorner] and `pressableRow`, so a tap still picks
+ * style is shared through [PopupShell], [PopupRowCorner] and miuix [Surface], so a tap still picks
  * exactly the row it lands on.
  */
 @Composable
@@ -852,46 +880,48 @@ private fun CommandSuggestionList(
     PopupShell {
         commands.forEachIndexed { index, command ->
             val rowShape = RoundedCornerShape(PopupRowCorner)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .pressableRow(
-                        shape = rowShape,
-                        container = if (index == selectedIndex) {
-                            MiuixTheme.colorScheme.primary.copy(alpha = 0.08f)
-                        } else {
-                            raisedSurface()
-                        },
-                        onClick = { onPick(command) },
-                    )
-                    .padding(
-                        horizontal = SuggestionRowPaddingHorizontal,
-                        vertical = SuggestionRowPaddingVertical,
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = rowShape,
+                color =
+                    if (index == selectedIndex) {
+                        MiuixTheme.colorScheme.primary.copy(alpha = 0.08f)
+                    } else {
+                        raisedSurface()
+                    },
+                onClick = { onPick(command) },
             ) {
-                Text(
-                    text = command.command,
-                    modifier = Modifier.width(SuggestionCommandWidth),
-                    fontSize = UiType.Subtitle,
-                    lineHeight = UiType.RowTitleLine,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = FontFamily.Monospace,
-                    color = MiuixTheme.colorScheme.primary,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.width(SuggestionCommandGap))
-                Text(
-                    text = command.description,
-                    modifier = Modifier.weight(1f),
-                    fontSize = UiType.RowDetail,
-                    lineHeight = UiType.MetaLine,
-                    color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(
+                    modifier =
+                        Modifier.padding(
+                            horizontal = SuggestionRowPaddingHorizontal,
+                            vertical = SuggestionRowPaddingVertical,
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = command.command,
+                        modifier = Modifier.width(SuggestionCommandWidth),
+                        fontSize = UiType.Subtitle,
+                        lineHeight = UiType.RowTitleLine,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = FontFamily.Monospace,
+                        color = MiuixTheme.colorScheme.primary,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.width(SuggestionCommandGap))
+                    Text(
+                        text = command.description,
+                        modifier = Modifier.weight(1f),
+                        fontSize = UiType.RowDetail,
+                        lineHeight = UiType.MetaLine,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             if (index != commands.lastIndex) Spacer(Modifier.height(SuggestionRowGap))
         }
@@ -908,48 +938,52 @@ private fun MentionSuggestionList(
     PopupShell {
         candidates.forEachIndexed { index, candidate ->
             val rowShape = RoundedCornerShape(PopupRowCorner)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .pressableRow(
-                        shape = rowShape,
-                        container = if (index == selectedIndex) {
-                            MiuixTheme.colorScheme.primary.copy(alpha = 0.08f)
-                        } else {
-                            raisedSurface()
-                        },
-                        onClick = { onPick(candidate) },
-                    )
-                    .padding(
-                        horizontal = SuggestionRowPaddingHorizontal,
-                        vertical = SuggestionRowPaddingVertical,
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = rowShape,
+                color =
+                    if (index == selectedIndex) {
+                        MiuixTheme.colorScheme.primary.copy(alpha = 0.08f)
+                    } else {
+                        raisedSurface()
+                    },
+                onClick = { onPick(candidate) },
             ) {
-                Text(
-                    text = candidate.label,
-                    modifier = Modifier.weight(1f),
-                    fontSize = UiType.Subtitle,
-                    lineHeight = UiType.RowTitleLine,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MiuixTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                // A file shows the directory it lives in; a plugin or task brings its own detail.
-                val detail = candidate.detail ?: parentPath(candidate.insert).takeIf { it.isNotEmpty() }
-                if (detail != null) {
-                    Spacer(Modifier.width(SuggestionCommandGap))
+                Row(
+                    modifier =
+                        Modifier.padding(
+                            horizontal = SuggestionRowPaddingHorizontal,
+                            vertical = SuggestionRowPaddingVertical,
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
-                        text = detail,
+                        text = candidate.label,
                         modifier = Modifier.weight(1f),
-                        fontSize = UiType.Meta,
-                        lineHeight = UiType.MetaLine,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        fontSize = UiType.Subtitle,
+                        lineHeight = UiType.RowTitleLine,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MiuixTheme.colorScheme.onSurface,
                         maxLines = 1,
-                        softWrap = false,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    // A file shows the directory it lives in; a plugin or task brings its own
+                    // detail.
+                    val detail =
+                        candidate.detail ?: parentPath(candidate.insert).takeIf { it.isNotEmpty() }
+                    if (detail != null) {
+                        Spacer(Modifier.width(SuggestionCommandGap))
+                        Text(
+                            text = detail,
+                            modifier = Modifier.weight(1f),
+                            fontSize = UiType.Meta,
+                            lineHeight = UiType.MetaLine,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
             if (index != candidates.lastIndex) Spacer(Modifier.height(SuggestionRowGap))
@@ -970,35 +1004,37 @@ private fun SkillSuggestionList(
     PopupShell {
         candidates.forEachIndexed { index, name ->
             val rowShape = RoundedCornerShape(PopupRowCorner)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .pressableRow(
-                        shape = rowShape,
-                        container = if (index == selectedIndex) {
-                            MiuixTheme.colorScheme.primary.copy(alpha = 0.08f)
-                        } else {
-                            raisedSurface()
-                        },
-                        onClick = { onPick(name) },
-                    )
-                    .padding(
-                        horizontal = SuggestionRowPaddingHorizontal,
-                        vertical = SuggestionRowPaddingVertical,
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = rowShape,
+                color =
+                    if (index == selectedIndex) {
+                        MiuixTheme.colorScheme.primary.copy(alpha = 0.08f)
+                    } else {
+                        raisedSurface()
+                    },
+                onClick = { onPick(name) },
             ) {
-                Text(
-                    text = "$" + name,
-                    modifier = Modifier.weight(1f),
-                    fontSize = UiType.Subtitle,
-                    lineHeight = UiType.RowTitleLine,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = FontFamily.Monospace,
-                    color = MiuixTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(
+                    modifier =
+                        Modifier.padding(
+                            horizontal = SuggestionRowPaddingHorizontal,
+                            vertical = SuggestionRowPaddingVertical,
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "$" + name,
+                        modifier = Modifier.weight(1f),
+                        fontSize = UiType.Subtitle,
+                        lineHeight = UiType.RowTitleLine,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.Monospace,
+                        color = MiuixTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             if (index != candidates.lastIndex) Spacer(Modifier.height(SuggestionRowGap))
         }
@@ -1009,7 +1045,8 @@ private fun SkillSuggestionList(
  * Case-insensitive subsequence match, the same shape of filter the TUI's file search uses: `cpu`
  * matches `com/cy/codex/ui/...`. Falls back to a plain `contains` in the caller, so a short query
  * still finds exact substrings.
- */private fun isSubsequence(query: String, candidate: String): Boolean {
+ */
+private fun isSubsequence(query: String, candidate: String): Boolean {
     if (query.isEmpty()) return true
     var index = 0
     for (char in candidate) {

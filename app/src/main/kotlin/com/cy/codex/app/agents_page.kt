@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,36 +24,44 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import com.cy.codex.AppEvent
 import com.cy.codex.CodexApp
-import com.cy.codex.CodexButton
-import com.cy.codex.CodexButtonSize
-import com.cy.codex.ModalSheet
 import com.cy.codex.R
-import com.cy.codex.SurfaceHeader
-import com.cy.codex.ButtonRole
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
-import com.cy.codex.CodexTextField
 import com.cy.codex.protocol.protocol.v2.AgentRunStatus
 import com.cy.codex.protocol.protocol.v2.ThreadStatus
+import com.cy.codex.sheetColor
+import com.cy.codex.sheetSideMargin
 import com.cy.codex.status.formatTokens
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /** Source kinds a `thread/list` scoped to an agent's descendants should include. */
-internal val SUB_AGENT_SOURCE_KINDS = listOf(
-    "subAgent",
-    "subAgentReview",
-    "subAgentCompact",
-    "subAgentThreadSpawn",
-    "subAgentOther",
-)
+internal val SUB_AGENT_SOURCE_KINDS =
+    listOf(
+        "subAgent",
+        "subAgentReview",
+        "subAgentCompact",
+        "subAgentThreadSpawn",
+        "subAgentOther",
+    )
 
 /**
  * `/agents` and `/subagents` as a page.
@@ -76,59 +86,75 @@ fun AgentsScreen(
     val usage = app.catalog.threadUsage
     val agentThreads = app.catalog.agentThreads
     val listedThreads = app.threads.threads
-    val entries = remember(roster, usage, agentThreads, listedThreads) {
-        val threadsById = (agentThreads + listedThreads).associateBy { it.id }
-        roster.map { agent -> agent.withThreadMetadata(threadsById[agent.threadId], usage[agent.threadId]) }
-    }
+    val entries =
+        remember(roster, usage, agentThreads, listedThreads) {
+            val threadsById = (agentThreads + listedThreads).associateBy { it.id }
+            roster.map { agent ->
+                agent.withThreadMetadata(threadsById[agent.threadId], usage[agent.threadId])
+            }
+        }
     var query by remember { mutableStateOf("") }
-    val filtered = remember(entries, query) {
-        val needle = query.trim()
-        if (needle.isEmpty()) entries else entries.filter { it.matches(needle) }
-    }
+    val filtered =
+        remember(entries, query) {
+            val needle = query.trim()
+            if (needle.isEmpty()) entries else entries.filter { it.matches(needle) }
+        }
     val busiest = filtered.maxOfOrNull { it.tokens }?.coerceAtLeast(1) ?: 1
     val totalTokens = entries.sumOf { it.tokens.toLong() }
     var renameTarget by remember { mutableStateOf<AgentRosterEntry?>(null) }
     var renameText by remember { mutableStateOf("") }
     var archiveTarget by remember { mutableStateOf<AgentRosterEntry?>(null) }
+    val renameAgent = {
+        val target = renameTarget
+        if (target != null && renameText.isNotBlank()) {
+            app.onAppEvent(AppEvent.RenameThread(target.threadId, renameText.trim()))
+            renameTarget = null
+        }
+    }
 
     // `thread/list` is the only source of subagent liveness and cli metadata, and it is a read the
     // page can need at any moment, so it is refreshed once per open rather than streamed.
-    LaunchedEffect(session.threadId) { app.onAppEvent(AppEvent.ReloadAgentThreads(session.threadId)) }
+    LaunchedEffect(session.threadId) {
+        app.onAppEvent(AppEvent.ReloadAgentThreads(session.threadId))
+    }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(colors.background),
-    ) {
-        SurfaceHeader(
+    Column(modifier = modifier.fillMaxSize().background(colors.background)) {
+        BasicComponent(
             title = stringResource(R.string.agents_overview_title),
-            subtitle = stringResource(R.string.agents_screen_subtitle, entries.size, formatTokens(totalTokens)),
-            leading = { AgentsBackButton(onBack) },
+            summary =
+                stringResource(
+                    R.string.agents_screen_subtitle,
+                    entries.size,
+                    formatTokens(totalTokens),
+                ),
+            startAction = { AgentsBackButton(onBack) },
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = UiConsts.ScreenMargin)
-                .padding(bottom = UiConsts.PageBottomInset),
+            modifier =
+                Modifier.weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = UiConsts.ScreenMargin)
+                    .padding(bottom = UiConsts.PageBottomInset),
             verticalArrangement = Arrangement.spacedBy(UiConsts.Space6),
         ) {
-            CodexTextField(
+            TextField(
                 value = query,
                 onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
                 label = stringResource(R.string.agents_screen_filter),
+                useLabelAsPlaceholder = true,
                 singleLine = true,
             )
             Spacer(Modifier.height(UiConsts.Space2))
             if (filtered.isEmpty()) {
                 Text(
-                    text = stringResource(
-                        if (entries.isEmpty()) R.string.agents_overview_empty else R.string.agent_picker_empty,
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = UiConsts.Space20),
+                    text =
+                        stringResource(
+                            if (entries.isEmpty()) R.string.agents_overview_empty
+                            else R.string.agent_picker_empty
+                        ),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = UiConsts.Space20),
                     fontSize = UiType.Body,
                     lineHeight = UiType.BodyLine,
                     color = colors.onSurfaceVariantSummary,
@@ -156,66 +182,131 @@ fun AgentsScreen(
         }
     }
 
-    ModalSheet(
+    WindowBottomSheet(
         show = renameTarget != null,
-        onDismiss = { renameTarget = null },
+        onDismissRequest = { renameTarget = null },
+        onDismissFinished = {},
         title = stringResource(R.string.agents_rename_title),
-        subtitle = renameTarget?.name,
+        backgroundColor = sheetColor(),
+        cornerRadius = UiConsts.SheetCorner,
+        sheetMaxWidth = UiConsts.SheetMaxWidth,
+        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
+        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
     ) {
-        CodexTextField(
-            value = renameText,
-            onValueChange = { renameText = it },
-            label = stringResource(R.string.agents_rename_label),
-            onImeAction = {
-                val target = renameTarget
-                if (target != null && renameText.isNotBlank()) {
-                    app.onAppEvent(AppEvent.RenameThread(target.threadId, renameText.trim()))
-                    renameTarget = null
-                }
-            },
-        )
-        Spacer(Modifier.height(UiConsts.Space12))
-        SheetActions(
-            confirm = stringResource(R.string.agents_rename_confirm),
-            confirmEnabled = renameText.isNotBlank(),
-            onConfirm = {
-                renameTarget?.let { app.onAppEvent(AppEvent.RenameThread(it.threadId, renameText.trim())) }
-                renameTarget = null
-            },
-            onCancel = { renameTarget = null },
-        )
+        Column(
+            modifier =
+                Modifier.fillMaxWidth()
+                    .heightIn(
+                        max =
+                            LocalWindowInfo.current.containerDpSize.height *
+                                UiConsts.SheetHeightFraction
+                    )
+        ) {
+            Text(
+                text = renameTarget?.name.orEmpty(),
+                fontSize = UiType.RowDetail,
+                lineHeight = UiType.RowDetailLine,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Column(
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(bottom = UiConsts.SheetPadding),
+                verticalArrangement = Arrangement.spacedBy(UiConsts.Space6),
+            ) {
+                TextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = stringResource(R.string.agents_rename_label),
+                    useLabelAsPlaceholder = true,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions =
+                        KeyboardActions(
+                            onDone = { renameAgent() },
+                            onGo = { renameAgent() },
+                            onSend = { renameAgent() },
+                        ),
+                )
+                Spacer(Modifier.height(UiConsts.Space12))
+                SheetActions(
+                    confirm = stringResource(R.string.agents_rename_confirm),
+                    confirmEnabled = renameText.isNotBlank(),
+                    onConfirm = renameAgent,
+                    onCancel = { renameTarget = null },
+                )
+            }
+        }
     }
 
-    ModalSheet(
+    WindowBottomSheet(
         show = archiveTarget != null,
-        onDismiss = { archiveTarget = null },
+        onDismissRequest = { archiveTarget = null },
+        onDismissFinished = {},
         title = stringResource(R.string.agents_archive_title),
-        subtitle = archiveTarget?.name,
+        backgroundColor = sheetColor(),
+        cornerRadius = UiConsts.SheetCorner,
+        sheetMaxWidth = UiConsts.SheetMaxWidth,
+        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
+        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
     ) {
-        Text(
-            text = stringResource(R.string.agents_archive_message),
-            fontSize = UiType.Body,
-            lineHeight = UiType.BodyLine,
-            color = colors.onSurfaceVariantSummary,
-        )
-        Spacer(Modifier.height(UiConsts.Space12))
-        SheetActions(
-            confirm = stringResource(R.string.agents_archive_confirm),
-            destructive = true,
-            onConfirm = {
-                archiveTarget?.let { app.onAppEvent(AppEvent.ArchiveThread(it.threadId, archived = true)) }
-                archiveTarget = null
-            },
-            onCancel = { archiveTarget = null },
-        )
+        Column(
+            modifier =
+                Modifier.fillMaxWidth()
+                    .heightIn(
+                        max =
+                            LocalWindowInfo.current.containerDpSize.height *
+                                UiConsts.SheetHeightFraction
+                    )
+        ) {
+            Text(
+                text = archiveTarget?.name.orEmpty(),
+                fontSize = UiType.RowDetail,
+                lineHeight = UiType.RowDetailLine,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Column(
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(bottom = UiConsts.SheetPadding),
+                verticalArrangement = Arrangement.spacedBy(UiConsts.Space6),
+            ) {
+                Text(
+                    text = stringResource(R.string.agents_archive_message),
+                    fontSize = UiType.Body,
+                    lineHeight = UiType.BodyLine,
+                    color = colors.onSurfaceVariantSummary,
+                )
+                Spacer(Modifier.height(UiConsts.Space12))
+                SheetActions(
+                    confirm = stringResource(R.string.agents_archive_confirm),
+                    destructive = true,
+                    onConfirm = {
+                        archiveTarget?.let {
+                            app.onAppEvent(AppEvent.ArchiveThread(it.threadId, archived = true))
+                        }
+                        archiveTarget = null
+                    },
+                    onCancel = { archiveTarget = null },
+                )
+            }
+        }
     }
 }
 
 /** Stop is offered only while the server calls the thread active; the rest are always available. */
-private fun AgentRosterEntry.canStop(): Boolean = when {
-    threadStatus != null -> threadStatus is ThreadStatus.Active
-    else -> status == AgentRunStatus.Running || status == AgentRunStatus.PendingInit
-}
+private fun AgentRosterEntry.canStop(): Boolean =
+    when {
+        threadStatus != null -> threadStatus is ThreadStatus.Active
+        else -> status == AgentRunStatus.Running || status == AgentRunStatus.PendingInit
+    }
 
 /**
  * The dashboard's per-row actions.
@@ -232,34 +323,40 @@ private fun AgentActions(
 ) {
     val destructive = agent.role == AgentRole.Sub
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(start = UiConsts.Space16, bottom = UiConsts.Space4),
+        modifier =
+            Modifier.fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(start = UiConsts.Space16, bottom = UiConsts.Space4),
         horizontalArrangement = Arrangement.spacedBy(UiConsts.Space6),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (agent.canStop()) {
-            CodexButton(
-                text = stringResource(R.string.agents_action_stop),
+            Button(
                 onClick = onStop,
-                role = ButtonRole.Secondary,
-                size = CodexButtonSize.Compact,
-            )
+                modifier = Modifier,
+                enabled = true,
+                colors = ButtonDefaults.buttonColors(),
+            ) {
+                Text(text = stringResource(R.string.agents_action_stop), maxLines = 1)
+            }
         }
-        CodexButton(
-            text = stringResource(R.string.agents_action_rename),
+        Button(
             onClick = onRename,
-            role = ButtonRole.Secondary,
-            size = CodexButtonSize.Compact,
-        )
+            modifier = Modifier,
+            enabled = true,
+            colors = ButtonDefaults.buttonColors(),
+        ) {
+            Text(text = stringResource(R.string.agents_action_rename), maxLines = 1)
+        }
         if (destructive) {
-            CodexButton(
-                text = stringResource(R.string.agents_action_archive),
+            Button(
                 onClick = onArchive,
-                role = ButtonRole.Secondary,
-                size = CodexButtonSize.Compact,
-            )
+                modifier = Modifier,
+                enabled = true,
+                colors = ButtonDefaults.buttonColors(),
+            ) {
+                Text(text = stringResource(R.string.agents_action_archive), maxLines = 1)
+            }
         }
     }
 }
@@ -276,23 +373,40 @@ private fun SheetActions(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(UiConsts.Space8, Alignment.End),
     ) {
-        CodexButton(
-            text = stringResource(R.string.agents_cancel),
+        Button(
             onClick = onCancel,
-            role = ButtonRole.Secondary,
-        )
-        CodexButton(
-            text = confirm,
+            modifier = Modifier,
+            enabled = true,
+            colors = ButtonDefaults.buttonColors(),
+        ) {
+            Text(text = stringResource(R.string.agents_cancel), maxLines = 1)
+        }
+        Button(
             onClick = onConfirm,
-            role = if (destructive) ButtonRole.Destructive else ButtonRole.Primary,
+            modifier = Modifier,
             enabled = confirmEnabled,
-        )
+            colors =
+                if (destructive) {
+                    ButtonDefaults.buttonColors(
+                        color = Color.Transparent,
+                        contentColor = MiuixTheme.colorScheme.error,
+                    )
+                } else {
+                    ButtonDefaults.buttonColorsPrimary()
+                },
+        ) {
+            Text(text = confirm, maxLines = 1)
+        }
     }
 }
 
 @Composable
 private fun AgentsBackButton(onBack: () -> Unit) {
-    IconButton(onClick = onBack, minWidth = UiConsts.IconButtonSize, minHeight = UiConsts.IconButtonSize) {
+    IconButton(
+        onClick = onBack,
+        minWidth = UiConsts.IconButtonSize,
+        minHeight = UiConsts.IconButtonSize,
+    ) {
         Icon(
             imageVector = MiuixIcons.ChevronBackward,
             contentDescription = stringResource(R.string.agents_screen_back),

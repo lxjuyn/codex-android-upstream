@@ -1,18 +1,20 @@
 package com.cy.codex.chatwidget
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -25,23 +27,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.cy.codex.AppEvent
-import com.cy.codex.CodexButton
-import com.cy.codex.CodexDivider
-import com.cy.codex.CodexTextField
 import com.cy.codex.R
-import com.cy.codex.SectionCard
-import com.cy.codex.SurfaceBackButton
-import com.cy.codex.SurfaceHeader
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
-import com.cy.codex.pressableRow
 import com.cy.codex.protocol.protocol.v2.ReviewTarget
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Check
+import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
 import top.yukonga.miuix.kmp.icon.extended.Merge
+import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -85,35 +91,57 @@ fun ReviewScreen(
     // eventually disagree, and the disagreement would be a request with a half-filled target.
     val target = reviewTarget(choice, branch, sha, commitTitle, instructions)
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(colors.background),
-    ) {
-        SurfaceHeader(
+    Column(modifier = modifier.fillMaxSize().background(colors.background)) {
+        BasicComponent(
             title = stringResource(R.string.review_screen_title),
-            subtitle = threadId,
-            leading = { SurfaceBackButton(stringResource(R.string.review_screen_back), onBack) },
+            summary = threadId,
+            startAction = {
+                IconButton(
+                    onClick = onBack,
+                    minWidth = UiConsts.IconButtonSize,
+                    minHeight = UiConsts.IconButtonSize,
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.ChevronBackward,
+                        contentDescription = stringResource(R.string.review_screen_back),
+                        modifier = Modifier.size(UiConsts.IconHeader),
+                        tint = MiuixTheme.colorScheme.primary,
+                    )
+                }
+            },
+            insideMargin = PaddingValues(14.dp, 10.dp),
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = UiConsts.ScreenMargin)
-                .padding(bottom = UiConsts.PageBottomInset),
+            modifier =
+                Modifier.weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = UiConsts.ScreenMargin)
+                    .padding(bottom = UiConsts.PageBottomInset),
             verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
         ) {
-            SectionCard(
-                title = stringResource(R.string.review_screen_section),
-                icon = MiuixIcons.Merge,
+            Card(
+                cornerRadius = UiConsts.SectionCorner,
+                insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
             ) {
+                BasicComponent(
+                    title = stringResource(R.string.review_screen_section),
+                    startAction = {
+                        Icon(
+                            imageVector = MiuixIcons.Merge,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MiuixTheme.colorScheme.primary,
+                        )
+                    },
+                )
+
                 ReviewChoiceRow(
                     choice = ReviewChoice.Uncommitted,
                     selected = choice == ReviewChoice.Uncommitted,
                     onSelect = { choice = ReviewChoice.Uncommitted },
                 )
-                CodexDivider()
+                HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
                 ReviewChoiceRow(
                     choice = ReviewChoice.BaseBranch,
                     selected = choice == ReviewChoice.BaseBranch,
@@ -121,15 +149,28 @@ fun ReviewScreen(
                 )
                 if (choice == ReviewChoice.BaseBranch) {
                     ReviewFields {
-                        CodexTextField(
-                            value = branch,
-                            onValueChange = { branch = it },
-                            label = stringResource(R.string.review_field_branch),
-                            placeholder = stringResource(R.string.review_field_branch_placeholder),
-                        )
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = stringResource(R.string.review_field_branch),
+                                fontSize = UiType.Meta,
+                                lineHeight = UiType.MetaLine,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                maxLines = 1,
+                            )
+                            Spacer(Modifier.height(UiConsts.Space4))
+                            TextField(
+                                value = branch,
+                                onValueChange = { branch = it },
+                                label =
+                                    (stringResource(R.string.review_field_branch_placeholder))
+                                        .orEmpty(),
+                                useLabelAsPlaceholder = true,
+                                singleLine = true,
+                            )
+                        }
                     }
                 }
-                CodexDivider()
+                HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
                 ReviewChoiceRow(
                     choice = ReviewChoice.Commit,
                     selected = choice == ReviewChoice.Commit,
@@ -137,23 +178,47 @@ fun ReviewScreen(
                 )
                 if (choice == ReviewChoice.Commit) {
                     ReviewFields {
-                        CodexTextField(
-                            value = sha,
-                            onValueChange = { sha = it },
-                            label = stringResource(R.string.review_field_sha),
-                            placeholder = stringResource(R.string.review_field_sha_placeholder),
-                        )
-                        CodexTextField(
-                            value = commitTitle,
-                            onValueChange = { commitTitle = it },
-                            label = stringResource(R.string.review_field_commit_title),
-                            placeholder = stringResource(
-                                R.string.review_field_commit_title_placeholder,
-                            ),
-                        )
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = stringResource(R.string.review_field_sha),
+                                fontSize = UiType.Meta,
+                                lineHeight = UiType.MetaLine,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                maxLines = 1,
+                            )
+                            Spacer(Modifier.height(UiConsts.Space4))
+                            TextField(
+                                value = sha,
+                                onValueChange = { sha = it },
+                                label =
+                                    (stringResource(R.string.review_field_sha_placeholder))
+                                        .orEmpty(),
+                                useLabelAsPlaceholder = true,
+                                singleLine = true,
+                            )
+                        }
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = stringResource(R.string.review_field_commit_title),
+                                fontSize = UiType.Meta,
+                                lineHeight = UiType.MetaLine,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                maxLines = 1,
+                            )
+                            Spacer(Modifier.height(UiConsts.Space4))
+                            TextField(
+                                value = commitTitle,
+                                onValueChange = { commitTitle = it },
+                                label =
+                                    (stringResource(R.string.review_field_commit_title_placeholder))
+                                        .orEmpty(),
+                                useLabelAsPlaceholder = true,
+                                singleLine = true,
+                            )
+                        }
                     }
                 }
-                CodexDivider()
+                HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
                 ReviewChoiceRow(
                     choice = ReviewChoice.Custom,
                     selected = choice == ReviewChoice.Custom,
@@ -161,24 +226,48 @@ fun ReviewScreen(
                 )
                 if (choice == ReviewChoice.Custom) {
                     ReviewFields {
-                        CodexTextField(
-                            value = instructions,
-                            onValueChange = { instructions = it },
-                            label = stringResource(R.string.review_field_instructions),
-                            placeholder = stringResource(
-                                R.string.review_field_instructions_placeholder,
-                            ),
-                            singleLine = false,
-                        )
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = stringResource(R.string.review_field_instructions),
+                                fontSize = UiType.Meta,
+                                lineHeight = UiType.MetaLine,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                maxLines = 1,
+                            )
+                            Spacer(Modifier.height(UiConsts.Space4))
+                            TextField(
+                                value = instructions,
+                                onValueChange = { instructions = it },
+                                label =
+                                    (stringResource(R.string.review_field_instructions_placeholder))
+                                        .orEmpty(),
+                                useLabelAsPlaceholder = true,
+                                singleLine = false,
+                            )
+                        }
                     }
                 }
             }
-            CodexButton(
-                text = stringResource(R.string.review_start),
+            Button(
                 onClick = { target?.let { onEvent(AppEvent.StartReview(threadId, it)) } },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = target != null,
-            )
+                colors = ButtonDefaults.buttonColorsPrimary(),
+                cornerRadius = UiConsts.ButtonHeight / 2,
+                minHeight = UiConsts.ButtonHeight,
+                insideMargin =
+                    PaddingValues(horizontal = UiConsts.ButtonPaddingHorizontal, vertical = 0.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.review_start),
+                    fontSize = UiType.Action,
+                    lineHeight = UiType.ActionLine,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             // The page has to say where the review will go, because the answer to "start review" is
             // not on this screen, and a user who does not know that reads the page as a failure.
             Text(
@@ -208,17 +297,15 @@ private fun ReviewChoiceRow(
     onSelect: () -> Unit,
 ) {
     val colors = MiuixTheme.colorScheme
-    val shape = remember { RoundedCornerShape(UiConsts.RowCorner) }
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pressableRow(
-                shape = shape,
-                container = if (selected) colors.primary.copy(alpha = 0.12f) else Color.Transparent,
-                onClick = onSelect,
-                onClickLabel = choice.title(),
-            )
-            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space9),
+        modifier =
+            Modifier.fillMaxWidth()
+                .squircleSurface(
+                    color = if (selected) colors.primary.copy(alpha = 0.12f) else Color.Transparent,
+                    cornerRadius = UiConsts.RowCorner,
+                )
+                .combinedClickable(onClick = onSelect)
+                .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space9),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -258,13 +345,13 @@ private fun ReviewChoiceRow(
 @Composable
 private fun ReviewFields(content: @Composable ColumnScope.() -> Unit) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                start = UiConsts.RowIndent,
-                end = UiConsts.Space4,
-                bottom = UiConsts.Space10,
-            ),
+        modifier =
+            Modifier.fillMaxWidth()
+                .padding(
+                    start = UiConsts.RowIndent,
+                    end = UiConsts.Space4,
+                    bottom = UiConsts.Space10,
+                ),
         verticalArrangement = Arrangement.spacedBy(UiConsts.Space8),
         content = content,
     )
@@ -295,26 +382,28 @@ private enum class ReviewChoice {
 /** Name of a choice, on its row and as the row's accessibility label. */
 @Composable
 @ReadOnlyComposable
-private fun ReviewChoice.title(): String = stringResource(
-    when (this) {
-        ReviewChoice.Uncommitted -> R.string.review_target_uncommitted
-        ReviewChoice.BaseBranch -> R.string.review_target_base_branch
-        ReviewChoice.Commit -> R.string.review_target_commit
-        ReviewChoice.Custom -> R.string.review_target_custom
-    },
-)
+private fun ReviewChoice.title(): String =
+    stringResource(
+        when (this) {
+            ReviewChoice.Uncommitted -> R.string.review_target_uncommitted
+            ReviewChoice.BaseBranch -> R.string.review_target_base_branch
+            ReviewChoice.Commit -> R.string.review_target_commit
+            ReviewChoice.Custom -> R.string.review_target_custom
+        }
+    )
 
 /** The one line under a choice that says which question it answers. */
 @Composable
 @ReadOnlyComposable
-private fun ReviewChoice.detail(): String = stringResource(
-    when (this) {
-        ReviewChoice.Uncommitted -> R.string.review_target_uncommitted_detail
-        ReviewChoice.BaseBranch -> R.string.review_target_base_branch_detail
-        ReviewChoice.Commit -> R.string.review_target_commit_detail
-        ReviewChoice.Custom -> R.string.review_target_custom_detail
-    },
-)
+private fun ReviewChoice.detail(): String =
+    stringResource(
+        when (this) {
+            ReviewChoice.Uncommitted -> R.string.review_target_uncommitted_detail
+            ReviewChoice.BaseBranch -> R.string.review_target_base_branch_detail
+            ReviewChoice.Commit -> R.string.review_target_commit_detail
+            ReviewChoice.Custom -> R.string.review_target_custom_detail
+        }
+    )
 
 /**
  * The target the current selection describes, or `null` while a required field is still blank.
@@ -329,17 +418,17 @@ private fun reviewTarget(
     sha: String,
     commitTitle: String,
     instructions: String,
-): ReviewTarget? = when (choice) {
-    ReviewChoice.Uncommitted -> ReviewTarget.UncommittedChanges
-    ReviewChoice.BaseBranch -> branch.trim()
-        .takeIf { it.isNotEmpty() }
-        ?.let { ReviewTarget.BaseBranch(it) }
+): ReviewTarget? =
+    when (choice) {
+        ReviewChoice.Uncommitted -> ReviewTarget.UncommittedChanges
+        ReviewChoice.BaseBranch ->
+            branch.trim().takeIf { it.isNotEmpty() }?.let { ReviewTarget.BaseBranch(it) }
 
-    ReviewChoice.Commit -> sha.trim()
-        .takeIf { it.isNotEmpty() }
-        ?.let { ReviewTarget.Commit(sha = it, title = commitTitle.trim().ifEmpty { null }) }
+        ReviewChoice.Commit ->
+            sha.trim()
+                .takeIf { it.isNotEmpty() }
+                ?.let { ReviewTarget.Commit(sha = it, title = commitTitle.trim().ifEmpty { null }) }
 
-    ReviewChoice.Custom -> instructions.trim()
-        .takeIf { it.isNotEmpty() }
-        ?.let { ReviewTarget.Custom(it) }
-}
+        ReviewChoice.Custom ->
+            instructions.trim().takeIf { it.isNotEmpty() }?.let { ReviewTarget.Custom(it) }
+    }

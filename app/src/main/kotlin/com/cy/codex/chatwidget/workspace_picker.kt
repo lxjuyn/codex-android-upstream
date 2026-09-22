@@ -1,6 +1,7 @@
 package com.cy.codex.chatwidget
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,21 +26,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
-import com.cy.codex.runtime.CodexApplication
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.cy.codex.R
-import com.cy.codex.protocol.AppServerClient
-import com.cy.codex.protocol.protocol.v2.FileMetadata
-import com.cy.codex.SurfaceHeader
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
-import com.cy.codex.pressableRow
+import com.cy.codex.protocol.AppServerClient
+import com.cy.codex.protocol.protocol.v2.FileMetadata
+import com.cy.codex.runtime.CodexApplication
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Icon
@@ -53,6 +52,7 @@ import top.yukonga.miuix.kmp.icon.extended.ChevronForward
 import top.yukonga.miuix.kmp.icon.extended.ConvertFile
 import top.yukonga.miuix.kmp.icon.extended.FolderFill
 import top.yukonga.miuix.kmp.icon.extended.UploadCloud
+import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -73,7 +73,8 @@ fun WorkspacePickerScreen(
 ) {
     val colors = MiuixTheme.colorScheme
     val runtime = LocalContext.current.applicationContext as CodexApplication
-    var currentPath by remember(initialPath) { mutableStateOf(initialPath.ifBlank { runtime.defaultWorkspace }) }
+    var currentPath by
+        remember(initialPath) { mutableStateOf(initialPath.ifBlank { runtime.defaultWorkspace }) }
     var entries by remember { mutableStateOf<List<FileMetadata>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -84,7 +85,8 @@ fun WorkspacePickerScreen(
     LaunchedEffect(currentPath) {
         loading = true
         error = null
-        client.readDirectory(currentPath)
+        client
+            .readDirectory(currentPath)
             .onSuccess { listing -> entries = listing }
             .onFailure { failure ->
                 entries = emptyList()
@@ -93,29 +95,28 @@ fun WorkspacePickerScreen(
         loading = false
     }
 
-    val directories = remember(entries) {
-        entries.filter { it.isDirectory }.sortedBy { it.name.lowercase() }
-    }
-    val files = remember(entries) {
-        entries.filterNot { it.isDirectory }.sortedBy { it.name.lowercase() }
-    }
+    val directories =
+        remember(entries) {
+            entries.filter { it.isDirectory }.sortedBy { it.name.lowercase() }
+        }
+    val files =
+        remember(entries) {
+            entries.filterNot { it.isDirectory }.sortedBy { it.name.lowercase() }
+        }
     val crumbs = remember(currentPath) { workspaceCrumbs(currentPath) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(colors.background),
-    ) {
-        SurfaceHeader(
+    Column(modifier = modifier.fillMaxSize().background(colors.background)) {
+        BasicComponent(
             title = stringResource(R.string.workspace_picker_title),
-            subtitle = currentPath,
-            leading = { WorkspaceBackButton(onBack) },
+            summary = currentPath,
+            startAction = { WorkspaceBackButton(onBack) },
+            insideMargin = PaddingValues(14.dp, 10.dp),
         )
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = UiConsts.Space12, vertical = UiConsts.Space2),
+            modifier =
+                Modifier.fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = UiConsts.Space12, vertical = UiConsts.Space2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             crumbs.forEachIndexed { index, crumb ->
@@ -130,14 +131,13 @@ fun WorkspacePickerScreen(
                 val last = index == crumbs.lastIndex
                 Text(
                     text = crumb.first,
-                    modifier = Modifier
-                        .clip(WorkspaceRowShape)
-                        .pressableRow(
-                            shape = WorkspaceRowShape,
-                            container = Color.Transparent,
-                            onClick = { currentPath = crumb.second },
-                        )
-                        .padding(horizontal = UiConsts.Space6, vertical = UiConsts.Space4),
+                    modifier =
+                        Modifier.squircleSurface(
+                                color = Color.Transparent,
+                                cornerRadius = UiConsts.RowCorner,
+                            )
+                            .combinedClickable(onClick = { currentPath = crumb.second })
+                            .padding(horizontal = UiConsts.Space6, vertical = UiConsts.Space4),
                     fontSize = UiType.Value,
                     lineHeight = UiType.ValueLine,
                     fontFamily = FontFamily.Monospace,
@@ -149,64 +149,67 @@ fun WorkspacePickerScreen(
         }
         Box(modifier = Modifier.weight(1f)) {
             when {
-                loading -> WorkspaceMessage(
-                    text = stringResource(R.string.workspace_picker_reading, currentPath),
-                    showProgress = true,
-                )
+                loading ->
+                    WorkspaceMessage(
+                        text = stringResource(R.string.workspace_picker_reading, currentPath),
+                        showProgress = true,
+                    )
 
                 error != null -> WorkspaceMessage(text = error!!, isError = true)
-                else -> LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        horizontal = UiConsts.ScreenMargin,
-                        vertical = UiConsts.Space6,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(UiConsts.Space2),
-                ) {
-                    if (currentPath != "/") {
-                        item(key = "..") {
+                else ->
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding =
+                            PaddingValues(
+                                horizontal = UiConsts.ScreenMargin,
+                                vertical = UiConsts.Space6,
+                            ),
+                        verticalArrangement = Arrangement.spacedBy(UiConsts.Space2),
+                    ) {
+                        if (currentPath != "/") {
+                            item(key = "..") {
+                                WorkspaceEntryRow(
+                                    name = "..",
+                                    detail = stringResource(R.string.workspace_picker_parent),
+                                    isDirectory = true,
+                                    onClick = { currentPath = workspaceParent(currentPath) },
+                                )
+                            }
+                        }
+                        items(directories, key = { it.path }) { entry ->
                             WorkspaceEntryRow(
-                                name = "..",
-                                detail = stringResource(R.string.workspace_picker_parent),
+                                name = entry.name,
+                                detail = entry.path,
                                 isDirectory = true,
-                                onClick = { currentPath = workspaceParent(currentPath) },
+                                onClick = { currentPath = entry.path },
                             )
                         }
-                    }
-                    items(directories, key = { it.path }) { entry ->
-                        WorkspaceEntryRow(
-                            name = entry.name,
-                            detail = entry.path,
-                            isDirectory = true,
-                            onClick = { currentPath = entry.path },
-                        )
-                    }
-                    items(files, key = { it.path }) { entry ->
-                        WorkspaceEntryRow(
-                            name = entry.name,
-                            detail = workspaceFormatSize(entry.size),
-                            isDirectory = false,
-                            onClick = null,
-                        )
-                    }
-                    if (directories.isEmpty() && files.isEmpty()) {
-                        item(key = "empty") {
-                            Text(
-                                text = stringResource(R.string.workspace_picker_empty),
-                                modifier = Modifier.padding(vertical = UiConsts.Space10),
-                                fontSize = UiType.Meta,
-                                lineHeight = UiType.MetaLine,
-                                color = colors.disabledOnSurface,
+                        items(files, key = { it.path }) { entry ->
+                            WorkspaceEntryRow(
+                                name = entry.name,
+                                detail = workspaceFormatSize(entry.size),
+                                isDirectory = false,
+                                onClick = null,
                             )
                         }
+                        if (directories.isEmpty() && files.isEmpty()) {
+                            item(key = "empty") {
+                                Text(
+                                    text = stringResource(R.string.workspace_picker_empty),
+                                    modifier = Modifier.padding(vertical = UiConsts.Space10),
+                                    fontSize = UiType.Meta,
+                                    lineHeight = UiType.MetaLine,
+                                    color = colors.disabledOnSurface,
+                                )
+                            }
+                        }
                     }
-                }
             }
         }
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = UiConsts.ScreenMargin, vertical = UiConsts.Space12),
+            modifier =
+                Modifier.fillMaxWidth()
+                    .padding(horizontal = UiConsts.ScreenMargin, vertical = UiConsts.Space12),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -257,16 +260,20 @@ private fun WorkspaceEntryRow(
 ) {
     val colors = MiuixTheme.colorScheme
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (onClick != null) {
-                    Modifier.pressableRow(WorkspaceRowShape, Color.Transparent, onClick)
-                } else {
-                    Modifier
-                },
-            )
-            .padding(horizontal = UiConsts.Space8, vertical = UiConsts.Space9),
+        modifier =
+            Modifier.fillMaxWidth()
+                .then(
+                    if (onClick != null) {
+                        Modifier.squircleSurface(
+                                color = Color.Transparent,
+                                cornerRadius = UiConsts.RowCorner,
+                            )
+                            .combinedClickable(onClick = onClick)
+                    } else {
+                        Modifier
+                    }
+                )
+                .padding(horizontal = UiConsts.Space8, vertical = UiConsts.Space9),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -308,12 +315,14 @@ private fun WorkspaceEntryRow(
 }
 
 @Composable
-private fun WorkspaceMessage(text: String, showProgress: Boolean = false, isError: Boolean = false) {
+private fun WorkspaceMessage(
+    text: String,
+    showProgress: Boolean = false,
+    isError: Boolean = false,
+) {
     val colors = MiuixTheme.colorScheme
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = UiConsts.Space16),
+        modifier = Modifier.fillMaxSize().padding(horizontal = UiConsts.Space16),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -334,7 +343,11 @@ private fun WorkspaceMessage(text: String, showProgress: Boolean = false, isErro
 
 @Composable
 private fun WorkspaceBackButton(onBack: () -> Unit) {
-    IconButton(onClick = onBack, minWidth = UiConsts.IconButtonSize, minHeight = UiConsts.IconButtonSize) {
+    IconButton(
+        onClick = onBack,
+        minWidth = UiConsts.IconButtonSize,
+        minHeight = UiConsts.IconButtonSize,
+    ) {
         Icon(
             imageVector = MiuixIcons.ChevronBackward,
             contentDescription = stringResource(R.string.workspace_picker_back),
@@ -344,18 +357,19 @@ private fun WorkspaceBackButton(onBack: () -> Unit) {
     }
 }
 
-private val WorkspaceRowShape = RoundedCornerShape(UiConsts.RowCorner)
-
 /** `label to path` for every ancestor of [path], root first; each crumb jumps to its own path. */
 private fun workspaceCrumbs(path: String): List<Pair<String, String>> {
     val normalized = path.trimEnd('/').ifEmpty { "/" }
     if (normalized == "/") return listOf("/" to "/")
     val crumbs = mutableListOf("/" to "/")
     var accumulated = ""
-    normalized.split('/').filter { it.isNotEmpty() }.forEach { segment ->
-        accumulated = "$accumulated/$segment"
-        crumbs += segment to accumulated
-    }
+    normalized
+        .split('/')
+        .filter { it.isNotEmpty() }
+        .forEach { segment ->
+            accumulated = "$accumulated/$segment"
+            crumbs += segment to accumulated
+        }
     return crumbs
 }
 
@@ -366,8 +380,9 @@ private fun workspaceParent(path: String): String {
     return trimmed.substringBeforeLast('/', "").ifEmpty { "/" }
 }
 
-private fun workspaceFormatSize(bytes: Long): String = when {
-    bytes >= 1_048_576 -> String.format(java.util.Locale.US, "%.1f MB", bytes / 1_048_576f)
-    bytes >= 1_024 -> String.format(java.util.Locale.US, "%.1f KB", bytes / 1_024f)
-    else -> "$bytes B"
-}
+private fun workspaceFormatSize(bytes: Long): String =
+    when {
+        bytes >= 1_048_576 -> String.format(java.util.Locale.US, "%.1f MB", bytes / 1_048_576f)
+        bytes >= 1_024 -> String.format(java.util.Locale.US, "%.1f KB", bytes / 1_024f)
+        else -> "$bytes B"
+    }

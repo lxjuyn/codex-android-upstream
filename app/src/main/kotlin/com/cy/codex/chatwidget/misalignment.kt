@@ -7,26 +7,31 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import com.cy.codex.ModalSheet
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import com.cy.codex.R
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
 import com.cy.codex.protocol.protocol.v2.MisalignmentErrorDetails
 import com.cy.codex.raisedSurface
+import com.cy.codex.sheetColor
+import com.cy.codex.sheetSideMargin
 import com.cy.codex.warningColor
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /** The longest steer `continuation_message` accepts upstream. */
 internal const val MaxMisalignmentSteerChars = 1024
@@ -48,12 +53,14 @@ internal fun MisalignmentBar(
     val colors = MiuixTheme.colorScheme
     val accent = warningColor()
     val shape = RoundedCornerShape(UiConsts.CornerControl)
-    val steer = details.steer?.message?.takeIf { it.isNotBlank() && it.length <= MaxMisalignmentSteerChars }
+    val steer =
+        details.steer?.message?.takeIf { it.isNotBlank() && it.length <= MaxMisalignmentSteerChars }
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(accent.copy(alpha = 0.12f), shape)
-            .padding(horizontal = UiConsts.Space12, vertical = UiConsts.Space10),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(accent.copy(alpha = 0.12f), shape)
+                .padding(horizontal = UiConsts.Space12, vertical = UiConsts.Space10)
     ) {
         Text(
             text = stringResource(R.string.misalignment_title),
@@ -70,13 +77,16 @@ internal fun MisalignmentBar(
             color = colors.onSurfaceSecondary,
         )
         Spacer(Modifier.height(UiConsts.Space8))
-        Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(UiConsts.Space8)) {
+        Row(
+            horizontalArrangement =
+                androidx.compose.foundation.layout.Arrangement.spacedBy(UiConsts.Space8)
+        ) {
             Text(
                 text = stringResource(R.string.misalignment_review),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(UiConsts.CornerChip))
-                    .clickable(onClick = onReview)
-                    .padding(horizontal = UiConsts.Space10, vertical = UiConsts.Space5),
+                modifier =
+                    Modifier.clip(RoundedCornerShape(UiConsts.CornerChip))
+                        .clickable(onClick = onReview)
+                        .padding(horizontal = UiConsts.Space10, vertical = UiConsts.Space5),
                 fontSize = UiType.Action,
                 lineHeight = UiType.ActionLine,
                 color = colors.primary,
@@ -84,10 +94,10 @@ internal fun MisalignmentBar(
             if (steer != null) {
                 Text(
                     text = stringResource(R.string.misalignment_continue),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(UiConsts.CornerChip))
-                        .clickable(onClick = onContinue)
-                        .padding(horizontal = UiConsts.Space10, vertical = UiConsts.Space5),
+                    modifier =
+                        Modifier.clip(RoundedCornerShape(UiConsts.CornerChip))
+                            .clickable(onClick = onContinue)
+                            .padding(horizontal = UiConsts.Space10, vertical = UiConsts.Space5),
                     fontSize = UiType.Action,
                     lineHeight = UiType.ActionLine,
                     fontWeight = FontWeight.Medium,
@@ -105,47 +115,67 @@ internal fun MisalignmentReviewSheet(
     onDismiss: () -> Unit,
 ) {
     val colors = MiuixTheme.colorScheme
-    val steer = details.steer?.message?.takeIf { it.isNotBlank() && it.length <= MaxMisalignmentSteerChars }
-    ModalSheet(
+    val steer =
+        details.steer?.message?.takeIf { it.isNotBlank() && it.length <= MaxMisalignmentSteerChars }
+    WindowBottomSheet(
         show = true,
-        onDismiss = onDismiss,
-        onDismissFinished = onDismiss,
+        onDismissRequest = onDismiss,
         title = stringResource(R.string.misalignment_review_title),
+        backgroundColor = sheetColor(),
+        cornerRadius = UiConsts.SheetCorner,
+        sheetMaxWidth = UiConsts.SheetMaxWidth,
+        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
+        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState()),
+            modifier =
+                Modifier.fillMaxWidth()
+                    .heightIn(
+                        max =
+                            LocalWindowInfo.current.containerDpSize.height *
+                                UiConsts.SheetHeightFraction
+                    )
         ) {
-            if (steer != null) {
+            Column(
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(bottom = UiConsts.SheetPadding)
+            ) {
+                if (steer != null) {
+                    Text(
+                        text = stringResource(R.string.misalignment_continuation_label),
+                        fontSize = UiType.Footnote,
+                        lineHeight = UiType.FootnoteLine,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.onSurfaceVariantSummary,
+                    )
+                    Spacer(Modifier.height(UiConsts.Space4))
+                    Text(
+                        text = steer,
+                        modifier =
+                            Modifier.fillMaxWidth()
+                                .background(
+                                    raisedSurface(),
+                                    RoundedCornerShape(UiConsts.CornerControl),
+                                )
+                                .padding(UiConsts.Space10),
+                        fontSize = UiType.Code,
+                        lineHeight = UiType.CodeLine,
+                        fontFamily = FontFamily.Monospace,
+                        color = colors.onSurface,
+                    )
+                    Spacer(Modifier.height(UiConsts.Space12))
+                }
                 Text(
-                    text = stringResource(R.string.misalignment_continuation_label),
-                    fontSize = UiType.Footnote,
-                    lineHeight = UiType.FootnoteLine,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.onSurfaceVariantSummary,
+                    text =
+                        details.detailedExplanation?.takeIf { it.isNotBlank() }
+                            ?: stringResource(R.string.misalignment_description),
+                    fontSize = UiType.Body,
+                    lineHeight = UiType.BodyLine,
+                    color = colors.onSurfaceSecondary,
                 )
-                Spacer(Modifier.height(UiConsts.Space4))
-                Text(
-                    text = steer,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(raisedSurface(), RoundedCornerShape(UiConsts.CornerControl))
-                        .padding(UiConsts.Space10),
-                    fontSize = UiType.Code,
-                    lineHeight = UiType.CodeLine,
-                    fontFamily = FontFamily.Monospace,
-                    color = colors.onSurface,
-                )
-                Spacer(Modifier.height(UiConsts.Space12))
             }
-            Text(
-                text = details.detailedExplanation?.takeIf { it.isNotBlank() }
-                    ?: stringResource(R.string.misalignment_description),
-                fontSize = UiType.Body,
-                lineHeight = UiType.BodyLine,
-                color = colors.onSurfaceSecondary,
-            )
         }
     }
 }

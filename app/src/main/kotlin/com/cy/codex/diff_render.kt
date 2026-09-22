@@ -2,6 +2,7 @@ package com.cy.codex
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -59,9 +60,9 @@ private const val DiffTabReplacement = "    "
  * cell is willing to show. File metadata (`diff --git`, `---`, `+++`, `\ No newline…`) is dropped
  * and the hunks of one file are separated by a `⋮` row, which is what the TUI renders.
  *
- * The body is a plain Column bounded by [maxLines] and grown in chunks on demand. A lazy list
- * would nest a second vertical scrollable inside the transcript's LazyColumn, and an unbounded
- * Column would make one transcript item lay out a whole file.
+ * The body is a plain Column bounded by [maxLines] and grown in chunks on demand. A lazy list would
+ * nest a second vertical scrollable inside the transcript's LazyColumn, and an unbounded Column
+ * would make one transcript item lay out a whole file.
  */
 @Composable
 fun DiffBody(
@@ -84,25 +85,29 @@ fun DiffBody(
     val signRemoved = stringResource(R.string.blocks_sign_removed)
     // Rows are folded once per body and re-folded only when the diff, the palette or the locale
     // changes, so recomposing a row does no string, Color or TextStyle construction.
-    val rows = remember(lines, palette, hunkTextColor, signAdded, signRemoved) {
-        buildDiffRows(lines, palette, hunkTextColor, signAdded, signRemoved)
-    }
+    val rows =
+        remember(lines, palette, hunkTextColor, signAdded, signRemoved) {
+            buildDiffRows(lines, palette, hunkTextColor, signAdded, signRemoved)
+        }
     // Syntax spans are built in one pass per body: the lexer has to see the lines in order for a
     // block comment or raw string to carry across them.
-    val styled = remember(lines, language, syntax) {
-        highlightDiffLines(lines, language, syntax)
-    }
+    val styled =
+        remember(lines, language, syntax) {
+            highlightDiffLines(lines, language, syntax)
+        }
     // Disclosure state for the truncated tail; keyed on the diff so a new payload opens at its
     // start instead of at a stale offset.
-    val visible = remember(rows, maxLines) {
-        mutableIntStateOf(maxLines.coerceIn(0, rows.size))
-    }
+    val visible =
+        remember(rows, maxLines) {
+            mutableIntStateOf(maxLines.coerceIn(0, rows.size))
+        }
     val shown = visible.intValue.coerceAtMost(rows.size)
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(vertical = verticalPadding),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(vertical = verticalPadding)
     ) {
         for (index in 0 until shown) {
             val row = rows[index]
@@ -168,46 +173,52 @@ internal fun buildDiffRows(
             // Only `@@` headers become rows, and only as the separator between hunks.
             if (line.text.startsWith("@@")) {
                 if (seenHunk) {
-                    rows += DiffRowModel(
-                        oldLine = "",
-                        newLine = "",
-                        sign = "",
-                        text = DiffHunkSeparator,
-                        background = Color.Transparent,
-                        textColor = hunkTextColor,
-                        sourceIndex = -1,
-                    )
+                    rows +=
+                        DiffRowModel(
+                            oldLine = "",
+                            newLine = "",
+                            sign = "",
+                            text = DiffHunkSeparator,
+                            background = Color.Transparent,
+                            textColor = hunkTextColor,
+                            sourceIndex = -1,
+                        )
                 }
                 seenHunk = true
             }
             continue
         }
-        val background = when (line.kind) {
-            DiffLineKind.Add -> palette.addSurface
-            DiffLineKind.Remove -> palette.removeSurface
-            DiffLineKind.Hunk -> palette.hunkSurface
-            DiffLineKind.Context -> Color.Transparent
-        }
-        val textColor = when (line.kind) {
-            DiffLineKind.Add -> palette.addText
-            DiffLineKind.Remove -> palette.removeText
-            DiffLineKind.Hunk -> hunkTextColor
-            DiffLineKind.Context -> palette.context
-        }
-        val sign = when (line.kind) {
-            DiffLineKind.Add -> signAdded
-            DiffLineKind.Remove -> signRemoved
-            DiffLineKind.Hunk, DiffLineKind.Context -> ""
-        }
-        rows += DiffRowModel(
-            oldLine = line.oldLine?.toString().orEmpty(),
-            newLine = line.newLine?.toString().orEmpty(),
-            sign = sign,
-            text = line.text.replace("\t", DiffTabReplacement),
-            background = background,
-            textColor = textColor,
-            sourceIndex = index,
-        )
+        val background =
+            when (line.kind) {
+                DiffLineKind.Add -> palette.addSurface
+                DiffLineKind.Remove -> palette.removeSurface
+                DiffLineKind.Hunk -> palette.hunkSurface
+                DiffLineKind.Context -> Color.Transparent
+            }
+        val textColor =
+            when (line.kind) {
+                DiffLineKind.Add -> palette.addText
+                DiffLineKind.Remove -> palette.removeText
+                DiffLineKind.Hunk -> hunkTextColor
+                DiffLineKind.Context -> palette.context
+            }
+        val sign =
+            when (line.kind) {
+                DiffLineKind.Add -> signAdded
+                DiffLineKind.Remove -> signRemoved
+                DiffLineKind.Hunk,
+                DiffLineKind.Context -> ""
+            }
+        rows +=
+            DiffRowModel(
+                oldLine = line.oldLine?.toString().orEmpty(),
+                newLine = line.newLine?.toString().orEmpty(),
+                sign = sign,
+                text = line.text.replace("\t", DiffTabReplacement),
+                background = background,
+                textColor = textColor,
+                sourceIndex = index,
+            )
     }
     return rows
 }
@@ -252,9 +263,7 @@ internal fun DiffRow(
     lineHeight: TextUnit = UiType.CaptionLine,
 ) {
     Row(
-        modifier = Modifier
-            .background(model.background)
-            .padding(vertical = verticalPadding),
+        modifier = Modifier.background(model.background).padding(vertical = verticalPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (showGutters) {
@@ -288,9 +297,9 @@ internal fun DiffRow(
 /**
  * The row that stands in for the hidden tail of a long diff.
  *
- * A tap reveals the next chunk rather than repeating the omitted count: a diff the caller
- * truncated is usually still worth reading, and the old note left no way to read it without
- * opening the status pane.
+ * A tap reveals the next chunk rather than repeating the omitted count: a diff the caller truncated
+ * is usually still worth reading, and the old note left no way to read it without opening the
+ * status pane.
  */
 @Composable
 private fun DiffExpander(
@@ -304,9 +313,9 @@ private fun DiffExpander(
 ) {
     Text(
         text = label,
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(start = startPadding, top = topPadding, bottom = bottomPadding),
+        modifier =
+            Modifier.clickable(onClick = onClick)
+                .padding(start = startPadding, top = topPadding, bottom = bottomPadding),
         fontSize = fontSize,
         lineHeight = lineHeight,
         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -326,9 +335,7 @@ fun DiffLineNumber(
 ) {
     Text(
         text = text,
-        modifier = Modifier
-            .width(width)
-            .padding(end = endPadding),
+        modifier = Modifier.width(width).padding(end = endPadding),
         fontSize = fontSize,
         lineHeight = lineHeight,
         fontFamily = FontFamily.Monospace,
@@ -386,10 +393,11 @@ fun FileKindBadge(
 ) {
     val color = fileKindColor(file.kind)
     Box(
-        modifier = modifier
-            .size(size)
-            .clip(RoundedCornerShape(corner))
-            .background(color.copy(alpha = 0.16f)),
+        modifier =
+            modifier
+                .size(size)
+                .clip(RoundedCornerShape(corner))
+                .background(color.copy(alpha = 0.16f)),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -475,22 +483,24 @@ fun FileDiffRow(
     val home = runtimeHome()
     val shownPath = displayDiffPath(file.path, cwd, home)
     val shownOld = file.oldPath?.let { displayDiffPath(it, cwd, home) }
-    val title = if (shownOld != null && shownOld != shownPath) {
-        "${shownOld.substringAfterLast('/')} → ${shownPath.substringAfterLast('/')}"
-    } else {
-        shownPath.substringAfterLast('/')
-    }
+    val title =
+        if (shownOld != null && shownOld != shownPath) {
+            "${shownOld.substringAfterLast('/')} → ${shownPath.substringAfterLast('/')}"
+        } else {
+            shownPath.substringAfterLast('/')
+        }
     val parent = shortenedParent(shownPath)
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .pressableRow(
-                    shape = shape,
-                    container = if (expanded) colors.primary.copy(alpha = 0.08f) else Color.Transparent,
-                    onClick = onToggle,
-                )
-                .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+            modifier =
+                Modifier.fillMaxWidth()
+                    .background(
+                        if (expanded) colors.primary.copy(alpha = 0.08f) else Color.Transparent,
+                        shape,
+                    )
+                    .clip(shape)
+                    .combinedClickable(onClick = onToggle)
+                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FileKindBadge(file)
@@ -521,14 +531,13 @@ fun FileDiffRow(
             Spacer(Modifier.width(chevronSpacing))
             Icon(
                 imageVector = MiuixIcons.ChevronForward,
-                contentDescription = if (expanded) {
-                    stringResource(R.string.blocks_collapse_diff)
-                } else {
-                    stringResource(R.string.blocks_view_diff)
-                },
-                modifier = Modifier
-                    .size(chevronSize)
-                    .rotate(if (expanded) 90f else 0f),
+                contentDescription =
+                    if (expanded) {
+                        stringResource(R.string.blocks_collapse_diff)
+                    } else {
+                        stringResource(R.string.blocks_view_diff)
+                    },
+                modifier = Modifier.size(chevronSize).rotate(if (expanded) 90f else 0f),
                 tint = colors.onSurfaceVariantSummary,
             )
         }
@@ -544,8 +553,8 @@ fun FileDiffRow(
 }
 
 /**
- * Card chrome used by every tool cell: an icon, a title line, an optional trailing slot and a
- * body. Mirrors the shared shape of the TUI's `history_cell/{exec,mcp,patches,search}.rs` cells.
+ * Card chrome used by every tool cell: an icon, a title line, an optional trailing slot and a body.
+ * Mirrors the shared shape of the TUI's `history_cell/{exec,mcp,patches,search}.rs` cells.
  */
 @Composable
 fun ToolCard(
@@ -571,11 +580,12 @@ fun ToolCard(
 ) {
     val colors = MiuixTheme.colorScheme
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(corner))
-            .background(codeSurface())
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(corner))
+                .background(codeSurface())
+                .padding(horizontal = horizontalPadding, vertical = verticalPadding)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
@@ -652,22 +662,21 @@ fun CollapsibleSection(
     val colors = MiuixTheme.colorScheme
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onToggle)
-                .padding(vertical = verticalPadding),
+            modifier =
+                Modifier.fillMaxWidth()
+                    .clickable(onClick = onToggle)
+                    .padding(vertical = verticalPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = MiuixIcons.ChevronForward,
-                contentDescription = if (expanded) {
-                    stringResource(R.string.blocks_collapse, title)
-                } else {
-                    stringResource(R.string.blocks_expand, title)
-                },
-                modifier = Modifier
-                    .size(chevronSize)
-                    .rotate(if (expanded) 90f else 0f),
+                contentDescription =
+                    if (expanded) {
+                        stringResource(R.string.blocks_collapse, title)
+                    } else {
+                        stringResource(R.string.blocks_expand, title)
+                    },
+                modifier = Modifier.size(chevronSize).rotate(if (expanded) 90f else 0f),
                 tint = colors.onSurfaceVariantSummary,
             )
             Spacer(Modifier.width(chevronSpacing))
@@ -693,9 +702,9 @@ fun CollapsibleSection(
         }
         if (expanded) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = contentStartPadding, top = contentTopPadding),
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .padding(start = contentStartPadding, top = contentTopPadding),
                 verticalArrangement = Arrangement.spacedBy(contentSpacing),
                 content = content,
             )

@@ -3,7 +3,7 @@ package com.cy.codex.status
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -40,36 +40,37 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.cy.codex.DiffBody
+import com.cy.codex.FileDiff
+import com.cy.codex.FileKindBadge
+import com.cy.codex.FileStatText
+import com.cy.codex.Motion
 import com.cy.codex.R
-import com.cy.codex.protocol.protocol.item.ContextCompactionItem
-import com.cy.codex.protocol.protocol.item.ThreadItem
-import com.cy.codex.protocol.protocol.v2.ThreadSessionState
-import com.cy.codex.label
+import com.cy.codex.UiConsts
+import com.cy.codex.UiType
 import com.cy.codex.app.AgentRole
 import com.cy.codex.app.AgentRosterEntry
 import com.cy.codex.app.statusLabel
 import com.cy.codex.app.tone
 import com.cy.codex.chatwidget.PlanTimeline
-import com.cy.codex.protocol.protocol.v2.ThreadStatus
-import com.cy.codex.protocol.protocol.v2.ThreadTokenUsage
-import com.cy.codex.DiffBody
-import com.cy.codex.FileKindBadge
-import com.cy.codex.FileStatText
-import com.cy.codex.FileDiff
+import com.cy.codex.description
 import com.cy.codex.displayDiffPath
+import com.cy.codex.label
 import com.cy.codex.languageFromPath
-import com.cy.codex.runtimeHome
-import com.cy.codex.shortenedParent
+import com.cy.codex.panelColor
+import com.cy.codex.protocol.protocol.item.ContextCompactionItem
+import com.cy.codex.protocol.protocol.item.ThreadItem
 import com.cy.codex.protocol.protocol.v2.AccountRateLimits
 import com.cy.codex.protocol.protocol.v2.ApprovalsReviewer
 import com.cy.codex.protocol.protocol.v2.AskForApproval
@@ -77,48 +78,45 @@ import com.cy.codex.protocol.protocol.v2.CollaborationMode
 import com.cy.codex.protocol.protocol.v2.CreditsSnapshot
 import com.cy.codex.protocol.protocol.v2.ModelPreset
 import com.cy.codex.protocol.protocol.v2.ReasoningEffort
-import com.cy.codex.description
-import com.cy.codex.ButtonRole
-import com.cy.codex.CodexButton
-import com.cy.codex.CodexButtonSize
-import com.cy.codex.ExpandBar
-import com.cy.codex.Motion
-import com.cy.codex.SectionCard
-import com.cy.codex.SquircleShape
-import com.cy.codex.ThreadStatusTone
-import com.cy.codex.UiConsts
-import com.cy.codex.ValueRow
-import com.cy.codex.floatingSurface
-import com.cy.codex.panelColor
-import com.cy.codex.pressableRow
+import com.cy.codex.protocol.protocol.v2.ThreadSessionState
+import com.cy.codex.protocol.protocol.v2.ThreadStatus
+import com.cy.codex.protocol.protocol.v2.ThreadTokenUsage
+import com.cy.codex.raisedSurface
+import com.cy.codex.runtimeHome
+import com.cy.codex.shortenedParent
 import com.cy.codex.statusDotColor
 import com.cy.codex.tone
 import com.cy.codex.usageColor
-import com.cy.codex.UiType
 import java.util.Locale
+import kotlin.math.roundToInt
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.DropdownArrowEndAction
+import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
-import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
-import top.yukonga.miuix.kmp.icon.extended.ChevronForward
-import top.yukonga.miuix.kmp.icon.extended.Community
-import top.yukonga.miuix.kmp.icon.extended.Layers
-import top.yukonga.miuix.kmp.icon.extended.Close
-import top.yukonga.miuix.kmp.icon.extended.Tasks
-import top.yukonga.miuix.kmp.icon.extended.Timer
-import top.yukonga.miuix.kmp.icon.extended.Notes
-import top.yukonga.miuix.kmp.icon.extended.Tune
-import top.yukonga.miuix.kmp.basic.DropdownArrowEndAction
-import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.ListPopupColumn
 import top.yukonga.miuix.kmp.basic.PopupPositionProvider
+import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
+import top.yukonga.miuix.kmp.basic.Surface
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Check
+import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
+import top.yukonga.miuix.kmp.icon.extended.ChevronForward
+import top.yukonga.miuix.kmp.icon.extended.Close
+import top.yukonga.miuix.kmp.icon.extended.Community
+import top.yukonga.miuix.kmp.icon.extended.Layers
+import top.yukonga.miuix.kmp.icon.extended.Notes
+import top.yukonga.miuix.kmp.icon.extended.Tasks
+import top.yukonga.miuix.kmp.icon.extended.Timer
+import top.yukonga.miuix.kmp.icon.extended.Tune
 import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import kotlin.math.roundToInt
 
 /**
  * The floating status card.
@@ -160,7 +158,6 @@ fun StatusCard(
     /** Whether `collaborationMode/list` offered a plan preset; hides the row when it did not. */
     planAvailable: Boolean,
     onCollaborationMode: (CollaborationMode) -> Unit,
-
     onCompact: () -> Unit,
     onOpenAgents: () -> Unit,
     onOpenAgent: (String) -> Unit,
@@ -170,14 +167,14 @@ fun StatusCard(
     /** Wall-clock time of the last rate-limit read; `null` when nothing was read yet. */
     rateLimitsUpdatedAt: Long? = null,
 ) {
-    val shape = remember { SquircleShape(UiConsts.PanelCorner) }
-    ExpandBar(
-        width = width,
-        height = null,
+    val shape = RoundedCornerShape(UiConsts.PanelCorner)
+    Surface(
+        onClick = {},
+        modifier = modifier.heightIn(max = maxHeight).width(width),
         shape = shape,
-        elevation = panelElevation,
-        expanded = true,
-        modifier = modifier.heightIn(max = maxHeight),
+        color = panelColor(),
+        shadowElevation = panelElevation,
+        indication = null,
     ) {
         SectionsColumn(
             state = state,
@@ -228,14 +225,14 @@ fun DiffCard(
     cwd: String? = null,
     panelElevation: Dp = UiConsts.PanelElevation,
 ) {
-    val shape = remember { SquircleShape(UiConsts.PanelCorner) }
-    ExpandBar(
-        width = width,
-        height = height,
+    val shape = RoundedCornerShape(UiConsts.PanelCorner)
+    Surface(
+        onClick = {},
+        modifier = modifier.width(width).height(height),
         shape = shape,
-        elevation = panelElevation,
-        expanded = true,
-        modifier = modifier,
+        color = panelColor(),
+        shadowElevation = panelElevation,
+        indication = null,
     ) {
         DiffPane(
             file = file,
@@ -270,7 +267,6 @@ private fun SectionsColumn(
     onServiceTier: (String?) -> Unit,
     planAvailable: Boolean,
     onCollaborationMode: (CollaborationMode) -> Unit,
-
     onCompact: () -> Unit,
     onOpenAgents: () -> Unit,
     onOpenAgent: (String) -> Unit,
@@ -280,10 +276,8 @@ private fun SectionsColumn(
     sectionGap: Dp = 7.dp,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(contentPadding),
+        modifier =
+            modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(sectionGap),
     ) {
         CardHeader(
@@ -306,9 +300,13 @@ private fun SectionsColumn(
 
         // Only when the account answered with something worth drawing: an empty limits card on a
         // platform without rate limits (Bedrock, API key) would read as "no limits left".
-        if (rateLimits.rateLimits.primary != null || rateLimits.rateLimits.secondary != null ||
-            rateLimits.rateLimits.credits != null || (rateLimits.rateLimitResetCredits?.availableCount ?: 0) > 0 ||
-            rateLimits.rateLimits.spendControlReached == true || rateLimits.rateLimits.individualLimit != null
+        if (
+            rateLimits.rateLimits.primary != null ||
+                rateLimits.rateLimits.secondary != null ||
+                rateLimits.rateLimits.credits != null ||
+                (rateLimits.rateLimitResetCredits?.availableCount ?: 0) > 0 ||
+                rateLimits.rateLimits.spendControlReached == true ||
+                rateLimits.rateLimits.individualLimit != null
         ) {
             RateLimitsSection(
                 rateLimits = rateLimits,
@@ -334,22 +332,77 @@ private fun SectionsColumn(
         )
 
         if (plan.isNotEmpty()) {
-            SectionCard(
-                title = stringResource(R.string.status_card_plan_title),
-                icon = MiuixIcons.Notes,
-                trailing = "${plan.count { it.status == com.cy.codex.protocol.protocol.v2.PlanStepStatus.Completed }}/${plan.size}",
-                expandable = true,
-                expanded = !state.isFolded(StatusSection.Plan),
-                onToggle = { state.toggleSection(StatusSection.Plan) },
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = UiConsts.SectionCorner,
+                insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+                colors =
+                    CardDefaults.defaultColors(
+                        color = raisedSurface(),
+                        contentColor = MiuixTheme.colorScheme.onSurface,
+                    ),
             ) {
-                PlanTimeline(steps = plan)
+                BasicComponent(
+                    startAction = {
+                        Icon(
+                            imageVector = MiuixIcons.Notes,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MiuixTheme.colorScheme.primary,
+                        )
+                    },
+                    onClick = { state.toggleSection(StatusSection.Plan) },
+                    endActions = {
+                        Text(
+                            text =
+                                "${plan.count { it.status == com.cy.codex.protocol.protocol.v2.PlanStepStatus.Completed }}/${plan.size}",
+                            fontWeight = FontWeight.Medium,
+                            color = MiuixTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            fontSize = UiType.Subtitle,
+                            lineHeight = UiType.SubtitleLine,
+                        )
+                        Spacer(Modifier.width(UiConsts.Space4))
+                        val arrowRotation by
+                            animateFloatAsState(
+                                targetValue = if (state.isFolded(StatusSection.Plan)) 0f else 90f,
+                                animationSpec = Motion.Disclosure,
+                                label = "sectionArrow",
+                            )
+                        Icon(
+                            imageVector = MiuixIcons.ChevronForward,
+                            contentDescription =
+                                stringResource(
+                                    if (state.isFolded(StatusSection.Plan))
+                                        R.string.components_expand
+                                    else R.string.components_collapse,
+                                    stringResource(R.string.status_card_plan_title),
+                                ),
+                            modifier = Modifier.size(14.dp).rotate(arrowRotation),
+                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                    },
+                    modifier = Modifier.height(UiConsts.ButtonHeightCompact),
+                    insideMargin = PaddingValues(0.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.status_card_plan_title),
+                        fontSize = UiType.Subtitle,
+                        lineHeight = UiType.SubtitleLine,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (!state.isFolded(StatusSection.Plan)) {
+
+                    PlanTimeline(steps = plan)
+                }
             }
         }
 
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min),
+            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(sectionGap),
         ) {
             AgentsSection(
@@ -359,9 +412,7 @@ private fun SectionsColumn(
                 onOpenAgents = onOpenAgents,
                 onOpenAgent = onOpenAgent,
                 onOpenAgentInfo = onOpenAgentInfo,
-                modifier = Modifier
-                    .weight(1.12f)
-                    .fillMaxHeight(),
+                modifier = Modifier.weight(1.12f).fillMaxHeight(),
             )
 
             FilesSection(
@@ -371,9 +422,7 @@ private fun SectionsColumn(
                 collapsed = state.isFolded(StatusSection.Files),
                 onToggle = { state.toggleSection(StatusSection.Files) },
                 onOpen = state::toggleFile,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
             )
         }
     }
@@ -404,9 +453,7 @@ private fun CardHeader(
     val colors = MiuixTheme.colorScheme
     val tone = status.tone()
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(headerPadding),
+        modifier = Modifier.fillMaxWidth().padding(headerPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(modifier = Modifier.size(iconBoxSize), contentAlignment = Alignment.Center) {
@@ -421,10 +468,8 @@ private fun CardHeader(
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    modifier = Modifier
-                        .size(dotSize)
-                        .clip(CircleShape)
-                        .background(statusDotColor(tone)),
+                    modifier =
+                        Modifier.size(dotSize).clip(CircleShape).background(statusDotColor(tone))
                 )
                 Spacer(Modifier.width(dotGap))
                 Text(
@@ -439,11 +484,16 @@ private fun CardHeader(
                 )
             }
             Text(
-                text = if (titlePending) {
-                    stringResource(R.string.status_card_generating_title)
-                } else {
-                    stringResource(R.string.status_card_agents_files_summary, agentCount, fileCount)
-                },
+                text =
+                    if (titlePending) {
+                        stringResource(R.string.status_card_generating_title)
+                    } else {
+                        stringResource(
+                            R.string.status_card_agents_files_summary,
+                            agentCount,
+                            fileCount,
+                        )
+                    },
                 fontSize = summarySize,
                 lineHeight = summaryLineHeight,
                 color = colors.onSurfaceVariantSummary,
@@ -453,11 +503,13 @@ private fun CardHeader(
             gitSummary?.let { summary ->
                 // `PR #123 · main +3 -1`, the same parts the TUI's status line composes.
                 Text(
-                    text = listOfNotNull(
-                        summary.pullRequest?.let { "PR #${it.number}" },
-                        summary.branch ?: session.gitBranch,
-                        summary.diffLabel,
-                    ).joinToString(" · "),
+                    text =
+                        listOfNotNull(
+                                summary.pullRequest?.let { "PR #${it.number}" },
+                                summary.branch ?: session.gitBranch,
+                                summary.diffLabel,
+                            )
+                            .joinToString(" · "),
                     fontSize = summarySize,
                     lineHeight = summaryLineHeight,
                     color = colors.onSurfaceVariantSummary,
@@ -502,80 +554,145 @@ private fun UsageSection(
     val colors = MiuixTheme.colorScheme
     val fraction = usage.usedFraction
     val total = usage.modelContextWindow ?: usage.total.totalTokens.coerceAtLeast(1)
-    SectionCard(
-        title = stringResource(R.string.status_card_context_title),
-        icon = MiuixIcons.Layers,
-        trailing = stringResource(R.string.status_card_usage_percent, (fraction * 100).roundToInt()),
-        expandable = true,
-        expanded = !collapsed,
-        onToggle = onToggle,
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
-        Row(verticalAlignment = Alignment.Bottom) {
+        BasicComponent(
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Layers,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            onClick = onToggle,
+            endActions = {
+                Text(
+                    text =
+                        stringResource(
+                            R.string.status_card_usage_percent,
+                            (fraction * 100).roundToInt(),
+                        ),
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    fontSize = UiType.Subtitle,
+                    lineHeight = UiType.SubtitleLine,
+                )
+                Spacer(Modifier.width(UiConsts.Space4))
+                val arrowRotation by
+                    animateFloatAsState(
+                        targetValue = if (collapsed) 0f else 90f,
+                        animationSpec = Motion.Disclosure,
+                        label = "sectionArrow",
+                    )
+                Icon(
+                    imageVector = MiuixIcons.ChevronForward,
+                    contentDescription =
+                        stringResource(
+                            if (collapsed) R.string.components_expand
+                            else R.string.components_collapse,
+                            stringResource(R.string.status_card_context_title),
+                        ),
+                    modifier = Modifier.size(14.dp).rotate(arrowRotation),
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+            },
+            modifier = Modifier.height(UiConsts.ButtonHeightCompact),
+            insideMargin = PaddingValues(0.dp),
+        ) {
             Text(
-                text = formatTokens(usage.total.totalTokens),
-                fontSize = totalSize,
-                lineHeight = totalLineHeight,
-                fontWeight = FontWeight.SemiBold,
-                color = colors.onSurface,
+                text = stringResource(R.string.status_card_context_title),
+                fontSize = UiType.Subtitle,
+                lineHeight = UiType.SubtitleLine,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.width(noteGap))
-            Text(
-                text = stringResource(R.string.status_card_usage_of_total, formatTokens(total)),
-                modifier = Modifier.padding(bottom = windowOffset),
-                fontSize = windowSize,
-                lineHeight = windowLineHeight,
-                color = colors.onSurfaceVariantSummary,
-            )
-            Spacer(Modifier.weight(1f))
-            CompactButton(compacted = compacted, onClick = onCompact)
         }
-        Spacer(Modifier.height(rowGap))
-        LinearProgressIndicator(
-            progress = fraction,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ProgressIndicatorDefaults.progressIndicatorColors(
-                foregroundColor = usageColor(fraction),
-                backgroundColor = colors.onBackground.copy(alpha = 0.08f),
-            ),
-            height = progressHeight,
-        )
-        Spacer(Modifier.height(rowGap))
-        Text(
-            text = stringResource(
-                R.string.status_card_usage_tokens,
-                formatTokens(usage.total.inputTokens),
-                formatTokens(usage.total.outputTokens),
-                formatTokens(usage.total.cachedInputTokens),
-            ),
-            fontSize = detailSize,
-            lineHeight = detailLineHeight,
-            color = colors.onSurfaceVariantSummary,
-            maxLines = 1,
-        )
-        // The two halves of the total that the first line folds away: reasoning is part of output,
-        // cache writes are part of input, and the TUI prints them only when they are non-zero.
-        if (usage.total.reasoningOutputTokens != 0L || usage.total.cacheWriteInputTokens != 0L) {
-            Spacer(Modifier.height(noteGap))
+        if (!collapsed) {
+
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = formatTokens(usage.total.totalTokens),
+                    fontSize = totalSize,
+                    lineHeight = totalLineHeight,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.onSurface,
+                )
+                Spacer(Modifier.width(noteGap))
+                Text(
+                    text = stringResource(R.string.status_card_usage_of_total, formatTokens(total)),
+                    modifier = Modifier.padding(bottom = windowOffset),
+                    fontSize = windowSize,
+                    lineHeight = windowLineHeight,
+                    color = colors.onSurfaceVariantSummary,
+                )
+                Spacer(Modifier.weight(1f))
+                CompactButton(compacted = compacted, onClick = onCompact)
+            }
+            Spacer(Modifier.height(rowGap))
+            LinearProgressIndicator(
+                progress = fraction,
+                modifier = Modifier.fillMaxWidth(),
+                colors =
+                    ProgressIndicatorDefaults.progressIndicatorColors(
+                        foregroundColor = usageColor(fraction),
+                        backgroundColor = colors.onBackground.copy(alpha = 0.08f),
+                    ),
+                height = progressHeight,
+            )
+            Spacer(Modifier.height(rowGap))
             Text(
-                text = stringResource(
-                    R.string.status_card_usage_tokens_more,
-                    formatTokens(usage.total.reasoningOutputTokens),
-                    formatTokens(usage.total.cacheWriteInputTokens),
-                ),
+                text =
+                    stringResource(
+                        R.string.status_card_usage_tokens,
+                        formatTokens(usage.total.inputTokens),
+                        formatTokens(usage.total.outputTokens),
+                        formatTokens(usage.total.cachedInputTokens),
+                    ),
                 fontSize = detailSize,
                 lineHeight = detailLineHeight,
                 color = colors.onSurfaceVariantSummary,
                 maxLines = 1,
             )
-        }
-        if (compacted) {
-            Spacer(Modifier.height(noteGap))
-            Text(
-                text = stringResource(R.string.status_card_compacted_note),
-                fontSize = detailSize,
-                lineHeight = detailLineHeight,
-                color = colors.onSurfaceVariantSummary,
-            )
+            // The two halves of the total that the first line folds away: reasoning is part of
+            // output,
+            // cache writes are part of input, and the TUI prints them only when they are non-zero.
+            if (
+                usage.total.reasoningOutputTokens != 0L || usage.total.cacheWriteInputTokens != 0L
+            ) {
+                Spacer(Modifier.height(noteGap))
+                Text(
+                    text =
+                        stringResource(
+                            R.string.status_card_usage_tokens_more,
+                            formatTokens(usage.total.reasoningOutputTokens),
+                            formatTokens(usage.total.cacheWriteInputTokens),
+                        ),
+                    fontSize = detailSize,
+                    lineHeight = detailLineHeight,
+                    color = colors.onSurfaceVariantSummary,
+                    maxLines = 1,
+                )
+            }
+            if (compacted) {
+                Spacer(Modifier.height(noteGap))
+                Text(
+                    text = stringResource(R.string.status_card_compacted_note),
+                    fontSize = detailSize,
+                    lineHeight = detailLineHeight,
+                    color = colors.onSurfaceVariantSummary,
+                )
+            }
         }
     }
 }
@@ -584,8 +701,8 @@ private fun UsageSection(
  * The account's rate-limit windows and credits.
  *
  * Mirrors the rows in `status/rate_limits.rs`: a bar per window, the reset time under it, and the
- * credits line. The card only appears when the account reported something, so a server without
- * rate limits (Bedrock, API key) never shows an empty one.
+ * credits line. The card only appears when the account reported something, so a server without rate
+ * limits (Bedrock, API key) never shows an empty one.
  */
 @Composable
 private fun RateLimitsSection(
@@ -598,108 +715,262 @@ private fun RateLimitsSection(
 ) {
     val colors = MiuixTheme.colorScheme
     val snapshot = rateLimits.rateLimits
-    val windows = listOfNotNull(
-        snapshot.primary?.let { it to stringResource(R.string.status_card_rate_primary) },
-        snapshot.secondary?.let { it to stringResource(R.string.status_card_rate_secondary) },
-    )
+    val windows =
+        listOfNotNull(
+            snapshot.primary?.let { it to stringResource(R.string.status_card_rate_primary) },
+            snapshot.secondary?.let { it to stringResource(R.string.status_card_rate_secondary) },
+        )
     // A stale window is worse than no window: it is presented as current, so after ten minutes the
     // footer says so instead of leaving the percentages looking freshly fetched.
     val ageMs = updatedAt?.takeIf { it > 0L }?.let { System.currentTimeMillis() - it }
     val stale = ageMs != null && ageMs > RateLimitStaleAfterMs
-    SectionCard(
-        title = stringResource(R.string.status_card_rate_title),
-        icon = MiuixIcons.Timer,
-        trailing = snapshot.limitName,
-        expandable = true,
-        expanded = !collapsed,
-        onToggle = onToggle,
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
-        windows.forEachIndexed { index, (window, label) ->
-            if (index > 0) Spacer(Modifier.height(barGap))
-            val fraction = (window.usedPercent / 100.0).toFloat().coerceIn(0f, 1f)
-            Column {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        text = label,
-                        modifier = Modifier.weight(1f),
-                        fontSize = UiType.Body,
-                        lineHeight = UiType.BodyLine,
-                        color = colors.onSurface,
-                    )
-                    Text(
-                        text = stringResource(R.string.status_card_usage_percent, window.usedPercent.toInt()),
-                        fontSize = UiType.Footnote,
-                        lineHeight = UiType.CardTitle,
-                        color = if (fraction >= 0.9f) colors.error else colors.onSurfaceVariantSummary,
-                    )
-                }
-                Spacer(Modifier.height(UiConsts.Space4))
-                LinearProgressIndicator(
-                    progress = fraction,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ProgressIndicatorDefaults.progressIndicatorColors(
-                        foregroundColor = usageColor(fraction),
-                        backgroundColor = colors.onBackground.copy(alpha = 0.08f),
-                    ),
-                    height = progressHeight,
+        BasicComponent(
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Timer,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
                 )
-                window.resetsAt?.let { resetsAt ->
-                    Spacer(Modifier.height(UiConsts.Space3))
+            },
+            onClick = onToggle,
+            endActions = {
+                Text(
+                    text = snapshot.limitName.orEmpty(),
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    fontSize = UiType.Subtitle,
+                    lineHeight = UiType.SubtitleLine,
+                )
+                Spacer(Modifier.width(UiConsts.Space4))
+                val arrowRotation by
+                    animateFloatAsState(
+                        targetValue = if (collapsed) 0f else 90f,
+                        animationSpec = Motion.Disclosure,
+                        label = "sectionArrow",
+                    )
+                Icon(
+                    imageVector = MiuixIcons.ChevronForward,
+                    contentDescription =
+                        stringResource(
+                            if (collapsed) R.string.components_expand
+                            else R.string.components_collapse,
+                            stringResource(R.string.status_card_rate_title),
+                        ),
+                    modifier = Modifier.size(14.dp).rotate(arrowRotation),
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+            },
+            modifier = Modifier.height(UiConsts.ButtonHeightCompact),
+            insideMargin = PaddingValues(0.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.status_card_rate_title),
+                fontSize = UiType.Subtitle,
+                lineHeight = UiType.SubtitleLine,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (!collapsed) {
+
+            windows.forEachIndexed { index, (window, label) ->
+                if (index > 0) Spacer(Modifier.height(barGap))
+                val fraction = (window.usedPercent / 100.0).toFloat().coerceIn(0f, 1f)
+                Column {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            text = label,
+                            modifier = Modifier.weight(1f),
+                            fontSize = UiType.Body,
+                            lineHeight = UiType.BodyLine,
+                            color = colors.onSurface,
+                        )
+                        Text(
+                            text =
+                                stringResource(
+                                    R.string.status_card_usage_percent,
+                                    window.usedPercent.toInt(),
+                                ),
+                            fontSize = UiType.Footnote,
+                            lineHeight = UiType.CardTitle,
+                            color =
+                                if (fraction >= 0.9f) colors.error
+                                else colors.onSurfaceVariantSummary,
+                        )
+                    }
+                    Spacer(Modifier.height(UiConsts.Space4))
+                    LinearProgressIndicator(
+                        progress = fraction,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors =
+                            ProgressIndicatorDefaults.progressIndicatorColors(
+                                foregroundColor = usageColor(fraction),
+                                backgroundColor = colors.onBackground.copy(alpha = 0.08f),
+                            ),
+                        height = progressHeight,
+                    )
+                    window.resetsAt?.let { resetsAt ->
+                        Spacer(Modifier.height(UiConsts.Space3))
+                        Text(
+                            text =
+                                stringResource(
+                                    R.string.status_card_rate_resets,
+                                    formatResetTime(resetsAt),
+                                ),
+                            fontSize = UiType.Footnote,
+                            lineHeight = UiType.CardTitle,
+                            color = colors.onSurfaceVariantSummary,
+                        )
+                    }
+                }
+            }
+            snapshot.credits?.let { credits ->
+                if (windows.isNotEmpty()) Spacer(Modifier.height(barGap))
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
+                    verticalAlignment = Alignment.Top,
+                ) {
                     Text(
-                        text = stringResource(R.string.status_card_rate_resets, formatResetTime(resetsAt)),
-                        fontSize = UiType.Footnote,
-                        lineHeight = UiType.CardTitle,
-                        color = colors.onSurfaceVariantSummary,
+                        text = stringResource(R.string.status_card_credits_label),
+                        modifier = Modifier.weight(1f),
+                        fontSize = UiType.Meta,
+                        lineHeight = UiType.MetaLine,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                    Spacer(Modifier.width(UiConsts.Space10))
+                    Text(
+                        text = creditsText(credits).ifEmpty { "—" },
+                        color = MiuixTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(1.4f),
+                        fontSize = UiType.Detail,
+                        lineHeight = UiType.DetailLine,
                     )
                 }
             }
-        }
-        snapshot.credits?.let { credits ->
-            if (windows.isNotEmpty()) Spacer(Modifier.height(barGap))
-            ValueRow(
-                label = stringResource(R.string.status_card_credits_label),
-                value = creditsText(credits),
-            )
-        }
-        rateLimits.rateLimitResetCredits?.takeIf { it.availableCount > 0 }?.let { summary ->
-            ValueRow(
-                label = stringResource(R.string.status_card_reset_credits_label),
-                value = summary.availableCount.toString(),
-            )
-        }
-        snapshot.individualLimit?.let { limit ->
-            if (windows.isNotEmpty() || snapshot.credits != null) Spacer(Modifier.height(barGap))
-            ValueRow(
-                label = stringResource(R.string.status_card_spend_control),
-                value = stringResource(
-                    R.string.status_card_spend_control_value,
-                    limit.used,
-                    limit.limit,
-                    limit.remainingPercent,
-                ),
-                tint = if (snapshot.spendControlReached == true) colors.error else null,
-            )
-        }
-        if (snapshot.spendControlReached == true && snapshot.individualLimit == null) {
-            if (windows.isNotEmpty() || snapshot.credits != null) Spacer(Modifier.height(barGap))
-            ValueRow(
-                label = stringResource(R.string.status_card_spend_control),
-                value = stringResource(R.string.status_card_spend_control_reached),
-                tint = colors.error,
-            )
-        }
-        if (ageMs != null) {
-            if (windows.isNotEmpty() || snapshot.credits != null) Spacer(Modifier.height(barGap))
-            Text(
-                text = if (stale) {
-                    stringResource(R.string.status_card_rate_stale, formatAge(ageMs))
-                } else {
-                    stringResource(R.string.status_card_rate_updated, formatAge(ageMs))
-                },
-                fontSize = UiType.Footnote,
-                lineHeight = UiType.CardTitle,
-                color = if (stale) colors.error else colors.onSurfaceVariantSummary,
-            )
+            rateLimits.rateLimitResetCredits
+                ?.takeIf { it.availableCount > 0 }
+                ?.let { summary ->
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth()
+                                .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.status_card_reset_credits_label),
+                            modifier = Modifier.weight(1f),
+                            fontSize = UiType.Meta,
+                            lineHeight = UiType.MetaLine,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                        Spacer(Modifier.width(UiConsts.Space10))
+                        Text(
+                            text = summary.availableCount.toString().ifEmpty { "—" },
+                            color = MiuixTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.weight(1.4f),
+                            fontSize = UiType.Detail,
+                            lineHeight = UiType.DetailLine,
+                        )
+                    }
+                }
+            snapshot.individualLimit?.let { limit ->
+                if (windows.isNotEmpty() || snapshot.credits != null)
+                    Spacer(Modifier.height(barGap))
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Text(
+                        text = stringResource(R.string.status_card_spend_control),
+                        modifier = Modifier.weight(1f),
+                        fontSize = UiType.Meta,
+                        lineHeight = UiType.MetaLine,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                    Spacer(Modifier.width(UiConsts.Space10))
+                    Text(
+                        text =
+                            stringResource(
+                                    R.string.status_card_spend_control_value,
+                                    limit.used,
+                                    limit.limit,
+                                    limit.remainingPercent,
+                                )
+                                .ifEmpty { "—" },
+                        color =
+                            if (snapshot.spendControlReached == true) colors.error
+                            else null ?: MiuixTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(1.4f),
+                        fontSize = UiType.Detail,
+                        lineHeight = UiType.DetailLine,
+                    )
+                }
+            }
+            if (snapshot.spendControlReached == true && snapshot.individualLimit == null) {
+                if (windows.isNotEmpty() || snapshot.credits != null)
+                    Spacer(Modifier.height(barGap))
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Text(
+                        text = stringResource(R.string.status_card_spend_control),
+                        modifier = Modifier.weight(1f),
+                        fontSize = UiType.Meta,
+                        lineHeight = UiType.MetaLine,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                    Spacer(Modifier.width(UiConsts.Space10))
+                    Text(
+                        text =
+                            stringResource(R.string.status_card_spend_control_reached).ifEmpty {
+                                "—"
+                            },
+                        color = colors.error ?: MiuixTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(1.4f),
+                        fontSize = UiType.Detail,
+                        lineHeight = UiType.DetailLine,
+                    )
+                }
+            }
+            if (ageMs != null) {
+                if (windows.isNotEmpty() || snapshot.credits != null)
+                    Spacer(Modifier.height(barGap))
+                Text(
+                    text =
+                        if (stale) {
+                            stringResource(R.string.status_card_rate_stale, formatAge(ageMs))
+                        } else {
+                            stringResource(R.string.status_card_rate_updated, formatAge(ageMs))
+                        },
+                    fontSize = UiType.Footnote,
+                    lineHeight = UiType.CardTitle,
+                    color = if (stale) colors.error else colors.onSurfaceVariantSummary,
+                )
+            }
         }
     }
 }
@@ -719,39 +990,56 @@ private fun formatAge(ageMs: Long): String {
 }
 
 @Composable
-private fun creditsText(credits: CreditsSnapshot): String = when {
-    credits.unlimited -> stringResource(R.string.status_card_credits_unlimited)
-    !credits.hasCredits -> stringResource(R.string.status_card_credits_none)
-    credits.balance != null -> stringResource(R.string.status_card_credits_remaining, credits.balance)
-    else -> stringResource(R.string.status_card_none)
-}
+private fun creditsText(credits: CreditsSnapshot): String =
+    when {
+        credits.unlimited -> stringResource(R.string.status_card_credits_unlimited)
+        !credits.hasCredits -> stringResource(R.string.status_card_credits_none)
+        credits.balance != null ->
+            stringResource(R.string.status_card_credits_remaining, credits.balance)
+        else -> stringResource(R.string.status_card_none)
+    }
 
 /** Local wall-clock time; the server sends epoch millis and the reader compares against a clock. */
 private fun formatResetTime(epochMillis: Long): String =
-    java.text.SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()).format(java.util.Date(epochMillis))
+    java.text
+        .SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
+        .format(java.util.Date(epochMillis))
 
 /**
  * The compact-context action of the usage row.
  *
- * Once the thread has been compacted there is nothing left to ask for, so the button keeps its place
- * and goes inert rather than disappearing: the row it would leave behind is the one being read.
+ * Once the thread has been compacted there is nothing left to ask for, so the button keeps its
+ * place and goes inert rather than disappearing: the row it would leave behind is the one being
+ * read.
  */
 @Composable
 private fun CompactButton(
     compacted: Boolean,
     onClick: () -> Unit,
 ) {
-    CodexButton(
-        text = if (compacted) {
-            stringResource(R.string.status_card_compacted_action)
-        } else {
-            stringResource(R.string.status_card_compact_action)
-        },
+    Button(
         onClick = onClick,
-        role = ButtonRole.Primary,
-        size = CodexButtonSize.Compact,
+        minHeight = UiConsts.ButtonHeightCompact,
+        minWidth = 0.dp,
+        cornerRadius = UiConsts.ButtonHeightCompact / 2,
+        insideMargin =
+            PaddingValues(horizontal = UiConsts.ButtonPaddingHorizontalCompact, vertical = 0.dp),
         enabled = !compacted,
-    )
+        colors = ButtonDefaults.buttonColorsPrimary(),
+    ) {
+        Text(
+            text =
+                if (compacted) {
+                    stringResource(R.string.status_card_compacted_action)
+                } else {
+                    stringResource(R.string.status_card_compact_action)
+                },
+            fontSize = UiType.Action,
+            lineHeight = UiType.ActionLine,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 @Composable
@@ -769,121 +1057,267 @@ private fun ModelSection(
     planAvailable: Boolean,
     onCollaborationMode: (CollaborationMode) -> Unit,
 ) {
-    SectionCard(
-        title = stringResource(R.string.status_card_model_title),
-        icon = MiuixIcons.Tune,
-        expandable = true,
-        expanded = !collapsed,
-        onToggle = onToggle,
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
-        // Each row *is* the picker. These used to open a modal sheet, which for a three-item choice
-        // is a page of ceremony on top of the card the user is already reading; a cascading popup
-        // anchored to the row keeps the choice next to the value it changes, and gets the open and
-        // close motion from the library instead of having none.
-        Column(verticalArrangement = Arrangement.spacedBy(UiConsts.Space1)) {
-            val modelIndex = models.indexOfFirst { it.model == session.model }.coerceAtLeast(0)
-            PickerRow(
-                label = stringResource(R.string.status_card_model_label),
-                // The chosen option's own name, not the config's label for it: the two disagree
-                // after SetModel writes the id into the label, and the popup's check mark is on the
-                // option, so the row has to agree with the option.
-                value = models.getOrNull(modelIndex)?.displayName ?: session.modelDisplayName,
-                items = models.map { model -> DropdownItem(text = model.displayName, summary = model.model) },
-                selectedIndex = modelIndex,
-                onSelectedIndexChange = { onModel(models[it].model) },
-                enabled = models.isNotEmpty(),
+        BasicComponent(
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Tune,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            onClick = onToggle,
+            endActions = {
+                Spacer(Modifier.width(UiConsts.Space4))
+                val arrowRotation by
+                    animateFloatAsState(
+                        targetValue = if (collapsed) 0f else 90f,
+                        animationSpec = Motion.Disclosure,
+                        label = "sectionArrow",
+                    )
+                Icon(
+                    imageVector = MiuixIcons.ChevronForward,
+                    contentDescription =
+                        stringResource(
+                            if (collapsed) R.string.components_expand
+                            else R.string.components_collapse,
+                            stringResource(R.string.status_card_model_title),
+                        ),
+                    modifier = Modifier.size(14.dp).rotate(arrowRotation),
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+            },
+            modifier = Modifier.height(UiConsts.ButtonHeightCompact),
+            insideMargin = PaddingValues(0.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.status_card_model_title),
+                fontSize = UiType.Subtitle,
+                lineHeight = UiType.SubtitleLine,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-
-            val efforts = models.getOrNull(modelIndex)?.supportedReasoningEfforts.orEmpty()
-            if (efforts.isNotEmpty()) {
+        }
+        if (!collapsed) {
+            // Each row *is* the picker. These used to open a modal sheet, which for a three-item
+            // choice
+            // is a page of ceremony on top of the card the user is already reading; a cascading
+            // popup
+            // anchored to the row keeps the choice next to the value it changes, and gets the open
+            // and
+            // close motion from the library instead of having none.
+            Column(verticalArrangement = Arrangement.spacedBy(UiConsts.Space1)) {
+                val modelIndex = models.indexOfFirst { it.model == session.model }.coerceAtLeast(0)
                 PickerRow(
-                    label = stringResource(R.string.status_card_reasoning_label),
-                    value = session.reasoningEffort.label(),
-                    items = efforts.map { effort -> DropdownItem(text = effort.label()) },
-                    selectedIndex = efforts.indexOf(session.reasoningEffort).coerceAtLeast(0),
-                    onSelectedIndexChange = { onEffort(efforts[it]) },
+                    label = stringResource(R.string.status_card_model_label),
+                    // The chosen option's own name, not the config's label for it: the two disagree
+                    // after SetModel writes the id into the label, and the popup's check mark is on
+                    // the
+                    // option, so the row has to agree with the option.
+                    value = models.getOrNull(modelIndex)?.displayName ?: session.modelDisplayName,
+                    items =
+                        models.map { model ->
+                            DropdownItem(text = model.displayName, summary = model.model)
+                        },
+                    selectedIndex = modelIndex,
+                    onSelectedIndexChange = { onModel(models[it].model) },
+                    enabled = models.isNotEmpty(),
                 )
-            }
 
-            val policies = AskForApproval.entries
-            PickerRow(
-                label = stringResource(R.string.status_card_approval_label),
-                value = session.approvalPolicy.label(),
-                items = policies.map { policy ->
-                    DropdownItem(text = policy.label(), summary = policy.description())
-                },
-                selectedIndex = policies.indexOf(session.approvalPolicy).coerceAtLeast(0),
-                onSelectedIndexChange = { onPolicy(policies[it]) },
-            )
+                val efforts = models.getOrNull(modelIndex)?.supportedReasoningEfforts.orEmpty()
+                if (efforts.isNotEmpty()) {
+                    PickerRow(
+                        label = stringResource(R.string.status_card_reasoning_label),
+                        value = session.reasoningEffort.label(),
+                        items = efforts.map { effort -> DropdownItem(text = effort.label()) },
+                        selectedIndex = efforts.indexOf(session.reasoningEffort).coerceAtLeast(0),
+                        onSelectedIndexChange = { onEffort(efforts[it]) },
+                    )
+                }
 
-            // The reviewer beside the policy: the policy decides whether a request is raised, the
-            // reviewer decides who answers it. AutoReview is offered only when the feature flag is
-            // on and managed policy allows the value (`auto_review_available` upstream).
-            val reviewers = ApprovalsReviewer.entries.filter {
-                it != ApprovalsReviewer.AutoReview || autoReviewAvailable
-            }
-            PickerRow(
-                label = stringResource(R.string.status_card_reviewer_label),
-                value = session.approvalsReviewer.label(),
-                items = reviewers.map { reviewer ->
-                    DropdownItem(text = reviewer.label(), summary = reviewer.description())
-                },
-                selectedIndex = reviewers.indexOf(session.approvalsReviewer).coerceAtLeast(0),
-                onSelectedIndexChange = { onReviewer(reviewers[it]) },
-            )
-
-            // Fast and other service tiers are per model. The row only exists when the catalog
-            // offers tiers for the current model, so a model without them never grows an empty
-            // picker; `null` selection is the model's own default (`"default"` on the wire).
-            val serviceTiers = models.getOrNull(modelIndex)?.serviceTiers.orEmpty()
-            if (serviceTiers.isNotEmpty()) {
-                val tierIds = listOf<String?>(null) + serviceTiers.map { it.id }
-                val tierIndex = tierIds.indexOf(session.serviceTier).coerceAtLeast(0)
+                val policies = AskForApproval.entries
                 PickerRow(
-                    label = stringResource(R.string.status_card_service_tier_label),
-                    value = serviceTiers.firstOrNull { it.id == session.serviceTier }?.name
-                        ?: stringResource(R.string.status_card_service_tier_default),
-                    items = listOf(
-                        DropdownItem(text = stringResource(R.string.status_card_service_tier_default)),
-                    ) + serviceTiers.map { tier -> DropdownItem(text = tier.name, summary = tier.description) },
-                    selectedIndex = tierIndex,
-                    onSelectedIndexChange = { index -> onServiceTier(tierIds[index]) },
+                    label = stringResource(R.string.status_card_approval_label),
+                    value = session.approvalPolicy.label(),
+                    items =
+                        policies.map { policy ->
+                            DropdownItem(text = policy.label(), summary = policy.description())
+                        },
+                    selectedIndex = policies.indexOf(session.approvalPolicy).coerceAtLeast(0),
+                    onSelectedIndexChange = { onPolicy(policies[it]) },
                 )
-            }
 
-            // The collaboration mode row the TUI's status card prints: Default and Plan, the two
-            // modes it makes user-selectable (`TUI_VISIBLE_COLLABORATION_MODES`).
-            if (planAvailable) {
-                val modes = listOf(CollaborationMode.Default, CollaborationMode.Plan)
+                // The reviewer beside the policy: the policy decides whether a request is raised,
+                // the
+                // reviewer decides who answers it. AutoReview is offered only when the feature flag
+                // is
+                // on and managed policy allows the value (`auto_review_available` upstream).
+                val reviewers =
+                    ApprovalsReviewer.entries.filter {
+                        it != ApprovalsReviewer.AutoReview || autoReviewAvailable
+                    }
                 PickerRow(
-                    label = stringResource(R.string.status_card_collaboration_label),
-                    value = session.collaborationMode.label(),
-                    items = modes.map { mode -> DropdownItem(text = mode.label(), summary = mode.description()) },
-                    selectedIndex = modes.indexOf(session.collaborationMode).coerceAtLeast(0),
-                    onSelectedIndexChange = { onCollaborationMode(modes[it]) },
+                    label = stringResource(R.string.status_card_reviewer_label),
+                    value = session.approvalsReviewer.label(),
+                    items =
+                        reviewers.map { reviewer ->
+                            DropdownItem(text = reviewer.label(), summary = reviewer.description())
+                        },
+                    selectedIndex = reviewers.indexOf(session.approvalsReviewer).coerceAtLeast(0),
+                    onSelectedIndexChange = { onReviewer(reviewers[it]) },
                 )
-            }
 
-            if (session.modelProviderId.isNotBlank()) {
-                ValueRow(
-                    label = stringResource(R.string.status_card_model_provider_label),
-                    value = session.modelProviderId,
-                )
-            }
-            ValueRow(
-                label = stringResource(R.string.status_card_access_label),
-                value = accessSummary(session),
-            )
-            ValueRow(
-                label = stringResource(R.string.status_card_agents_md_label),
-                value = agentsSummary(session),
-            )
-            if (session.forkedFromId != null) {
-                ValueRow(
-                    label = stringResource(R.string.status_card_forked_from_label),
-                    value = session.forkedFromId,
-                    monospace = true,
-                )
+                // Fast and other service tiers are per model. The row only exists when the catalog
+                // offers tiers for the current model, so a model without them never grows an empty
+                // picker; `null` selection is the model's own default (`"default"` on the wire).
+                val serviceTiers = models.getOrNull(modelIndex)?.serviceTiers.orEmpty()
+                if (serviceTiers.isNotEmpty()) {
+                    val tierIds = listOf<String?>(null) + serviceTiers.map { it.id }
+                    val tierIndex = tierIds.indexOf(session.serviceTier).coerceAtLeast(0)
+                    PickerRow(
+                        label = stringResource(R.string.status_card_service_tier_label),
+                        value =
+                            serviceTiers.firstOrNull { it.id == session.serviceTier }?.name
+                                ?: stringResource(R.string.status_card_service_tier_default),
+                        items =
+                            listOf(
+                                DropdownItem(
+                                    text = stringResource(R.string.status_card_service_tier_default)
+                                )
+                            ) +
+                                serviceTiers.map { tier ->
+                                    DropdownItem(text = tier.name, summary = tier.description)
+                                },
+                        selectedIndex = tierIndex,
+                        onSelectedIndexChange = { index -> onServiceTier(tierIds[index]) },
+                    )
+                }
+
+                // The collaboration mode row the TUI's status card prints: Default and Plan, the
+                // two
+                // modes it makes user-selectable (`TUI_VISIBLE_COLLABORATION_MODES`).
+                if (planAvailable) {
+                    val modes = listOf(CollaborationMode.Default, CollaborationMode.Plan)
+                    PickerRow(
+                        label = stringResource(R.string.status_card_collaboration_label),
+                        value = session.collaborationMode.label(),
+                        items =
+                            modes.map { mode ->
+                                DropdownItem(text = mode.label(), summary = mode.description())
+                            },
+                        selectedIndex = modes.indexOf(session.collaborationMode).coerceAtLeast(0),
+                        onSelectedIndexChange = { onCollaborationMode(modes[it]) },
+                    )
+                }
+
+                if (session.modelProviderId.isNotBlank()) {
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth()
+                                .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.status_card_model_provider_label),
+                            modifier = Modifier.weight(1f),
+                            fontSize = UiType.Meta,
+                            lineHeight = UiType.MetaLine,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                        Spacer(Modifier.width(UiConsts.Space10))
+                        Text(
+                            text = session.modelProviderId.ifEmpty { "—" },
+                            color = MiuixTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.weight(1.4f),
+                            fontSize = UiType.Detail,
+                            lineHeight = UiType.DetailLine,
+                        )
+                    }
+                }
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Text(
+                        text = stringResource(R.string.status_card_access_label),
+                        modifier = Modifier.weight(1f),
+                        fontSize = UiType.Meta,
+                        lineHeight = UiType.MetaLine,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                    Spacer(Modifier.width(UiConsts.Space10))
+                    Text(
+                        text = accessSummary(session).ifEmpty { "—" },
+                        color = MiuixTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(1.4f),
+                        fontSize = UiType.Detail,
+                        lineHeight = UiType.DetailLine,
+                    )
+                }
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Text(
+                        text = stringResource(R.string.status_card_agents_md_label),
+                        modifier = Modifier.weight(1f),
+                        fontSize = UiType.Meta,
+                        lineHeight = UiType.MetaLine,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                    Spacer(Modifier.width(UiConsts.Space10))
+                    Text(
+                        text = agentsSummary(session).ifEmpty { "—" },
+                        color = MiuixTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(1.4f),
+                        fontSize = UiType.Detail,
+                        lineHeight = UiType.DetailLine,
+                    )
+                }
+                if (session.forkedFromId != null) {
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth()
+                                .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.status_card_forked_from_label),
+                            modifier = Modifier.weight(1f),
+                            fontSize = UiType.Meta,
+                            lineHeight = UiType.MetaLine,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                        Spacer(Modifier.width(UiConsts.Space10))
+                        Text(
+                            text = session.forkedFromId.ifEmpty { "—" },
+                            fontFamily = FontFamily.Monospace,
+                            color = MiuixTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.weight(1.4f),
+                            fontSize = UiType.Detail,
+                            lineHeight = UiType.DetailLine,
+                        )
+                    }
+                }
             }
         }
     }
@@ -918,9 +1352,9 @@ internal fun agentsSummary(session: ThreadSessionState): String =
  * These rows used to be `miuix-preference` spinners, and a preference row is built for a settings
  * page: a 56dp minimum height and a 17/14sp type ramp, a full step above every other row in this
  * card. The popup shell is still the library's — anchoring it to the row, the open/close motion and
- * the haptic are the parts worth not rewriting — but both the row and the options it opens are drawn
- * at the card's own ramp, so a label/value row and its list read like the file and agent rows beside
- * them rather than as a settings page that landed on top of the card.
+ * the haptic are the parts worth not rewriting — but both the row and the options it opens are
+ * drawn at the card's own ramp, so a label/value row and its list read like the file and agent rows
+ * beside them rather than as a settings page that landed on top of the card.
  */
 @Composable
 private fun PickerRow(
@@ -932,7 +1366,6 @@ private fun PickerRow(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(horizontal = 9.dp, vertical = 5.dp),
-    labelWidth: Dp = 64.dp,
     labelSize: TextUnit = UiType.RowDetail,
     labelLineHeight: TextUnit = UiType.Message,
     valueSize: TextUnit = UiType.RowTitle,
@@ -944,39 +1377,44 @@ private fun PickerRow(
     val haptics = LocalHapticFeedback.current
     var expanded by remember { mutableStateOf(false) }
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .then(
-                if (enabled) {
-                    Modifier.pressableRow(
-                        shape = shape,
-                        container = Color.Transparent,
-                        onClick = {
-                            expanded = !expanded
-                            if (expanded) {
-                                haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
-                            }
-                        },
-                        onClickLabel = label,
-                    )
-                } else {
-                    Modifier.clip(shape)
-                },
-            )
-            .padding(contentPadding),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .then(
+                    if (enabled) {
+                        Modifier.clip(shape)
+                            .background(Color.Transparent, shape)
+                            .combinedClickable(
+                                onClick = {
+                                    expanded = !expanded
+                                    if (expanded) {
+                                        haptics.performHapticFeedback(
+                                            HapticFeedbackType.ContextClick
+                                        )
+                                    }
+                                },
+                                onClickLabel = label,
+                            )
+                    } else {
+                        Modifier.clip(shape)
+                    }
+                )
+                .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = label,
-            modifier = Modifier.width(labelWidth),
+            modifier = Modifier.weight(1f),
             fontSize = labelSize,
             lineHeight = labelLineHeight,
             color = colors.onSurfaceVariantSummary,
-            maxLines = 1,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
+        Spacer(Modifier.width(UiConsts.Space8))
         Text(
             text = value,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1.4f),
             fontSize = valueSize,
             lineHeight = valueLineHeight,
             fontWeight = FontWeight.Medium,
@@ -1002,10 +1440,10 @@ private fun PickerRow(
  * The option list a [PickerRow] drops next to itself.
  *
  * Not the library's `OverlayDropdownPopup`: that popup draws its options with the library's own
- * dropdown row, whose title is `body1` at 16sp over a summary at 14sp and whose padding belongs to a
- * settings page. A list opened from a 13sp row therefore arrived a full step larger than the row
- * itself. The popup's shell, anchoring and scale-in are still the library's; only the rows inside are
- * drawn here.
+ * dropdown row, whose title is `body1` at 16sp over a summary at 14sp and whose padding belongs to
+ * a settings page. A list opened from a 13sp row therefore arrived a full step larger than the row
+ * itself. The popup's shell, anchoring and scale-in are still the library's; only the rows inside
+ * are drawn here.
  */
 @Composable
 private fun PickerPopup(
@@ -1034,7 +1472,8 @@ private fun PickerPopup(
                 PickerOptionRow(
                     item = item,
                     selected = index == selectedIndex,
-                    contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = verticalPadding),
+                    contentPadding =
+                        PaddingValues(horizontal = horizontalPadding, vertical = verticalPadding),
                     onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                         currentOnSelectedIndexChange(index)
@@ -1066,14 +1505,15 @@ private fun PickerOptionRow(
 ) {
     val colors = MiuixTheme.colorScheme
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pressableRow(
-                shape = RectangleShape,
-                container = if (selected) colors.primary.copy(alpha = 0.12f) else Color.Transparent,
-                onClick = onClick,
-            )
-            .padding(contentPadding),
+        modifier =
+            Modifier.fillMaxWidth()
+                .clip(RectangleShape)
+                .background(
+                    if (selected) colors.primary.copy(alpha = 0.12f) else Color.Transparent,
+                    RectangleShape,
+                )
+                .combinedClickable(onClick = onClick)
+                .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -1121,25 +1561,80 @@ private fun AgentsSection(
     modifier: Modifier = Modifier,
     rowGap: Dp = 1.dp,
 ) {
-    SectionCard(
-        title = stringResource(R.string.status_card_agents_title),
-        icon = MiuixIcons.Community,
-        trailing = stringResource(R.string.status_card_agents_count, roster.size),
-        modifier = modifier,
-        expandable = true,
-        expanded = !collapsed,
-        onToggle = onToggle,
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(rowGap)) {
-            // Same two gestures as a file row: a tap goes into the thing the row names, a long
-            // press asks about it. For an agent that is "open its session" and "show me what it is",
-            // and the dashboard stays one tap away in the header for the overview.
-            roster.forEach { agent ->
-                AgentRow(
-                    agent = agent,
-                    onClick = { onOpenAgent(agent.threadId) },
-                    onLongClick = { onOpenAgentInfo(agent.threadId) },
+        BasicComponent(
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Community,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
                 )
+            },
+            onClick = onToggle,
+            endActions = {
+                Text(
+                    text = stringResource(R.string.status_card_agents_count, roster.size),
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    fontSize = UiType.Subtitle,
+                    lineHeight = UiType.SubtitleLine,
+                )
+                Spacer(Modifier.width(UiConsts.Space4))
+                val arrowRotation by
+                    animateFloatAsState(
+                        targetValue = if (collapsed) 0f else 90f,
+                        animationSpec = Motion.Disclosure,
+                        label = "sectionArrow",
+                    )
+                Icon(
+                    imageVector = MiuixIcons.ChevronForward,
+                    contentDescription =
+                        stringResource(
+                            if (collapsed) R.string.components_expand
+                            else R.string.components_collapse,
+                            stringResource(R.string.status_card_agents_title),
+                        ),
+                    modifier = Modifier.size(14.dp).rotate(arrowRotation),
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+            },
+            modifier = Modifier.height(UiConsts.ButtonHeightCompact),
+            insideMargin = PaddingValues(0.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.status_card_agents_title),
+                fontSize = UiType.Subtitle,
+                lineHeight = UiType.SubtitleLine,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (!collapsed) {
+
+            Column(verticalArrangement = Arrangement.spacedBy(rowGap)) {
+                // Same two gestures as a file row: a tap goes into the thing the row names, a long
+                // press asks about it. For an agent that is "open its session" and "show me what it
+                // is",
+                // and the dashboard stays one tap away in the header for the overview.
+                roster.forEach { agent ->
+                    AgentRow(
+                        agent = agent,
+                        onClick = { onOpenAgent(agent.threadId) },
+                        onLongClick = { onOpenAgentInfo(agent.threadId) },
+                    )
+                }
             }
         }
     }
@@ -1172,30 +1667,33 @@ private fun AgentRow(
     // would push a page about the page the user is already on.
     val opens = agent.role != AgentRole.Main
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (opens) {
-                    Modifier.pressableRow(
-                        shape = shape,
-                        container = Color.Transparent,
-                        onClick = onClick,
-                        onLongClick = onLongClick,
-                        onClickLabel = stringResource(R.string.status_card_open_agent_session, agent.name),
-                        onLongClickLabel = stringResource(R.string.status_card_agent_details, agent.name),
-                    )
-                } else {
-                    Modifier.clip(shape)
-                },
-            )
-            .padding(contentPadding),
+        modifier =
+            Modifier.fillMaxWidth()
+                .then(
+                    if (opens) {
+                        Modifier.clip(shape)
+                            .background(Color.Transparent, shape)
+                            .combinedClickable(
+                                onClick = onClick,
+                                onLongClick = onLongClick,
+                                onClickLabel =
+                                    stringResource(
+                                        R.string.status_card_open_agent_session,
+                                        agent.name,
+                                    ),
+                                onLongClickLabel =
+                                    stringResource(R.string.status_card_agent_details, agent.name),
+                            )
+                    } else {
+                        Modifier.clip(shape)
+                    }
+                )
+                .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier
-                .size(dotSize)
-                .clip(CircleShape)
-                .background(statusDotColor(agent.tone())),
+            modifier =
+                Modifier.size(dotSize).clip(CircleShape).background(statusDotColor(agent.tone()))
         )
         Spacer(Modifier.width(dotGap))
         Text(
@@ -1211,10 +1709,10 @@ private fun AgentRow(
             Spacer(Modifier.width(badgeGap))
             Text(
                 text = stringResource(R.string.status_card_agent_main_badge),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(badgeCorner))
-                    .background(colors.primary.copy(alpha = 0.14f))
-                    .padding(badgePadding),
+                modifier =
+                    Modifier.clip(RoundedCornerShape(badgeCorner))
+                        .background(colors.primary.copy(alpha = 0.14f))
+                        .padding(badgePadding),
                 fontSize = badgeSize,
                 lineHeight = badgeLineHeight,
                 fontWeight = FontWeight.Medium,
@@ -1255,32 +1753,86 @@ private fun FilesSection(
     emptyLineHeight: TextUnit = UiType.Message,
 ) {
     val colors = MiuixTheme.colorScheme
-    SectionCard(
-        title = stringResource(R.string.status_card_files_title),
-        icon = MiuixIcons.Notes,
-        trailing = stringResource(R.string.status_card_files_count, files.size),
-        modifier = modifier,
-        expandable = true,
-        expanded = !collapsed,
-        onToggle = onToggle,
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
-        if (files.isEmpty()) {
-            Text(
-                text = stringResource(R.string.status_card_files_empty),
-                fontSize = emptySize,
-                lineHeight = emptyLineHeight,
-                color = colors.onSurfaceVariantSummary,
-            )
-            return@SectionCard
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(rowGap)) {
-            files.forEach { file ->
-                FileRow(
-                    file = file,
-                    cwd = cwd,
-                    open = file.path == openPath,
-                    onClick = { onOpen(file.path) },
+        BasicComponent(
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Notes,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
                 )
+            },
+            onClick = onToggle,
+            endActions = {
+                Text(
+                    text = stringResource(R.string.status_card_files_count, files.size),
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    fontSize = UiType.Subtitle,
+                    lineHeight = UiType.SubtitleLine,
+                )
+                Spacer(Modifier.width(UiConsts.Space4))
+                val arrowRotation by
+                    animateFloatAsState(
+                        targetValue = if (collapsed) 0f else 90f,
+                        animationSpec = Motion.Disclosure,
+                        label = "sectionArrow",
+                    )
+                Icon(
+                    imageVector = MiuixIcons.ChevronForward,
+                    contentDescription =
+                        stringResource(
+                            if (collapsed) R.string.components_expand
+                            else R.string.components_collapse,
+                            stringResource(R.string.status_card_files_title),
+                        ),
+                    modifier = Modifier.size(14.dp).rotate(arrowRotation),
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+            },
+            modifier = Modifier.height(UiConsts.ButtonHeightCompact),
+            insideMargin = PaddingValues(0.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.status_card_files_title),
+                fontSize = UiType.Subtitle,
+                lineHeight = UiType.SubtitleLine,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (!collapsed) {
+
+            if (files.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.status_card_files_empty),
+                    fontSize = emptySize,
+                    lineHeight = emptyLineHeight,
+                    color = colors.onSurfaceVariantSummary,
+                )
+                return@Card
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(rowGap)) {
+                files.forEach { file ->
+                    FileRow(
+                        file = file,
+                        cwd = cwd,
+                        open = file.path == openPath,
+                        onClick = { onOpen(file.path) },
+                    )
+                }
             }
         }
     }
@@ -1308,14 +1860,15 @@ private fun FileRow(
     val title = if (file.oldPath != null) file.displayName else shownPath.substringAfterLast('/')
     val parent = shortenedParent(shownPath)
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pressableRow(
-                shape = shape,
-                container = if (open) colors.primary.copy(alpha = 0.12f) else Color.Transparent,
-                onClick = onClick,
-            )
-            .padding(contentPadding),
+        modifier =
+            Modifier.fillMaxWidth()
+                .clip(shape)
+                .background(
+                    if (open) colors.primary.copy(alpha = 0.12f) else Color.Transparent,
+                    shape,
+                )
+                .combinedClickable(onClick = onClick)
+                .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         FileKindBadge(file)
@@ -1342,22 +1895,23 @@ private fun FileRow(
         Spacer(Modifier.width(statGap))
         FileStatText(file.additions, file.removals)
         Spacer(Modifier.width(chevronGap))
-        // Same disclosure as every other expanding row: 90 degrees when open, over Motion.Disclosure.
-        val chevronRotation by animateFloatAsState(
-            targetValue = if (open) 90f else 0f,
-            animationSpec = Motion.Disclosure,
-            label = "diffRowChevron",
-        )
+        // Same disclosure as every other expanding row: 90 degrees when open, over
+        // Motion.Disclosure.
+        val chevronRotation by
+            animateFloatAsState(
+                targetValue = if (open) 90f else 0f,
+                animationSpec = Motion.Disclosure,
+                label = "diffRowChevron",
+            )
         Icon(
             imageVector = MiuixIcons.ChevronForward,
-            contentDescription = if (open) {
-                stringResource(R.string.status_card_diff_collapse)
-            } else {
-                stringResource(R.string.status_card_diff_expand)
-            },
-            modifier = Modifier
-                .size(chevronSize)
-                .rotate(chevronRotation),
+            contentDescription =
+                if (open) {
+                    stringResource(R.string.status_card_diff_collapse)
+                } else {
+                    stringResource(R.string.status_card_diff_expand)
+                },
+            modifier = Modifier.size(chevronSize).rotate(chevronRotation),
             tint = colors.onSurfaceVariantSummary,
         )
     }
@@ -1377,7 +1931,8 @@ fun DiffPane(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     cwd: String? = null,
-    headerPadding: PaddingValues = PaddingValues(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 10.dp),
+    headerPadding: PaddingValues =
+        PaddingValues(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 10.dp),
     nameSize: TextUnit = UiType.Message,
     nameLineHeight: TextUnit = UiType.Title,
     pathSize: TextUnit = UiType.Chip,
@@ -1401,9 +1956,7 @@ fun DiffPane(
     val title = if (file.oldPath != null) file.displayName else shownPath.substringAfterLast('/')
     Column(modifier = modifier) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(headerPadding),
+            modifier = Modifier.fillMaxWidth().padding(headerPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -1438,16 +1991,12 @@ fun DiffPane(
             }
         }
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(dividerHeight)
-                .background(colors.outline.copy(alpha = 0.24f)),
+            modifier =
+                Modifier.fillMaxWidth()
+                    .height(dividerHeight)
+                    .background(colors.outline.copy(alpha = 0.24f))
         )
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState()),
-        ) {
+        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             DiffBody(
                 lines = file.lines,
                 maxLines = 800,
@@ -1456,28 +2005,34 @@ fun DiffPane(
         }
         if (siblings.size > 1) {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(dividerHeight)
-                    .background(colors.outline.copy(alpha = 0.24f)),
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .height(dividerHeight)
+                        .background(colors.outline.copy(alpha = 0.24f))
             )
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(footerPadding),
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(footerPadding),
                 horizontalArrangement = Arrangement.spacedBy(footerGap),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = stringResource(R.string.status_card_diff_position, index + 1, siblings.size),
+                    text =
+                        stringResource(
+                            R.string.status_card_diff_position,
+                            index + 1,
+                            siblings.size,
+                        ),
                     fontSize = positionSize,
                     lineHeight = positionLineHeight,
                     color = colors.onSurfaceVariantSummary,
                 )
                 siblings.forEach { sibling ->
                     // These were drawn as pills with no tap handler behind them, which is a button
-                    // that lies about itself. They are names in a list of names, so the fill and the
+                    // that lies about itself. They are names in a list of names, so the fill and
+                    // the
                     // silhouette are gone and only the open file keeps a colour.
                     Text(
                         text = sibling.fileName,
@@ -1497,11 +2052,18 @@ fun DiffPane(
 /**
  * The foldable sub-cards of the status card.
  *
- * Every one of them answers a different question — how full the context is, what this turn is doing,
- * which agents and files it has touched — and a reader who is watching one of them pays for the other
- * four with rows they are not reading, so each folds on its own.
+ * Every one of them answers a different question — how full the context is, what this turn is
+ * doing, which agents and files it has touched — and a reader who is watching one of them pays for
+ * the other four with rows they are not reading, so each folds on its own.
  */
-enum class StatusSection { Usage, RateLimits, Model, Plan, Agents, Files }
+enum class StatusSection {
+    Usage,
+    RateLimits,
+    Model,
+    Plan,
+    Agents,
+    Files,
+}
 
 /** Panel-local toggle state, hoisted out of the card so it survives collapse/reopen. */
 class StatusPanelState {
@@ -1565,9 +2127,9 @@ class StatusPanelState {
  * opens — the panel appearing next to it is the state change, and a rotating glyph on top of that
  * made the button look like it was doing something to the session rather than to the panel.
  *
- * The chip stays silent about the session's state: it opens the card, and the card is where running,
- * waiting and approvals are read. The running outline and the badge dot that used to sit on top of it
- * made the button look like the thing doing the work.
+ * The chip stays silent about the session's state: it opens the card, and the card is where
+ * running, waiting and approvals are read. The running outline and the badge dot that used to sit
+ * on top of it made the button look like the thing doing the work.
  */
 @Composable
 fun StatusCardButton(
@@ -1577,41 +2139,41 @@ fun StatusCardButton(
     elevation: Dp = 12.dp,
 ) {
     val colors = MiuixTheme.colorScheme
-    val shape = remember { SquircleShape(UiConsts.ChipCorner) }
+    val shape = RoundedCornerShape(UiConsts.ChipCorner)
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val pressOverlay by animateColorAsState(
-        targetValue = if (pressed) colors.onBackground.copy(alpha = 0.12f) else Color.Transparent,
-        animationSpec = Motion.Tint,
-        label = "statusButtonPress",
-    )
-    Box(
-        modifier = modifier
-            .size(UiConsts.ChipSize)
-            .floatingSurface(
-                shape = shape,
-                tint = if (open) colors.primary.copy(alpha = 0.92f) else panelColor(),
-                pressOverlay = pressOverlay,
-                elevation = elevation,
-            )
-            .clip(shape)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = MiuixIcons.Tasks,
-            contentDescription = if (open) {
-                stringResource(R.string.status_card_collapse_panel)
-            } else {
-                stringResource(R.string.status_card_expand_panel)
-            },
-            modifier = Modifier.size(UiConsts.ChipIcon),
-            tint = if (open) colors.onPrimary else colors.primary,
+    val pressOverlay by
+        animateColorAsState(
+            targetValue =
+                if (pressed) colors.onBackground.copy(alpha = 0.12f) else Color.Transparent,
+            animationSpec = Motion.Tint,
+            label = "statusButtonPress",
         )
+    Surface(
+        onClick = onClick,
+        modifier = modifier.size(UiConsts.ChipSize),
+        shape = shape,
+        color =
+            pressOverlay.compositeOver(
+                if (open) colors.primary.copy(alpha = 0.92f) else panelColor()
+            ),
+        shadowElevation = elevation,
+        interactionSource = interactionSource,
+        indication = null,
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = MiuixIcons.Tasks,
+                contentDescription =
+                    if (open) {
+                        stringResource(R.string.status_card_collapse_panel)
+                    } else {
+                        stringResource(R.string.status_card_expand_panel)
+                    },
+                modifier = Modifier.size(UiConsts.ChipIcon),
+                tint = if (open) colors.onPrimary else colors.primary,
+            )
+        }
     }
 }
 
@@ -1637,22 +2199,25 @@ fun BackChevron(
 /** Token counts are unreadable raw; `128400` becomes `128.4K`. */
 @Composable
 @ReadOnlyComposable
-internal fun formatTokens(tokens: Long): String = when {
-    tokens >= 1_000_000 -> stringResource(
-        R.string.status_card_tokens_millions,
-        String.format(Locale.US, "%.1f", tokens / 1_000_000f),
-    )
+internal fun formatTokens(tokens: Long): String =
+    when {
+        tokens >= 1_000_000 ->
+            stringResource(
+                R.string.status_card_tokens_millions,
+                String.format(Locale.US, "%.1f", tokens / 1_000_000f),
+            )
 
-    tokens >= 1_000 -> {
-        val thousands = tokens / 1_000f
-        if (thousands >= 100f) {
-            stringResource(R.string.status_card_tokens_rounded, Math.round(thousands))
-        } else {
-            stringResource(R.string.status_card_tokens_thousands, String.format(Locale.US, "%.1f", thousands))
+        tokens >= 1_000 -> {
+            val thousands = tokens / 1_000f
+            if (thousands >= 100f) {
+                stringResource(R.string.status_card_tokens_rounded, Math.round(thousands))
+            } else {
+                stringResource(
+                    R.string.status_card_tokens_thousands,
+                    String.format(Locale.US, "%.1f", thousands),
+                )
+            }
         }
+
+        else -> tokens.toString()
     }
-
-    else -> tokens.toString()
-}
-
-

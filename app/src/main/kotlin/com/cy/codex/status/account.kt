@@ -2,19 +2,24 @@ package com.cy.codex.status
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,11 +28,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,55 +35,61 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import com.cy.codex.AppEvent
+import com.cy.codex.CatalogState
 import com.cy.codex.R
+import com.cy.codex.UiConsts
+import com.cy.codex.UiType
+import com.cy.codex.codeSurface
 import com.cy.codex.protocol.protocol.v2.Account
 import com.cy.codex.protocol.protocol.v2.AccountRateLimits
 import com.cy.codex.protocol.protocol.v2.AccountReadResponse
 import com.cy.codex.protocol.protocol.v2.AccountUsage
 import com.cy.codex.protocol.protocol.v2.CreditsSnapshot
-import com.cy.codex.protocol.protocol.v2.RateLimitResetCredit
-import com.cy.codex.protocol.protocol.v2.RateLimitWindow
-import com.cy.codex.AppEvent
-import com.cy.codex.CatalogState
-import com.cy.codex.CodexButton
-import com.cy.codex.CodexButtonSize
-import com.cy.codex.CodexTextField
-import com.cy.codex.ModalSheet
-import com.cy.codex.ButtonRole
 import com.cy.codex.protocol.protocol.v2.LoginAccountParams
 import com.cy.codex.protocol.protocol.v2.LoginAccountResponse
-import com.cy.codex.SectionCard
-import com.cy.codex.SurfaceHeader
-import com.cy.codex.UiConsts
-import com.cy.codex.status.formatTokens
-import com.cy.codex.UiType
-import com.cy.codex.codeSurface
-import com.cy.codex.pressableRow
+import com.cy.codex.protocol.protocol.v2.RateLimitResetCredit
+import com.cy.codex.protocol.protocol.v2.RateLimitWindow
+import com.cy.codex.raisedSurface
+import com.cy.codex.sheetColor
+import com.cy.codex.sheetSideMargin
 import com.cy.codex.usageColor
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import kotlin.math.roundToInt
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
 import top.yukonga.miuix.kmp.icon.extended.Community
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Store
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-import kotlin.math.roundToInt
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * Account page: login state, rate-limit windows and the daily token chart.
@@ -104,15 +110,18 @@ fun AccountScreen(
     val usage = catalog.usage
 
     Column(modifier = modifier.fillMaxSize().background(MiuixTheme.colorScheme.background)) {
-        SurfaceHeader(
+        BasicComponent(
             title = stringResource(R.string.account_screen_title),
-            subtitle = if (account.signedIn) {
-                account.email ?: account.planType ?: stringResource(R.string.account_screen_signed_in)
-            } else {
-                stringResource(R.string.account_screen_not_signed_in)
-            },
-            leading = { AccountBackButton(onBack) },
-            trailing = {
+            summary =
+                if (account.signedIn) {
+                    account.email
+                        ?: account.planType
+                        ?: stringResource(R.string.account_screen_signed_in)
+                } else {
+                    stringResource(R.string.account_screen_not_signed_in)
+                },
+            startAction = { AccountBackButton(onBack) },
+            endActions = {
                 IconButton(
                     onClick = {
                         // Three reloads rather than one "refresh the page": the three answers come
@@ -137,8 +146,12 @@ fun AccountScreen(
             },
         )
         Column(
-            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
-                .padding(horizontal = UiConsts.ScreenMargin).padding(bottom = UiConsts.PageBottomInset),
+            modifier =
+                Modifier.weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = UiConsts.ScreenMargin)
+                    .padding(bottom = UiConsts.PageBottomInset),
             verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
         ) {
             AccountLoginSection(account)
@@ -160,16 +173,18 @@ private fun AccountSignIn(catalog: CatalogState, onEvent: (AppEvent) -> Unit) {
     var browserError by remember { mutableStateOf<String?>(null) }
     val uriHandler = LocalUriHandler.current
     val pending = catalog.pendingLogin
-    val url = when (pending) {
-        is LoginAccountResponse.Chatgpt -> pending.authUrl
-        is LoginAccountResponse.ChatgptDeviceCode -> pending.verificationUrl
-        else -> null
-    }
-    val loginId = when (pending) {
-        is LoginAccountResponse.Chatgpt -> pending.loginId
-        is LoginAccountResponse.ChatgptDeviceCode -> pending.loginId
-        else -> null
-    }
+    val url =
+        when (pending) {
+            is LoginAccountResponse.Chatgpt -> pending.authUrl
+            is LoginAccountResponse.ChatgptDeviceCode -> pending.verificationUrl
+            else -> null
+        }
+    val loginId =
+        when (pending) {
+            is LoginAccountResponse.Chatgpt -> pending.loginId
+            is LoginAccountResponse.ChatgptDeviceCode -> pending.loginId
+            else -> null
+        }
     fun openBrowser() {
         url?.let { it ->
             runCatching { uriHandler.openUri(it) }
@@ -185,59 +200,85 @@ private fun AccountSignIn(catalog: CatalogState, onEvent: (AppEvent) -> Unit) {
         if (pending != null) {
             if (pending is LoginAccountResponse.ChatgptDeviceCode) {
                 SelectionContainer {
-                    Text(text = pending.userCode, fontSize = UiType.SheetTitle, fontFamily = FontFamily.Monospace)
+                    Text(
+                        text = pending.userCode,
+                        fontSize = UiType.SheetTitle,
+                        fontFamily = FontFamily.Monospace,
+                    )
                 }
             }
-            Text(stringResource(R.string.runtime_login_waiting), color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+            Text(
+                stringResource(R.string.runtime_login_waiting),
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            )
             if (url != null) {
-                CodexButton(stringResource(R.string.runtime_open_browser), ::openBrowser, Modifier.fillMaxWidth())
+                Button(
+                    onClick = ::openBrowser,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = true,
+                    colors = ButtonDefaults.buttonColorsPrimary(),
+                ) {
+                    Text(text = stringResource(R.string.runtime_open_browser), maxLines = 1)
+                }
             }
             if (loginId != null) {
-                CodexButton(
-                    stringResource(R.string.runtime_cancel_login),
-                    { onEvent(AppEvent.CancelLogin(loginId)) },
-                    Modifier.fillMaxWidth(),
-                    role = ButtonRole.Secondary,
-                )
+                Button(
+                    onClick = { onEvent(AppEvent.CancelLogin(loginId)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = true,
+                    colors = ButtonDefaults.buttonColors(),
+                ) {
+                    Text(text = stringResource(R.string.runtime_cancel_login), maxLines = 1)
+                }
             }
         } else {
             // The browser flow's callback is served by the in-process app-server on
             // `http://localhost:<port>`, which the device's own browser can reach, so Android needs
             // no custom scheme or `onNewIntent` handoff. The same parameters the TUI sends.
-            CodexButton(
-                stringResource(R.string.runtime_login_chatgpt),
-                {
+            Button(
+                onClick = {
                     onEvent(
                         AppEvent.Login(
-                            LoginAccountParams.Chatgpt(useHostedLoginSuccessPage = false),
-                        ),
+                            LoginAccountParams.Chatgpt(useHostedLoginSuccessPage = false)
+                        )
                     )
                 },
-                Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 enabled = !catalog.loginLoading,
-            )
-            CodexButton(
-                stringResource(R.string.runtime_login_device_code),
-                { onEvent(AppEvent.Login(LoginAccountParams.ChatgptDeviceCode)) },
-                Modifier.fillMaxWidth(),
-                role = ButtonRole.Secondary,
+                colors = ButtonDefaults.buttonColorsPrimary(),
+            ) {
+                Text(text = stringResource(R.string.runtime_login_chatgpt), maxLines = 1)
+            }
+            Button(
+                onClick = { onEvent(AppEvent.Login(LoginAccountParams.ChatgptDeviceCode)) },
+                modifier = Modifier.fillMaxWidth(),
                 enabled = !catalog.loginLoading,
-            )
-            CodexTextField(
+                colors = ButtonDefaults.buttonColors(),
+            ) {
+                Text(text = stringResource(R.string.runtime_login_device_code), maxLines = 1)
+            }
+            TextField(
                 value = key,
                 onValueChange = { key = it },
+                modifier = Modifier.fillMaxWidth(),
                 label = stringResource(R.string.runtime_api_key),
+                useLabelAsPlaceholder = true,
+                singleLine = true,
+                enabled = !catalog.loginLoading,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 visualTransformation = PasswordVisualTransformation(),
-                enabled = !catalog.loginLoading,
             )
-            CodexButton(
-                stringResource(R.string.runtime_login_api_key),
-                { onEvent(AppEvent.Login(LoginAccountParams.ApiKey(key.trim()))); key = "" },
-                Modifier.fillMaxWidth(),
-                role = ButtonRole.Secondary,
+            Button(
+                onClick = {
+                    onEvent(AppEvent.Login(LoginAccountParams.ApiKey(key.trim())))
+                    key = ""
+                },
+                modifier = Modifier.fillMaxWidth(),
                 enabled = key.isNotBlank() && !catalog.loginLoading,
-            )
+                colors = ButtonDefaults.buttonColors(),
+            ) {
+                Text(text = stringResource(R.string.runtime_login_api_key), maxLines = 1)
+            }
         }
         if (catalog.loginLoading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         (catalog.loginError ?: browserError)?.let {
@@ -247,39 +288,72 @@ private fun AccountSignIn(catalog: CatalogState, onEvent: (AppEvent) -> Unit) {
 }
 
 /** The address of a ChatGPT account; the other variants have no identity to show. */
-private val AccountReadResponse.email: String? get() = (account as? Account.Chatgpt)?.email
+private val AccountReadResponse.email: String?
+    get() = (account as? Account.Chatgpt)?.email
 
 /** The first line of the account card: a ChatGPT address, or the variant's own name. */
 @Composable
 @ReadOnlyComposable
-private fun accountIdentity(response: AccountReadResponse): String = when (val account = response.account) {
-    is Account.Chatgpt -> account.email ?: stringResource(R.string.account_screen_email_unbound)
-    Account.ApiKey -> stringResource(R.string.account_screen_api_key)
-    is Account.AmazonBedrock -> stringResource(R.string.account_screen_bedrock)
-    null -> stringResource(R.string.account_screen_email_unbound)
-}
+private fun accountIdentity(response: AccountReadResponse): String =
+    when (val account = response.account) {
+        is Account.Chatgpt -> account.email ?: stringResource(R.string.account_screen_email_unbound)
+        Account.ApiKey -> stringResource(R.string.account_screen_api_key)
+        is Account.AmazonBedrock -> stringResource(R.string.account_screen_bedrock)
+        null -> stringResource(R.string.account_screen_email_unbound)
+    }
 
 /** The plan slug of a ChatGPT account; API-key and Bedrock accounts do not carry one. */
-private val AccountReadResponse.planType: String? get() = (account as? Account.Chatgpt)?.planType
+private val AccountReadResponse.planType: String?
+    get() = (account as? Account.Chatgpt)?.planType
 
-private val AccountReadResponse.signedIn: Boolean get() = account != null
+private val AccountReadResponse.signedIn: Boolean
+    get() = account != null
 
 /** 登录状态: mirrors the status card's `Account:` row (`{email} ({plan})`). */
 @Composable
 private fun AccountLoginSection(account: AccountReadResponse) {
     val colors = MiuixTheme.colorScheme
-    SectionCard(
-        title = stringResource(R.string.account_screen_sign_in_status),
-        icon = MiuixIcons.Community,
-        trailing = if (account.signedIn) {
-            stringResource(R.string.account_screen_signed_in)
-        } else {
-            stringResource(R.string.account_screen_not_signed_in)
-        },
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
+        BasicComponent(
+            title = stringResource(R.string.account_screen_sign_in_status),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Community,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            endActions = {
+                Text(
+                    text =
+                        if (account.signedIn) {
+                            stringResource(R.string.account_screen_signed_in)
+                        } else {
+                            stringResource(R.string.account_screen_not_signed_in)
+                        },
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+            },
+        )
+
         Row(
-            modifier = Modifier.fillMaxWidth().clip(AccountRowShape).background(codeSurface())
-                .padding(horizontal = UiConsts.Space9, vertical = UiConsts.Space8),
+            modifier =
+                Modifier.fillMaxWidth()
+                    .clip(AccountRowShape)
+                    .background(codeSurface())
+                    .padding(horizontal = UiConsts.Space9, vertical = UiConsts.Space8),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -296,11 +370,12 @@ private fun AccountLoginSection(account: AccountReadResponse) {
                 )
             }
             AccountChip(
-                text = if (account.signedIn) {
-                    stringResource(R.string.account_screen_online)
-                } else {
-                    stringResource(R.string.account_screen_offline)
-                },
+                text =
+                    if (account.signedIn) {
+                        stringResource(R.string.account_screen_online)
+                    } else {
+                        stringResource(R.string.account_screen_offline)
+                    },
                 tint = if (account.signedIn) colors.primary else colors.disabledOnSurface,
             )
         }
@@ -319,12 +394,41 @@ private fun AccountLoginSection(account: AccountReadResponse) {
 private fun AccountLimitSection(limits: AccountRateLimits) {
     val colors = MiuixTheme.colorScheme
     val snapshot = limits.rateLimits
-    SectionCard(title = stringResource(R.string.account_screen_rate_limits), icon = MiuixIcons.Store) {
-        val windows = listOfNotNull(
-            snapshot.primary?.let { it to (snapshot.limitName ?: stringResource(R.string.account_screen_rate_limit_primary)) },
-            snapshot.secondary?.let { it to stringResource(R.string.account_screen_rate_limit_secondary) },
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
+    ) {
+        BasicComponent(
+            title = stringResource(R.string.account_screen_rate_limits),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Store,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
         )
-        if (windows.isEmpty()) AccountNote(stringResource(R.string.account_screen_rate_limits_empty))
+
+        val windows =
+            listOfNotNull(
+                snapshot.primary?.let {
+                    it to
+                        (snapshot.limitName
+                            ?: stringResource(R.string.account_screen_rate_limit_primary))
+                },
+                snapshot.secondary?.let {
+                    it to stringResource(R.string.account_screen_rate_limit_secondary)
+                },
+            )
+        if (windows.isEmpty())
+            AccountNote(stringResource(R.string.account_screen_rate_limits_empty))
         windows.forEachIndexed { index, (window, label) ->
             if (index > 0) Spacer(Modifier.height(UiConsts.Space11))
             AccountRateMeter(label, window)
@@ -348,19 +452,21 @@ private fun AccountLimitSection(limits: AccountRateLimits) {
 /** `unlimited` outranks the balance, and no credits at all is its own sentence. */
 @Composable
 @ReadOnlyComposable
-private fun accountCreditsText(credits: CreditsSnapshot): String = when {
-    credits.unlimited -> stringResource(R.string.account_screen_credits_unlimited)
-    !credits.hasCredits -> stringResource(R.string.account_screen_credits_none)
-    credits.balance != null -> stringResource(R.string.account_screen_credits_balance, credits.balance)
-    else -> stringResource(R.string.account_screen_credits_none)
-}
+private fun accountCreditsText(credits: CreditsSnapshot): String =
+    when {
+        credits.unlimited -> stringResource(R.string.account_screen_credits_unlimited)
+        !credits.hasCredits -> stringResource(R.string.account_screen_credits_none)
+        credits.balance != null ->
+            stringResource(R.string.account_screen_credits_balance, credits.balance)
+        else -> stringResource(R.string.account_screen_credits_none)
+    }
 
 /**
  * The reset credits the account holds, and the one action that spends one.
  *
- * Mirrors the TUI's `/usage` reset picker (`chatwidget/usage.rs`): the list is sorted by expiry,
- * an already-consumed credit is not actionable, and redeeming is confirmed first because a
- * consumed credit cannot be returned. The card stays hidden when the account reported none.
+ * Mirrors the TUI's `/usage` reset picker (`chatwidget/usage.rs`): the list is sorted by expiry, an
+ * already-consumed credit is not actionable, and redeeming is confirmed first because a consumed
+ * credit cannot be returned. The card stays hidden when the account reported none.
  */
 @Composable
 private fun AccountResetCreditsSection(limits: AccountRateLimits, onEvent: (AppEvent) -> Unit) {
@@ -370,11 +476,36 @@ private fun AccountResetCreditsSection(limits: AccountRateLimits, onEvent: (AppE
     if (summary.availableCount <= 0 && credits.isEmpty()) return
     var pending by remember { mutableStateOf<RateLimitResetCredit?>(null) }
 
-    SectionCard(
-        title = stringResource(R.string.account_screen_reset_credits),
-        icon = MiuixIcons.Refresh,
-        trailing = summary.availableCount.toString(),
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
+        BasicComponent(
+            title = stringResource(R.string.account_screen_reset_credits),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            endActions = {
+                Text(
+                    text = summary.availableCount.toString(),
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+            },
+        )
+
         AccountText(
             stringResource(R.string.account_screen_reset_credits_note),
             size = UiType.Footnote,
@@ -385,23 +516,37 @@ private fun AccountResetCreditsSection(limits: AccountRateLimits, onEvent: (AppE
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     AccountText(
-                        credit.title ?: stringResource(R.string.account_screen_reset_credit_untitled),
+                        credit.title
+                            ?: stringResource(R.string.account_screen_reset_credit_untitled),
                         size = UiType.RowTitle,
                         weight = FontWeight.Medium,
                     )
                     if (!credit.description.isNullOrBlank()) {
-                        AccountText(credit.description, size = UiType.Meta, color = colors.onSurfaceVariantSummary)
+                        AccountText(
+                            credit.description,
+                            size = UiType.Meta,
+                            color = colors.onSurfaceVariantSummary,
+                        )
                     }
-                    AccountText(resetCreditExpiry(credit), size = UiType.Footnote, color = colors.disabledOnSurface)
+                    AccountText(
+                        resetCreditExpiry(credit),
+                        size = UiType.Footnote,
+                        color = colors.disabledOnSurface,
+                    )
                 }
                 Spacer(Modifier.width(UiConsts.Space8))
                 if (credit.status.equals("available", ignoreCase = true)) {
-                    CodexButton(
-                        text = stringResource(R.string.account_screen_reset_credit_use),
+                    Button(
                         onClick = { pending = credit },
-                        role = ButtonRole.Primary,
-                        size = CodexButtonSize.Compact,
-                    )
+                        modifier = Modifier,
+                        enabled = true,
+                        colors = ButtonDefaults.buttonColorsPrimary(),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.account_screen_reset_credit_use),
+                            maxLines = 1,
+                        )
+                    }
                 } else {
                     AccountChip(resetCreditStatusLabel(credit.status), colors.disabledOnSurface)
                 }
@@ -431,11 +576,14 @@ private fun resetCreditExpiry(credit: RateLimitResetCredit): String =
 
 @Composable
 @ReadOnlyComposable
-private fun resetCreditStatusLabel(status: String): String = when {
-    status.equals("redeeming", ignoreCase = true) -> stringResource(R.string.account_screen_reset_credit_redeeming)
-    status.equals("redeemed", ignoreCase = true) -> stringResource(R.string.account_screen_reset_credit_redeemed)
-    else -> stringResource(R.string.account_screen_reset_credit_unknown)
-}
+private fun resetCreditStatusLabel(status: String): String =
+    when {
+        status.equals("redeeming", ignoreCase = true) ->
+            stringResource(R.string.account_screen_reset_credit_redeeming)
+        status.equals("redeemed", ignoreCase = true) ->
+            stringResource(R.string.account_screen_reset_credit_redeemed)
+        else -> stringResource(R.string.account_screen_reset_credit_unknown)
+    }
 
 /** The irreversibility is the whole reason this confirmation exists. */
 @Composable
@@ -444,37 +592,80 @@ private fun ResetCreditSheet(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    ModalSheet(
+    WindowBottomSheet(
         show = true,
-        onDismiss = onDismiss,
+        onDismissRequest = onDismiss,
         onDismissFinished = onDismiss,
         title = stringResource(R.string.account_screen_reset_credit_confirm_title),
-        subtitle = credit.title ?: stringResource(R.string.account_screen_reset_credit_untitled),
+        backgroundColor = sheetColor(),
+        cornerRadius = UiConsts.SheetCorner,
+        sheetMaxWidth = UiConsts.SheetMaxWidth,
+        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
+        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
     ) {
-        val colors = MiuixTheme.colorScheme
-        Text(
-            text = stringResource(R.string.account_screen_reset_credit_confirm_body),
-            modifier = Modifier.padding(horizontal = UiConsts.Space4),
-            fontSize = UiType.Body,
-            lineHeight = UiType.BodyLine,
-            color = colors.onSurfaceVariantSummary,
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = UiConsts.Space4),
-            horizontalArrangement = Arrangement.spacedBy(UiConsts.Space8),
+        Column(
+            modifier =
+                Modifier.fillMaxWidth()
+                    .heightIn(
+                        max =
+                            LocalWindowInfo.current.containerDpSize.height *
+                                UiConsts.SheetHeightFraction
+                    )
         ) {
-            CodexButton(
-                text = stringResource(R.string.account_screen_reset_credit_confirm_cancel),
-                onClick = onDismiss,
-                modifier = Modifier.weight(1f),
-                role = ButtonRole.Secondary,
+            Text(
+                text =
+                    credit.title ?: stringResource(R.string.account_screen_reset_credit_untitled),
+                fontSize = UiType.RowDetail,
+                lineHeight = UiType.RowDetailLine,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            CodexButton(
-                text = stringResource(R.string.account_screen_reset_credit_confirm_action),
-                onClick = onConfirm,
-                modifier = Modifier.weight(1f),
-                role = ButtonRole.Primary,
-            )
+            Column(
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(bottom = UiConsts.SheetPadding),
+                verticalArrangement = Arrangement.spacedBy(UiConsts.Space6),
+            ) {
+                val colors = MiuixTheme.colorScheme
+                Text(
+                    text = stringResource(R.string.account_screen_reset_credit_confirm_body),
+                    modifier = Modifier.padding(horizontal = UiConsts.Space4),
+                    fontSize = UiType.Body,
+                    lineHeight = UiType.BodyLine,
+                    color = colors.onSurfaceVariantSummary,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = UiConsts.Space4),
+                    horizontalArrangement = Arrangement.spacedBy(UiConsts.Space8),
+                ) {
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        enabled = true,
+                        colors = ButtonDefaults.buttonColors(),
+                    ) {
+                        Text(
+                            text =
+                                stringResource(R.string.account_screen_reset_credit_confirm_cancel),
+                            maxLines = 1,
+                        )
+                    }
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier.weight(1f),
+                        enabled = true,
+                        colors = ButtonDefaults.buttonColorsPrimary(),
+                    ) {
+                        Text(
+                            text =
+                                stringResource(R.string.account_screen_reset_credit_confirm_action),
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -496,16 +687,21 @@ private fun AccountRateMeter(label: String, window: RateLimitWindow) {
         LinearProgressIndicator(
             progress = fraction,
             modifier = Modifier.fillMaxWidth(),
-            colors = ProgressIndicatorDefaults.progressIndicatorColors(
-                foregroundColor = usageColor(fraction),
-                backgroundColor = colors.onBackground.copy(alpha = 0.08f),
-            ),
+            colors =
+                ProgressIndicatorDefaults.progressIndicatorColors(
+                    foregroundColor = usageColor(fraction),
+                    backgroundColor = colors.onBackground.copy(alpha = 0.08f),
+                ),
             height = UiConsts.ProgressHeight,
         )
         if (window.resetsAt != null) {
             Spacer(Modifier.height(UiConsts.Space5))
             AccountText(
-                text = stringResource(R.string.account_screen_resets_at, accountFormatReset(window.resetsAt)),
+                text =
+                    stringResource(
+                        R.string.account_screen_resets_at,
+                        accountFormatReset(window.resetsAt),
+                    ),
                 size = UiType.Footnote,
                 color = colors.onSurfaceVariantSummary,
             )
@@ -517,12 +713,37 @@ private fun AccountRateMeter(label: String, window: RateLimitWindow) {
 @Composable
 private fun AccountUsageSection(usage: AccountUsage) {
     val colors = MiuixTheme.colorScheme
-    SectionCard(
-        title = stringResource(R.string.account_screen_usage),
-        icon = MiuixIcons.Store,
-        trailing = formatTokens(usage.totalTokens),
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
-        if (usage.dailyBuckets.isEmpty()) AccountNote(stringResource(R.string.account_screen_usage_empty))
+        BasicComponent(
+            title = stringResource(R.string.account_screen_usage),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Store,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            endActions = {
+                Text(
+                    text = formatTokens(usage.totalTokens),
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+            },
+        )
+        if (usage.dailyBuckets.isEmpty())
+            AccountNote(stringResource(R.string.account_screen_usage_empty))
         if (usage.dailyBuckets.isNotEmpty()) {
             AccountUsageChart(
                 buckets = usage.dailyBuckets.map { it.tokens },
@@ -543,33 +764,41 @@ private fun AccountUsageSection(usage: AccountUsage) {
             }
             Spacer(Modifier.height(UiConsts.Space6))
             AccountText(
-                text = stringResource(
-                    R.string.account_screen_usage_peak,
-                    // The server's own peak, when this build answered with the full summary; the
-                    // charted buckets are the fallback for a response that only carries the series.
-                    formatTokens(usage.peakDailyTokens.takeIf { it > 0 } ?: usage.dailyBuckets.maxOf { it.tokens }.toLong()),
-                    usage.dailyBuckets.size,
-                ),
+                text =
+                    stringResource(
+                        R.string.account_screen_usage_peak,
+                        // The server's own peak, when this build answered with the full summary;
+                        // the
+                        // charted buckets are the fallback for a response that only carries the
+                        // series.
+                        formatTokens(
+                            usage.peakDailyTokens.takeIf { it > 0 }
+                                ?: usage.dailyBuckets.maxOf { it.tokens }.toLong()
+                        ),
+                        usage.dailyBuckets.size,
+                    ),
                 size = UiType.Footnote,
                 color = colors.disabledOnSurface,
             )
             if (usage.currentStreakDays > 0 || usage.longestStreakDays > 0) {
                 AccountText(
-                    text = stringResource(
-                        R.string.account_screen_usage_streak,
-                        usage.currentStreakDays,
-                        usage.longestStreakDays,
-                    ),
+                    text =
+                        stringResource(
+                            R.string.account_screen_usage_streak,
+                            usage.currentStreakDays,
+                            usage.longestStreakDays,
+                        ),
                     size = UiType.Footnote,
                     color = colors.disabledOnSurface,
                 )
             }
             if (usage.longestRunningTurnSec > 0) {
                 AccountText(
-                    text = stringResource(
-                        R.string.account_screen_usage_longest_turn,
-                        accountTurnDuration(usage.longestRunningTurnSec),
-                    ),
+                    text =
+                        stringResource(
+                            R.string.account_screen_usage_longest_turn,
+                            accountTurnDuration(usage.longestRunningTurnSec),
+                        ),
                     size = UiType.Footnote,
                     color = colors.disabledOnSurface,
                 )
@@ -600,7 +829,8 @@ private fun AccountUsageChart(buckets: List<Int>, modifier: Modifier = Modifier)
         val corner = CornerRadius(barWidth / 2f, barWidth / 2f)
         val minHeight = UiConsts.Space3.toPx()
         buckets.forEachIndexed { index, tokens ->
-            val barHeight = (size.height * (tokens.toFloat() / peak.toFloat())).coerceIn(minHeight, size.height)
+            val barHeight =
+                (size.height * (tokens.toFloat() / peak.toFloat())).coerceIn(minHeight, size.height)
             drawRoundRect(
                 color = colors.primary,
                 topLeft = Offset(index * slot + (slot - barWidth) / 2f, size.height - barHeight),
@@ -615,14 +845,39 @@ private fun AccountUsageChart(buckets: List<Int>, modifier: Modifier = Modifier)
 @Composable
 private fun AccountLogoutSection(loggedIn: Boolean, onLogout: () -> Unit) {
     val colors = MiuixTheme.colorScheme
-    SectionCard(title = stringResource(R.string.account_screen_credentials), icon = MiuixIcons.Community) {
-        Row(
-            modifier = Modifier.fillMaxWidth()
-                .then(
-                    if (loggedIn) Modifier.pressableRow(AccountRowShape, Color.Transparent, onLogout)
-                    else Modifier.clip(AccountRowShape),
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
+    ) {
+        BasicComponent(
+            title = stringResource(R.string.account_screen_credentials),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Community,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
                 )
-                .padding(horizontal = UiConsts.Space8, vertical = UiConsts.Space10),
+            },
+        )
+
+        Row(
+            modifier =
+                Modifier.fillMaxWidth()
+                    .then(
+                        if (loggedIn)
+                            Modifier.clip(AccountRowShape)
+                                .background(Color.Transparent, AccountRowShape)
+                                .combinedClickable(onClick = onLogout)
+                        else Modifier.clip(AccountRowShape)
+                    )
+                    .padding(horizontal = UiConsts.Space8, vertical = UiConsts.Space10),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AccountText(
@@ -633,11 +888,12 @@ private fun AccountLogoutSection(loggedIn: Boolean, onLogout: () -> Unit) {
                 weight = FontWeight.Medium,
             )
             AccountText(
-                text = if (loggedIn) {
-                    stringResource(R.string.account_screen_remove_credentials)
-                } else {
-                    stringResource(R.string.account_screen_not_signed_in)
-                },
+                text =
+                    if (loggedIn) {
+                        stringResource(R.string.account_screen_remove_credentials)
+                    } else {
+                        stringResource(R.string.account_screen_not_signed_in)
+                    },
                 size = UiType.Meta,
                 color = colors.disabledOnSurface,
             )
@@ -677,7 +933,11 @@ private fun AccountText(
 
 @Composable
 private fun AccountBackButton(onBack: () -> Unit) {
-    IconButton(onClick = onBack, minWidth = UiConsts.IconButtonSize, minHeight = UiConsts.IconButtonSize) {
+    IconButton(
+        onClick = onBack,
+        minWidth = UiConsts.IconButtonSize,
+        minHeight = UiConsts.IconButtonSize,
+    ) {
         Icon(
             MiuixIcons.ChevronBackward,
             stringResource(R.string.account_screen_back),
@@ -694,7 +954,12 @@ private fun AccountInfoLine(label: String, value: String, labelWidth: Dp = 72.dp
         Modifier.fillMaxWidth().padding(vertical = UiConsts.Space4),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AccountText(label, Modifier.width(labelWidth), size = UiType.Body, color = colors.onSurfaceVariantSummary)
+        AccountText(
+            label,
+            Modifier.width(labelWidth),
+            size = UiType.Body,
+            color = colors.onSurfaceVariantSummary,
+        )
         AccountText(value, Modifier.weight(1f), mono = true, maxLines = 1)
     }
 }
@@ -703,10 +968,17 @@ private fun AccountInfoLine(label: String, value: String, labelWidth: Dp = 72.dp
 private fun AccountChip(text: String, tint: Color) {
     val shape = RoundedCornerShape(UiConsts.BadgeCorner)
     Box(
-        Modifier.clip(shape).background(tint.copy(alpha = UiConsts.BadgeTintAlpha))
-            .padding(horizontal = UiConsts.Space6, vertical = UiConsts.Space2),
+        Modifier.clip(shape)
+            .background(tint.copy(alpha = UiConsts.BadgeTintAlpha))
+            .padding(horizontal = UiConsts.Space6, vertical = UiConsts.Space2)
     ) {
-        AccountText(text, size = UiType.Chip, color = tint, weight = FontWeight.Medium, maxLines = 1)
+        AccountText(
+            text,
+            size = UiType.Chip,
+            color = tint,
+            weight = FontWeight.Medium,
+            maxLines = 1,
+        )
     }
 }
 
@@ -723,9 +995,14 @@ private fun AccountNote(text: String) {
 @Composable
 @ReadOnlyComposable
 private fun accountFormatReset(millis: Long): String =
-    Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).format(
-        DateTimeFormatter.ofPattern(stringResource(R.string.account_screen_reset_format), Locale.getDefault()),
-    )
+    Instant.ofEpochMilli(millis)
+        .atZone(ZoneId.systemDefault())
+        .format(
+            DateTimeFormatter.ofPattern(
+                stringResource(R.string.account_screen_reset_format),
+                Locale.getDefault(),
+            )
+        )
 
 /** `9月15日` is too wide for a chart tick; the day number alone is enough. */
 private fun accountShortDay(day: String): String {

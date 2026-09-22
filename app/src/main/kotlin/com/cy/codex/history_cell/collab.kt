@@ -1,6 +1,7 @@
 package com.cy.codex.history_cell
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,21 +29,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.cy.codex.R
+import com.cy.codex.ThreadStatusTone
+import com.cy.codex.ToolCard
+import com.cy.codex.UiConsts
+import com.cy.codex.UiType
+import com.cy.codex.label
 import com.cy.codex.protocol.protocol.item.CollabAgentToolCallItem
 import com.cy.codex.protocol.protocol.item.SubAgentActivityItem
 import com.cy.codex.protocol.protocol.v2.AgentRunStatus
 import com.cy.codex.protocol.protocol.v2.CollabAgentState
 import com.cy.codex.protocol.protocol.v2.CollabAgentToolCallStatus
 import com.cy.codex.protocol.protocol.v2.SubAgentActivityKind
-import com.cy.codex.ToolCard
-import com.cy.codex.label
-import com.cy.codex.ThreadStatusTone
-import com.cy.codex.UiConsts
-import com.cy.codex.pressableRow
 import com.cy.codex.statusDotColor
-import com.cy.codex.UiType
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -83,9 +82,10 @@ fun CollabToolCallCell(
     val tone = collabCallTone(item.status)
     // Receivers keep the order the server sent; any extra agents in `agentsStates` follow, sorted,
     // so recomposition never reshuffles the list.
-    val threadIds = remember(item.receiverThreadIds, item.agentsStates) {
-        (item.receiverThreadIds + item.agentsStates.keys.sorted()).distinct()
-    }
+    val threadIds =
+        remember(item.receiverThreadIds, item.agentsStates) {
+            (item.receiverThreadIds + item.agentsStates.keys.sorted()).distinct()
+        }
     val prompt = item.prompt?.trim().orEmpty()
 
     ToolCard(
@@ -102,7 +102,7 @@ fun CollabToolCallCell(
                 MetaChip(text = model)
                 item.reasoningEffort?.let {
                     MetaChip(
-                        text = stringResource(R.string.collab_cell_reasoning_effort, it.label()),
+                        text = stringResource(R.string.collab_cell_reasoning_effort, it.label())
                     )
                 }
             }
@@ -157,24 +157,26 @@ fun SubAgentActivityCell(
 ) {
     val colors = MiuixTheme.colorScheme
     val tone = subAgentActivityTone(item.kind)
-    val icon = when (item.kind) {
-        SubAgentActivityKind.Started -> MiuixIcons.Play
-        SubAgentActivityKind.Interacted -> MiuixIcons.Messages
-        SubAgentActivityKind.Interrupted -> MiuixIcons.Pause
-        SubAgentActivityKind.Completed -> MiuixIcons.Ok
-    }
+    val icon =
+        when (item.kind) {
+            SubAgentActivityKind.Started -> MiuixIcons.Play
+            SubAgentActivityKind.Interacted -> MiuixIcons.Messages
+            SubAgentActivityKind.Interrupted -> MiuixIcons.Pause
+            SubAgentActivityKind.Completed -> MiuixIcons.Ok
+        }
     val path = item.agentPath.ifBlank { agentNameOf(item.agentThreadId) }
 
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .pressableRow(
-                shape = RoundedCornerShape(UiConsts.RowCorner),
-                container = Color.Transparent,
-                onClick = { onOpenAgent(item.agentThreadId) },
-                onLongClick = { onOpenAgentInfo(item.agentThreadId) },
-            )
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(Color.Transparent, RoundedCornerShape(UiConsts.RowCorner))
+                .clip(RoundedCornerShape(UiConsts.RowCorner))
+                .combinedClickable(
+                    onClick = { onOpenAgent(item.agentThreadId) },
+                    onLongClick = { onOpenAgentInfo(item.agentThreadId) },
+                )
+                .padding(horizontal = horizontalPadding, vertical = verticalPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -249,23 +251,18 @@ private fun AgentStateRow(
     val status = state?.status ?: AgentRunStatus.Running
     val tone = agentRunTone(status)
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pressableRow(
-                shape = RoundedCornerShape(UiConsts.RowCorner),
-                container = Color.Transparent,
-                onClick = onClick,
-                onLongClick = onLongClick,
-            )
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        modifier =
+            Modifier.fillMaxWidth()
+                .background(Color.Transparent, RoundedCornerShape(UiConsts.RowCorner))
+                .clip(RoundedCornerShape(UiConsts.RowCorner))
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = onLongClick,
+                )
+                .padding(horizontal = horizontalPadding, vertical = verticalPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(dotSize)
-                .clip(CircleShape)
-                .background(statusDotColor(tone)),
-        )
+        Box(modifier = Modifier.size(dotSize).clip(CircleShape).background(statusDotColor(tone)))
         Spacer(Modifier.width(dotSpacing))
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -320,17 +317,13 @@ private fun QuotedBlock(
     lineHeight: TextUnit = UiType.RowTitleLine,
 ) {
     val colors = MiuixTheme.colorScheme
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(IntrinsicSize.Min),
-    ) {
+    Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         Box(
-            modifier = Modifier
-                .width(barWidth)
-                .fillMaxHeight()
-                .clip(RoundedCornerShape(corner))
-                .background(colors.primary.copy(alpha = 0.45f)),
+            modifier =
+                Modifier.width(barWidth)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(corner))
+                    .background(colors.primary.copy(alpha = 0.45f))
         )
         Spacer(Modifier.width(spacing))
         Text(
@@ -343,60 +336,68 @@ private fun QuotedBlock(
     }
 }
 
-internal fun collabCallTone(status: CollabAgentToolCallStatus): ThreadStatusTone = when (status) {
-    CollabAgentToolCallStatus.InProgress -> ThreadStatusTone.Running
-    CollabAgentToolCallStatus.Completed -> ThreadStatusTone.Done
-    CollabAgentToolCallStatus.Failed -> ThreadStatusTone.Failed
-    CollabAgentToolCallStatus.Interrupted -> ThreadStatusTone.Waiting
-}
+internal fun collabCallTone(status: CollabAgentToolCallStatus): ThreadStatusTone =
+    when (status) {
+        CollabAgentToolCallStatus.InProgress -> ThreadStatusTone.Running
+        CollabAgentToolCallStatus.Completed -> ThreadStatusTone.Done
+        CollabAgentToolCallStatus.Failed -> ThreadStatusTone.Failed
+        CollabAgentToolCallStatus.Interrupted -> ThreadStatusTone.Waiting
+    }
 
 @Composable
 @ReadOnlyComposable
-internal fun collabCallLabel(status: CollabAgentToolCallStatus): String = when (status) {
-    CollabAgentToolCallStatus.InProgress -> stringResource(R.string.collab_cell_call_status_running)
-    CollabAgentToolCallStatus.Completed ->
-        stringResource(R.string.collab_cell_call_status_completed)
-    CollabAgentToolCallStatus.Failed -> stringResource(R.string.collab_cell_call_status_failed)
-    CollabAgentToolCallStatus.Interrupted ->
-        stringResource(R.string.collab_cell_call_status_interrupted)
-}
+internal fun collabCallLabel(status: CollabAgentToolCallStatus): String =
+    when (status) {
+        CollabAgentToolCallStatus.InProgress ->
+            stringResource(R.string.collab_cell_call_status_running)
+        CollabAgentToolCallStatus.Completed ->
+            stringResource(R.string.collab_cell_call_status_completed)
+        CollabAgentToolCallStatus.Failed -> stringResource(R.string.collab_cell_call_status_failed)
+        CollabAgentToolCallStatus.Interrupted ->
+            stringResource(R.string.collab_cell_call_status_interrupted)
+    }
 
-internal fun agentRunTone(status: AgentRunStatus): ThreadStatusTone = when (status) {
-    AgentRunStatus.PendingInit -> ThreadStatusTone.Waiting
-    AgentRunStatus.Running -> ThreadStatusTone.Running
-    AgentRunStatus.Interrupted -> ThreadStatusTone.Waiting
-    AgentRunStatus.Completed -> ThreadStatusTone.Done
-    AgentRunStatus.Errored -> ThreadStatusTone.Failed
-    AgentRunStatus.Shutdown -> ThreadStatusTone.Idle
-    AgentRunStatus.NotFound -> ThreadStatusTone.Failed
-}
-
-@Composable
-@ReadOnlyComposable
-internal fun agentRunLabel(status: AgentRunStatus): String = when (status) {
-    AgentRunStatus.PendingInit -> stringResource(R.string.collab_cell_agent_status_pending_init)
-    AgentRunStatus.Running -> stringResource(R.string.collab_cell_agent_status_running)
-    AgentRunStatus.Interrupted -> stringResource(R.string.collab_cell_agent_status_interrupted)
-    AgentRunStatus.Completed -> stringResource(R.string.collab_cell_agent_status_completed)
-    AgentRunStatus.Errored -> stringResource(R.string.collab_cell_agent_status_errored)
-    AgentRunStatus.Shutdown -> stringResource(R.string.collab_cell_agent_status_shutdown)
-    AgentRunStatus.NotFound -> stringResource(R.string.collab_cell_agent_status_not_found)
-}
-
-private fun subAgentActivityTone(kind: SubAgentActivityKind): ThreadStatusTone = when (kind) {
-    SubAgentActivityKind.Started -> ThreadStatusTone.Running
-    SubAgentActivityKind.Interacted -> ThreadStatusTone.Running
-    SubAgentActivityKind.Interrupted -> ThreadStatusTone.Waiting
-    SubAgentActivityKind.Completed -> ThreadStatusTone.Done
-}
+internal fun agentRunTone(status: AgentRunStatus): ThreadStatusTone =
+    when (status) {
+        AgentRunStatus.PendingInit -> ThreadStatusTone.Waiting
+        AgentRunStatus.Running -> ThreadStatusTone.Running
+        AgentRunStatus.Interrupted -> ThreadStatusTone.Waiting
+        AgentRunStatus.Completed -> ThreadStatusTone.Done
+        AgentRunStatus.Errored -> ThreadStatusTone.Failed
+        AgentRunStatus.Shutdown -> ThreadStatusTone.Idle
+        AgentRunStatus.NotFound -> ThreadStatusTone.Failed
+    }
 
 @Composable
 @ReadOnlyComposable
-private fun subAgentActivityLabel(kind: SubAgentActivityKind): String = when (kind) {
-    SubAgentActivityKind.Started -> stringResource(R.string.collab_cell_activity_started)
-    SubAgentActivityKind.Interacted -> stringResource(R.string.collab_cell_activity_interacted)
-    SubAgentActivityKind.Interrupted -> stringResource(R.string.collab_cell_activity_interrupted)
-    SubAgentActivityKind.Completed -> stringResource(R.string.collab_cell_activity_completed)
-}
+internal fun agentRunLabel(status: AgentRunStatus): String =
+    when (status) {
+        AgentRunStatus.PendingInit -> stringResource(R.string.collab_cell_agent_status_pending_init)
+        AgentRunStatus.Running -> stringResource(R.string.collab_cell_agent_status_running)
+        AgentRunStatus.Interrupted -> stringResource(R.string.collab_cell_agent_status_interrupted)
+        AgentRunStatus.Completed -> stringResource(R.string.collab_cell_agent_status_completed)
+        AgentRunStatus.Errored -> stringResource(R.string.collab_cell_agent_status_errored)
+        AgentRunStatus.Shutdown -> stringResource(R.string.collab_cell_agent_status_shutdown)
+        AgentRunStatus.NotFound -> stringResource(R.string.collab_cell_agent_status_not_found)
+    }
+
+private fun subAgentActivityTone(kind: SubAgentActivityKind): ThreadStatusTone =
+    when (kind) {
+        SubAgentActivityKind.Started -> ThreadStatusTone.Running
+        SubAgentActivityKind.Interacted -> ThreadStatusTone.Running
+        SubAgentActivityKind.Interrupted -> ThreadStatusTone.Waiting
+        SubAgentActivityKind.Completed -> ThreadStatusTone.Done
+    }
+
+@Composable
+@ReadOnlyComposable
+private fun subAgentActivityLabel(kind: SubAgentActivityKind): String =
+    when (kind) {
+        SubAgentActivityKind.Started -> stringResource(R.string.collab_cell_activity_started)
+        SubAgentActivityKind.Interacted -> stringResource(R.string.collab_cell_activity_interacted)
+        SubAgentActivityKind.Interrupted ->
+            stringResource(R.string.collab_cell_activity_interrupted)
+        SubAgentActivityKind.Completed -> stringResource(R.string.collab_cell_activity_completed)
+    }
 
 private fun shortThreadId(threadId: String): String = threadId.take(8)

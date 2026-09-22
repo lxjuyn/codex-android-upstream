@@ -26,19 +26,15 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.cy.codex.R
+import com.cy.codex.UiConsts
+import com.cy.codex.UiType
 import com.cy.codex.protocol.ApprovalRequest
 import com.cy.codex.protocol.protocol.v2.ToolRequestUserInputQuestion
 import com.cy.codex.protocol.protocol.v2.UserInputAnswer
-import com.cy.codex.UiConsts
-import com.cy.codex.UiType
-import com.cy.codex.pressableRow
-import com.cy.codex.raisedSurface
-import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Notes
-import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.preference.RadioButtonLocation
+import top.yukonga.miuix.kmp.preference.RadioButtonPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -58,9 +54,6 @@ private const val OtherChoice = -1
 
 /** Prefix marking notes that ride along with a selected option. */
 private const val UserNotePrefix = "user_note: "
-
-/** Tappable option row of a question. */
-private val OptionShape = RoundedCornerShape(UiConsts.CornerControl)
 
 /** The numbered badge in front of a question header. */
 private val BadgeShape = RoundedCornerShape(UiConsts.CornerChip)
@@ -87,9 +80,11 @@ internal fun RequestUserInputForm(
     fun submit() {
         if (!complete || submitted) return
         submitted = true
-        onSubmit(questions.mapNotNull { question ->
-            answersFor(question, selections, notes)?.let { UserInputAnswer(question.id, it) }
-        })
+        onSubmit(
+            questions.mapNotNull { question ->
+                answersFor(question, selections, notes)?.let { UserInputAnswer(question.id, it) }
+            }
+        )
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -119,10 +114,11 @@ internal fun RequestUserInputForm(
         if (!complete && questions.isNotEmpty()) {
             Spacer(Modifier.height(UiConsts.Space8))
             Text(
-                text = stringResource(
-                    R.string.request_user_input_view_unanswered,
-                    questions.size - answered,
-                ),
+                text =
+                    stringResource(
+                        R.string.request_user_input_view_unanswered,
+                        questions.size - answered,
+                    ),
                 modifier = Modifier.fillMaxWidth(),
                 fontSize = UiType.Meta,
                 lineHeight = UiType.MetaLine,
@@ -173,10 +169,10 @@ private fun QuestionBlock(
         ) {
             Text(
                 text = "${index + 1}",
-                modifier = Modifier
-                    .size(BadgeSize)
-                    .background(colors.primary.copy(alpha = 0.14f), BadgeShape)
-                    .padding(top = BadgeTopPadding),
+                modifier =
+                    Modifier.size(BadgeSize)
+                        .background(colors.primary.copy(alpha = 0.14f), BadgeShape)
+                        .padding(top = BadgeTopPadding),
                 fontSize = UiType.Chip,
                 lineHeight = UiType.ChipLine,
                 textAlign = TextAlign.Center,
@@ -206,9 +202,10 @@ private fun QuestionBlock(
         if (options.isNotEmpty()) {
             Spacer(Modifier.height(UiConsts.Space8))
             options.forEachIndexed { optionIndex, option ->
-                OptionRow(
-                    label = option.label,
-                    description = option.description,
+                RadioButtonPreference(
+                    title = option.label,
+                    summary = option.description.takeIf { it.isNotBlank() },
+                    radioButtonLocation = RadioButtonLocation.End,
                     selected = selected == optionIndex,
                     onClick = { onSelect(optionIndex) },
                 )
@@ -221,76 +218,27 @@ private fun QuestionBlock(
                 value = note,
                 onValueChange = onNoteChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = if (options.isEmpty()) {
-                    stringResource(R.string.request_user_input_view_your_answer)
-                } else {
-                    stringResource(R.string.request_user_input_view_other)
-                },
+                label =
+                    if (options.isEmpty()) {
+                        stringResource(R.string.request_user_input_view_your_answer)
+                    } else {
+                        stringResource(R.string.request_user_input_view_other)
+                    },
                 singleLine = !question.isSecret,
                 minLines = 1,
                 maxLines = if (question.isSecret) 1 else 4,
-                visualTransformation = if (question.isSecret) {
-                    PasswordVisualTransformation()
-                } else {
-                    VisualTransformation.None
-                },
-                textStyle = if (question.isSecret) {
-                    MiuixTheme.textStyles.main.copy(fontFamily = FontFamily.Monospace)
-                } else {
-                    MiuixTheme.textStyles.main
-                },
-            )
-        }
-    }
-}
-
-/** One tappable option row with a trailing check mark when selected. */
-@Composable
-private fun OptionRow(
-    label: String,
-    description: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val colors = MiuixTheme.colorScheme
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pressableRow(
-                shape = OptionShape,
-                container = if (selected) colors.primary.copy(alpha = 0.1f) else raisedSurface(),
-                onClick = onClick,
-            )
-            .padding(
-                horizontal = UiConsts.Space12,
-                vertical = UiConsts.Space10,
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = label,
-                fontSize = UiType.RowTitle,
-                lineHeight = UiType.RowTitleLine,
-                fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
-                color = if (selected) colors.primary else colors.onSurface,
-            )
-            if (description.isNotBlank()) {
-                Text(
-                    text = description,
-                    fontSize = UiType.Meta,
-                    lineHeight = UiType.MetaLine,
-                    color = colors.onSurfaceVariantSummary,
-                )
-            }
-        }
-        if (selected) {
-            Spacer(Modifier.width(UiConsts.Space8))
-            Icon(
-                imageVector = MiuixIcons.Ok,
-                contentDescription = stringResource(R.string.request_user_input_view_selected),
-                modifier = Modifier.size(UiConsts.IconInline),
-                tint = colors.primary,
+                visualTransformation =
+                    if (question.isSecret) {
+                        PasswordVisualTransformation()
+                    } else {
+                        VisualTransformation.None
+                    },
+                textStyle =
+                    if (question.isSecret) {
+                        MiuixTheme.textStyles.main.copy(fontFamily = FontFamily.Monospace)
+                    } else {
+                        MiuixTheme.textStyles.main
+                    },
             )
         }
     }

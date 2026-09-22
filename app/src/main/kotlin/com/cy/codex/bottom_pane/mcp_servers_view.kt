@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,24 +27,26 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.cy.codex.AppEvent
-import com.cy.codex.ButtonRole
-import com.cy.codex.CodexButton
-import com.cy.codex.CodexButtonSize
-import com.cy.codex.CodexDivider
+import com.cy.codex.CatalogState
 import com.cy.codex.R
+import com.cy.codex.ThreadStatusTone
+import com.cy.codex.UiConsts
+import com.cy.codex.UiType
+import com.cy.codex.label
 import com.cy.codex.protocol.protocol.v2.McpAuthStatus
 import com.cy.codex.protocol.protocol.v2.McpServerConnectionStatus
 import com.cy.codex.protocol.protocol.v2.McpServerStartupState
 import com.cy.codex.protocol.protocol.v2.McpServerStatusEntry
-import com.cy.codex.CatalogState
-import com.cy.codex.label
-import com.cy.codex.SectionCard
-import com.cy.codex.SurfaceHeader
-import com.cy.codex.ThreadStatusTone
-import com.cy.codex.UiConsts
-import com.cy.codex.UiType
+import com.cy.codex.raisedSurface
 import com.cy.codex.statusDotColor
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
@@ -74,42 +77,79 @@ fun McpScreen(
     // merely slow.
     val startup = catalog.mcpStartup.values.sortedBy { it.status != McpServerStartupState.Failed }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(colors.background),
-    ) {
-        SurfaceHeader(
+    Column(modifier = modifier.fillMaxSize().background(colors.background)) {
+        BasicComponent(
             title = stringResource(R.string.mcp_screen_title),
-            subtitle = stringResource(R.string.mcp_screen_subtitle, servers.size, ready),
-            leading = { McpBackButton(onBack) },
+            summary = stringResource(R.string.mcp_screen_subtitle, servers.size, ready),
+            startAction = { McpBackButton(onBack) },
+            insideMargin = PaddingValues(14.dp, 10.dp),
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = UiConsts.ScreenMargin)
-                .padding(bottom = UiConsts.PageBottomInset),
+            modifier =
+                Modifier.weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = UiConsts.ScreenMargin)
+                    .padding(bottom = UiConsts.PageBottomInset),
             verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
         ) {
             if (startup.isNotEmpty()) {
-                SectionCard(
-                    title = stringResource(R.string.mcp_screen_startup_section),
-                    icon = MiuixIcons.Community,
-                    trailing = startup.size.toString(),
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadius = UiConsts.SectionCorner,
+                    insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+                    colors =
+                        CardDefaults.defaultColors(
+                            color = raisedSurface(),
+                            contentColor = MiuixTheme.colorScheme.onSurface,
+                        ),
                 ) {
+                    BasicComponent(
+                        title = stringResource(R.string.mcp_screen_startup_section),
+                        startAction = {
+                            Icon(
+                                imageVector = MiuixIcons.Community,
+                                contentDescription = null,
+                                modifier = Modifier.size(UiConsts.IconInline),
+                                tint = MiuixTheme.colorScheme.primary,
+                            )
+                        },
+                        insideMargin = PaddingValues(0.dp),
+                        endActions = { Text(text = startup.size.toString(), maxLines = 1) },
+                    )
+                    Spacer(Modifier.height(UiConsts.Space8))
+
                     startup.forEachIndexed { index, update ->
                         if (index > 0) McpDivider()
                         McpStartupRow(update)
                     }
                 }
             }
-            SectionCard(
-                title = stringResource(R.string.mcp_screen_section_servers),
-                icon = MiuixIcons.Community,
-                trailing = servers.size.toString(),
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = UiConsts.SectionCorner,
+                insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+                colors =
+                    CardDefaults.defaultColors(
+                        color = raisedSurface(),
+                        contentColor = MiuixTheme.colorScheme.onSurface,
+                    ),
             ) {
+                BasicComponent(
+                    title = stringResource(R.string.mcp_screen_section_servers),
+                    startAction = {
+                        Icon(
+                            imageVector = MiuixIcons.Community,
+                            contentDescription = null,
+                            modifier = Modifier.size(UiConsts.IconInline),
+                            tint = MiuixTheme.colorScheme.primary,
+                        )
+                    },
+                    insideMargin = PaddingValues(0.dp),
+                    endActions = { Text(text = servers.size.toString(), maxLines = 1) },
+                )
+                Spacer(Modifier.height(UiConsts.Space8))
+
                 if (servers.isEmpty()) {
                     Text(
                         text = stringResource(R.string.mcp_screen_empty),
@@ -138,34 +178,41 @@ private fun McpStartupRow(update: com.cy.codex.protocol.protocol.v2.McpStartupSt
     val colors = MiuixTheme.colorScheme
     val failed = update.status == McpServerStartupState.Failed
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
+        modifier =
+            Modifier.fillMaxWidth()
+                .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier
-                .size(UiConsts.DotSize)
-                .clip(CircleShape)
-                .background(statusDotColor(if (failed) ThreadStatusTone.Failed else ThreadStatusTone.Waiting)),
+            modifier =
+                Modifier.size(UiConsts.DotSize)
+                    .clip(CircleShape)
+                    .background(
+                        statusDotColor(
+                            if (failed) ThreadStatusTone.Failed else ThreadStatusTone.Waiting
+                        )
+                    )
         )
         Spacer(Modifier.width(UiConsts.Space8))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = if (failed) {
-                    stringResource(R.string.mcp_screen_startup_failed, update.serverName)
-                } else {
-                    stringResource(R.string.mcp_screen_startup_starting, update.serverName)
-                },
+                text =
+                    if (failed) {
+                        stringResource(R.string.mcp_screen_startup_failed, update.serverName)
+                    } else {
+                        stringResource(R.string.mcp_screen_startup_starting, update.serverName)
+                    },
                 fontSize = UiType.Subtitle,
                 lineHeight = UiType.SubtitleLine,
                 color = colors.onSurface,
             )
-            val detail = update.error ?: if (failed && update.failureReason == "reauthenticationRequired") {
-                stringResource(R.string.mcp_screen_startup_reauth)
-            } else {
-                null
-            }
+            val detail =
+                update.error
+                    ?: if (failed && update.failureReason == "reauthenticationRequired") {
+                        stringResource(R.string.mcp_screen_startup_reauth)
+                    } else {
+                        null
+                    }
             if (detail != null) {
                 Spacer(Modifier.height(UiConsts.Space2))
                 Text(
@@ -183,20 +230,21 @@ private fun McpStartupRow(update: com.cy.codex.protocol.protocol.v2.McpStartupSt
 private fun McpServerRow(server: McpServerStatusEntry, onClick: () -> Unit, onLogin: () -> Unit) {
     val colors = MiuixTheme.colorScheme
     val tone = mcpTone(server.status)
-    val needsLogin = server.authStatus == McpAuthStatus.NotLoggedIn ||
-        server.status == McpServerConnectionStatus.AuthenticationRequired
+    val needsLogin =
+        server.authStatus == McpAuthStatus.NotLoggedIn ||
+            server.status == McpServerConnectionStatus.AuthenticationRequired
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
+        modifier =
+            Modifier.fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier
-                    .size(UiConsts.DotSize)
-                    .clip(CircleShape)
-                    .background(statusDotColor(tone)),
+                modifier =
+                    Modifier.size(UiConsts.DotSize)
+                        .clip(CircleShape)
+                        .background(statusDotColor(tone))
             )
             Spacer(Modifier.width(UiConsts.Space8))
             Text(
@@ -214,7 +262,12 @@ private fun McpServerRow(server: McpServerStatusEntry, onClick: () -> Unit, onLo
         Spacer(Modifier.height(UiConsts.Space4))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = stringResource(R.string.mcp_screen_tools_resources, server.tools, server.resources),
+                text =
+                    stringResource(
+                        R.string.mcp_screen_tools_resources,
+                        server.tools,
+                        server.resources,
+                    ),
                 modifier = Modifier.weight(1f),
                 fontSize = UiType.Meta,
                 lineHeight = UiType.MetaLine,
@@ -232,11 +285,11 @@ private fun McpServerRow(server: McpServerStatusEntry, onClick: () -> Unit, onLo
             Spacer(Modifier.height(UiConsts.Space6))
             Text(
                 text = server.error,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(McpRowShape)
-                    .background(colors.error.copy(alpha = 0.12f))
-                    .padding(horizontal = UiConsts.Space8, vertical = UiConsts.Space6),
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .clip(McpRowShape)
+                        .background(colors.error.copy(alpha = 0.12f))
+                        .padding(horizontal = UiConsts.Space8, vertical = UiConsts.Space6),
                 fontSize = UiType.Meta,
                 lineHeight = UiType.MetaLine,
                 color = colors.error,
@@ -252,12 +305,27 @@ private fun McpServerRow(server: McpServerStatusEntry, onClick: () -> Unit, onLo
                     tint = colors.error,
                 )
                 Spacer(Modifier.weight(1f))
-                CodexButton(
-                    text = stringResource(R.string.mcp_screen_auth_login),
+                Button(
                     onClick = onLogin,
-                    role = ButtonRole.Primary,
-                    size = CodexButtonSize.Compact,
-                )
+                    modifier = Modifier,
+                    enabled = true,
+                    colors = ButtonDefaults.buttonColorsPrimary(),
+                    cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                    minWidth = 0.dp,
+                    minHeight = UiConsts.ButtonHeightCompact,
+                    insideMargin =
+                        PaddingValues(
+                            horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                            vertical = 0.dp,
+                        ),
+                ) {
+                    Text(
+                        text = stringResource(R.string.mcp_screen_auth_login),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
@@ -268,9 +336,9 @@ private fun McpServerRow(server: McpServerStatusEntry, onClick: () -> Unit, onLo
 private fun McpAddServerRow() {
     val colors = MiuixTheme.colorScheme
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space10),
+        modifier =
+            Modifier.fillMaxWidth()
+                .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space10),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -298,7 +366,11 @@ private fun McpAddServerRow() {
 
 @Composable
 private fun McpBackButton(onBack: () -> Unit) {
-    IconButton(onClick = onBack, minWidth = UiConsts.IconButtonSize, minHeight = UiConsts.IconButtonSize) {
+    IconButton(
+        onClick = onBack,
+        minWidth = UiConsts.IconButtonSize,
+        minHeight = UiConsts.IconButtonSize,
+    ) {
         Icon(
             imageVector = MiuixIcons.ChevronBackward,
             contentDescription = stringResource(R.string.mcp_screen_back),
@@ -311,10 +383,10 @@ private fun McpBackButton(onBack: () -> Unit) {
 @Composable
 private fun McpChip(text: String, tint: Color) {
     Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(UiConsts.BadgeCorner))
-            .background(tint.copy(alpha = UiConsts.BadgeTintAlpha))
-            .padding(horizontal = UiConsts.Space6, vertical = UiConsts.Space2),
+        modifier =
+            Modifier.clip(RoundedCornerShape(UiConsts.BadgeCorner))
+                .background(tint.copy(alpha = UiConsts.BadgeTintAlpha))
+                .padding(horizontal = UiConsts.Space6, vertical = UiConsts.Space2)
     ) {
         Text(
             text = text,
@@ -328,20 +400,20 @@ private fun McpChip(text: String, tint: Color) {
 }
 
 @Composable
-private fun McpDivider() = CodexDivider()
+private fun McpDivider() =
+    HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
 
 private val McpRowShape = RoundedCornerShape(UiConsts.RowCorner)
 
 /** Connection state → the same four tones the transcript's status dots use. */
-private fun mcpTone(status: McpServerConnectionStatus): ThreadStatusTone = when (status) {
-    McpServerConnectionStatus.Connected -> ThreadStatusTone.Done
-    McpServerConnectionStatus.NotStarted,
-    McpServerConnectionStatus.Starting,
-    McpServerConnectionStatus.AuthenticationRequired,
-    -> ThreadStatusTone.Waiting
+private fun mcpTone(status: McpServerConnectionStatus): ThreadStatusTone =
+    when (status) {
+        McpServerConnectionStatus.Connected -> ThreadStatusTone.Done
+        McpServerConnectionStatus.NotStarted,
+        McpServerConnectionStatus.Starting,
+        McpServerConnectionStatus.AuthenticationRequired -> ThreadStatusTone.Waiting
 
-    McpServerConnectionStatus.Failed -> ThreadStatusTone.Failed
-    McpServerConnectionStatus.Cancelled,
-    McpServerConnectionStatus.Disabled,
-    -> ThreadStatusTone.Idle
-}
+        McpServerConnectionStatus.Failed -> ThreadStatusTone.Failed
+        McpServerConnectionStatus.Cancelled,
+        McpServerConnectionStatus.Disabled -> ThreadStatusTone.Idle
+    }

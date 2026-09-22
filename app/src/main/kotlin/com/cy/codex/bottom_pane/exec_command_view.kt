@@ -5,6 +5,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,9 +13,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -34,23 +37,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.cy.codex.ButtonRole
-import com.cy.codex.CodexButton
-import com.cy.codex.CodexButtonSize
-import com.cy.codex.CodexDivider
-import com.cy.codex.CodexTextField
 import com.cy.codex.R
-import com.cy.codex.SectionCard
-import com.cy.codex.SurfaceBackButton
-import com.cy.codex.SurfaceHeader
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
-import com.cy.codex.ValueRow
 import com.cy.codex.codeSurface
 import com.cy.codex.protocol.AppServerClient
 import com.cy.codex.protocol.AppServerEvent
+import com.cy.codex.raisedSurface
 import com.cy.codex.successColor
 import com.cy.codex.warningColor
 import java.util.Base64
@@ -58,10 +56,22 @@ import kotlin.time.TimeSource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonColors
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
 import top.yukonga.miuix.kmp.icon.extended.Notes
 import top.yukonga.miuix.kmp.icon.extended.Play
+import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -99,7 +109,8 @@ fun ExecCommandScreen(
 ) {
     val colors = MiuixTheme.colorScheme
     val scope = rememberCoroutineScope()
-    val arguments = remember(shellPath) { mutableStateListOf(shellPath, "--noprofile", "--norc", "-c", "") }
+    val arguments =
+        remember(shellPath) { mutableStateListOf(shellPath, "--noprofile", "--norc", "-c", "") }
     var cwd by remember { mutableStateOf(initialCwd) }
     var timeoutText by remember { mutableStateOf("") }
     var status by remember { mutableStateOf<ExecRunStatus>(ExecRunStatus.Idle) }
@@ -174,18 +185,32 @@ fun ExecCommandScreen(
     }
 
     Column(modifier = modifier.fillMaxSize().background(colors.background)) {
-        SurfaceHeader(
+        BasicComponent(
             title = stringResource(R.string.exec_command_title),
-            subtitle = stringResource(R.string.exec_command_subtitle),
-            leading = { SurfaceBackButton(stringResource(R.string.exec_command_back), onBack) },
+            summary = stringResource(R.string.exec_command_subtitle),
+            startAction = {
+                IconButton(
+                    onClick = onBack,
+                    minWidth = UiConsts.IconButtonSize,
+                    minHeight = UiConsts.IconButtonSize,
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.ChevronBackward,
+                        contentDescription = stringResource(R.string.exec_command_back),
+                        modifier = Modifier.size(UiConsts.IconHeader),
+                        tint = MiuixTheme.colorScheme.primary,
+                    )
+                }
+            },
+            insideMargin = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = UiConsts.ScreenMargin)
-                .padding(bottom = UiConsts.PageBottomInset),
+            modifier =
+                Modifier.weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = UiConsts.ScreenMargin)
+                    .padding(bottom = UiConsts.PageBottomInset),
             verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
         ) {
             ExecCommandForm(
@@ -206,20 +231,23 @@ fun ExecCommandScreen(
                         status = ExecRunStatus.Running
                         scope.launch {
                             val callStarted = TimeSource.Monotonic.markNow()
-                            client.execCommand(
-                                command = argv,
-                                cwd = cwd.trim().ifEmpty { null },
-                                timeoutMs = timeoutText.trim().toLongOrNull(),
-                            )
+                            client
+                                .execCommand(
+                                    command = argv,
+                                    cwd = cwd.trim().ifEmpty { null },
+                                    timeoutMs = timeoutText.trim().toLongOrNull(),
+                                )
                                 .onSuccess { answer ->
                                     if (answer.stdout.isNotEmpty() || answer.stderr.isNotEmpty()) {
                                         execOutput = answer.stdout + answer.stderr
                                     }
                                     execProcessId = null
-                                    status = ExecRunStatus.Finished(
-                                        exitCode = answer.exitCode,
-                                        durationMs = callStarted.elapsedNow().inWholeMilliseconds,
-                                    )
+                                    status =
+                                        ExecRunStatus.Finished(
+                                            exitCode = answer.exitCode,
+                                            durationMs =
+                                                callStarted.elapsedNow().inWholeMilliseconds,
+                                        )
                                 }
                                 .onFailure { failure ->
                                     execProcessId = null
@@ -247,7 +275,8 @@ fun ExecCommandScreen(
                     val id = execProcessId
                     if (id != null) {
                         scope.launch {
-                            client.execWrite(processId = id, data = data, closeStdin = closeStdin)
+                            client
+                                .execWrite(processId = id, data = data, closeStdin = closeStdin)
                                 .onFailure { notice = it.message }
                         }
                     }
@@ -289,11 +318,12 @@ fun ExecCommandScreen(
                     if (argv.isNotEmpty()) {
                         scope.launch {
                             notice = null
-                            client.spawnProcess(
-                                command = argv,
-                                cwd = termCwd.trim().ifEmpty { null },
-                                tty = true,
-                            )
+                            client
+                                .spawnProcess(
+                                    command = argv,
+                                    cwd = termCwd.trim().ifEmpty { null },
+                                    tty = true,
+                                )
                                 .onSuccess { handle ->
                                     terminalId = handle
                                     terminalOutput = ""
@@ -315,7 +345,8 @@ fun ExecCommandScreen(
                     val id = terminalId
                     if (id != null) {
                         scope.launch {
-                            client.writeProcessStdin(id, line.toByteArray(), closeStdin = false)
+                            client
+                                .writeProcessStdin(id, line.toByteArray(), closeStdin = false)
                                 .onFailure { failure -> notice = failure.message }
                         }
                     }
@@ -324,8 +355,10 @@ fun ExecCommandScreen(
                     val id = terminalId
                     if (id != null) {
                         scope.launch {
-                            client.writeProcessStdin(id, null, closeStdin = true)
-                                .onFailure { failure -> notice = failure.message }
+                            client.writeProcessStdin(id, null, closeStdin = true).onFailure {
+                                failure ->
+                                notice = failure.message
+                            }
                         }
                     }
                 },
@@ -333,8 +366,9 @@ fun ExecCommandScreen(
                     val id = terminalId
                     if (id != null) {
                         scope.launch {
-                            client.resizeProcessPty(id, rows, cols)
-                                .onFailure { failure -> notice = failure.message }
+                            client.resizeProcessPty(id, rows, cols).onFailure { failure ->
+                                notice = failure.message
+                            }
                         }
                     }
                 },
@@ -363,9 +397,7 @@ private sealed interface ExecRunStatus {
     data class Failed(val reason: String) : ExecRunStatus
 }
 
-/**
- * The argv editor, plus the two facts every command needs: where it runs, and how long it may.
- */
+/** The argv editor, plus the two facts every command needs: where it runs, and how long it may. */
 @Composable
 private fun ExecCommandForm(
     arguments: MutableList<String>,
@@ -376,11 +408,37 @@ private fun ExecCommandForm(
     running: Boolean,
     onRun: () -> Unit,
 ) {
-    SectionCard(
-        title = stringResource(R.string.exec_command_form_title),
-        icon = MiuixIcons.Play,
-        trailing = arguments.size.toString(),
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
+        BasicComponent(
+            title = stringResource(R.string.exec_command_form_title),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Play,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            endActions = {
+                Text(
+                    text = arguments.size.toString(),
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+            },
+            insideMargin = PaddingValues(0.dp),
+        )
+        Spacer(Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.exec_command_form_note),
             modifier = Modifier.padding(vertical = UiConsts.Space4),
@@ -396,59 +454,144 @@ private fun ExecCommandForm(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CodexTextField(
-                    value = argument,
-                    onValueChange = { arguments[index] = it },
-                    modifier = Modifier.weight(1f),
-                    label = stringResource(R.string.exec_command_arg_label, index + 1),
-                    placeholder = stringResource(R.string.exec_command_arg_placeholder),
-                )
+                Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    Text(
+                        text = stringResource(R.string.exec_command_arg_label, index + 1),
+                        fontSize = UiType.Meta,
+                        lineHeight = UiType.MetaLine,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        maxLines = 1,
+                    )
+                    Spacer(Modifier.height(UiConsts.Space4))
+                    TextField(
+                        value = argument,
+                        onValueChange = { arguments[index] = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = stringResource(R.string.exec_command_arg_placeholder),
+                        useLabelAsPlaceholder = true,
+                        singleLine = true,
+                    )
+                }
                 Spacer(Modifier.width(UiConsts.Space8))
-                CodexButton(
-                    text = stringResource(R.string.exec_command_arg_remove),
+                Button(
                     onClick = { if (arguments.size > 1) arguments.removeAt(index) },
-                    size = CodexButtonSize.Compact,
-                    role = ButtonRole.Destructive,
+                    modifier =
+                        Modifier.squircleBorder(
+                            UiConsts.OutlineThickness,
+                            if (arguments.size > 1) MiuixTheme.colorScheme.error.copy(alpha = 0.5f)
+                            else MiuixTheme.colorScheme.outline.copy(alpha = 0.18f),
+                            UiConsts.ButtonHeightCompact / 2,
+                        ),
                     enabled = arguments.size > 1,
-                )
+                    colors =
+                        ButtonColors(
+                            color = Color.Transparent,
+                            disabledColor =
+                                MiuixTheme.colorScheme.disabledOnSurface.copy(alpha = 0.1f),
+                            contentColor = MiuixTheme.colorScheme.error,
+                            disabledContentColor = MiuixTheme.colorScheme.disabledOnSurface,
+                        ),
+                    cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                    minWidth = 0.dp,
+                    minHeight = UiConsts.ButtonHeightCompact,
+                    insideMargin =
+                        PaddingValues(
+                            horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                            vertical = 0.dp,
+                        ),
+                ) {
+                    Text(
+                        text = stringResource(R.string.exec_command_arg_remove),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
         Spacer(Modifier.height(UiConsts.Space8))
-        CodexButton(
-            text = stringResource(R.string.exec_command_arg_add),
+        Button(
             onClick = { arguments.add("") },
-            size = CodexButtonSize.Compact,
-            role = ButtonRole.Secondary,
-        )
-        CodexDivider()
-        CodexTextField(
-            value = cwd,
-            onValueChange = onCwdChange,
-            label = stringResource(R.string.exec_command_cwd_label),
-            placeholder = stringResource(R.string.exec_command_cwd_placeholder),
-        )
+            colors = ButtonDefaults.buttonColors(),
+            cornerRadius = UiConsts.ButtonHeightCompact / 2,
+            minWidth = 0.dp,
+            minHeight = UiConsts.ButtonHeightCompact,
+            insideMargin =
+                PaddingValues(
+                    horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                    vertical = 0.dp,
+                ),
+        ) {
+            Text(
+                text = stringResource(R.string.exec_command_arg_add),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.exec_command_cwd_label),
+                fontSize = UiType.Meta,
+                lineHeight = UiType.MetaLine,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+            )
+            Spacer(Modifier.height(UiConsts.Space4))
+            TextField(
+                value = cwd,
+                onValueChange = onCwdChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(R.string.exec_command_cwd_placeholder),
+                useLabelAsPlaceholder = true,
+                singleLine = true,
+            )
+        }
         Spacer(Modifier.height(UiConsts.Space8))
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CodexTextField(
-                value = timeoutText,
-                onValueChange = onTimeoutChange,
-                modifier = Modifier.weight(1f),
-                label = stringResource(R.string.exec_command_timeout_label),
-                placeholder = stringResource(R.string.exec_command_timeout_placeholder),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            )
+            Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                Text(
+                    text = stringResource(R.string.exec_command_timeout_label),
+                    fontSize = UiType.Meta,
+                    lineHeight = UiType.MetaLine,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    maxLines = 1,
+                )
+                Spacer(Modifier.height(UiConsts.Space4))
+                TextField(
+                    value = timeoutText,
+                    onValueChange = onTimeoutChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = stringResource(R.string.exec_command_timeout_placeholder),
+                    useLabelAsPlaceholder = true,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+            }
         }
         Spacer(Modifier.height(UiConsts.Space10))
-        CodexButton(
-            text = stringResource(R.string.exec_command_run),
+        Button(
             onClick = onRun,
             modifier = Modifier.fillMaxWidth(),
-            role = ButtonRole.Primary,
             enabled = !running && arguments.firstOrNull()?.isNotBlank() == true,
-        )
+            colors = ButtonDefaults.buttonColorsPrimary(),
+            cornerRadius = UiConsts.ButtonHeight / 2,
+            minWidth = 0.dp,
+            minHeight = UiConsts.ButtonHeight,
+            insideMargin =
+                PaddingValues(horizontal = UiConsts.ButtonPaddingHorizontal, vertical = 0.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.exec_command_run),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -474,75 +617,144 @@ private fun ExecOutputCard(
     val colors = MiuixTheme.colorScheme
     val rows = rowsText.trim().toIntOrNull()
     val cols = colsText.trim().toIntOrNull()
-    val stateLabel = when (status) {
-        ExecRunStatus.Idle -> stringResource(R.string.exec_command_state_idle)
-        ExecRunStatus.Running -> stringResource(R.string.exec_command_state_running)
-        is ExecRunStatus.Finished -> {
-            stringResource(R.string.exec_command_state_finished, status.exitCode)
-        }
+    val stateLabel =
+        when (status) {
+            ExecRunStatus.Idle -> stringResource(R.string.exec_command_state_idle)
+            ExecRunStatus.Running -> stringResource(R.string.exec_command_state_running)
+            is ExecRunStatus.Finished -> {
+                stringResource(R.string.exec_command_state_finished, status.exitCode)
+            }
 
-        is ExecRunStatus.Failed -> stringResource(R.string.exec_command_state_failed)
-    }
-    val stateTint: Color? = when (status) {
-        ExecRunStatus.Idle -> null
-        ExecRunStatus.Running -> colors.primary
-        is ExecRunStatus.Finished -> if (status.exitCode == 0) successColor() else colors.error
-        is ExecRunStatus.Failed -> colors.error
-    }
-    val duration = when (status) {
-        is ExecRunStatus.Running -> {
-            stringResource(R.string.exec_command_duration_running, elapsedMs)
+            is ExecRunStatus.Failed -> stringResource(R.string.exec_command_state_failed)
         }
-
-        is ExecRunStatus.Finished -> {
-            stringResource(R.string.exec_command_duration_value, status.durationMs)
+    val stateTint: Color? =
+        when (status) {
+            ExecRunStatus.Idle -> null
+            ExecRunStatus.Running -> colors.primary
+            is ExecRunStatus.Finished -> if (status.exitCode == 0) successColor() else colors.error
+            is ExecRunStatus.Failed -> colors.error
         }
+    val duration =
+        when (status) {
+            is ExecRunStatus.Running -> {
+                stringResource(R.string.exec_command_duration_running, elapsedMs)
+            }
 
-        else -> ""
-    }
+            is ExecRunStatus.Finished -> {
+                stringResource(R.string.exec_command_duration_value, status.durationMs)
+            }
+
+            else -> ""
+        }
     val exitCode = (status as? ExecRunStatus.Finished)?.exitCode?.toString().orEmpty()
-    val processRow = when {
-        processId != null -> processId
-        status is ExecRunStatus.Running -> stringResource(R.string.exec_command_process_attached)
-        status is ExecRunStatus.Idle -> ""
-        else -> stringResource(R.string.exec_command_process_done)
-    }
+    val processRow =
+        when {
+            processId != null -> processId
+            status is ExecRunStatus.Running ->
+                stringResource(R.string.exec_command_process_attached)
+            status is ExecRunStatus.Idle -> ""
+            else -> stringResource(R.string.exec_command_process_done)
+        }
 
-    SectionCard(
-        title = stringResource(R.string.exec_command_output_title),
-        icon = MiuixIcons.Notes,
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
-        ValueRow(
-            label = stringResource(R.string.exec_command_state_label),
-            value = stateLabel,
-            tint = stateTint,
+        BasicComponent(
+            title = stringResource(R.string.exec_command_output_title),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Notes,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            insideMargin = PaddingValues(0.dp),
         )
-        CodexDivider()
-        ValueRow(
-            label = stringResource(R.string.exec_command_exit_label),
-            value = exitCode,
-            monospace = true,
+        Spacer(Modifier.height(8.dp))
+        BasicComponent(
+            title = stringResource(R.string.exec_command_state_label),
+            endActions = {
+                Text(
+                    text = (stateLabel).ifEmpty { "—" },
+                    modifier = Modifier.weight(1f, fill = false),
+                    fontSize = UiType.Detail,
+                    lineHeight = UiType.DetailLine,
+                    fontFamily = null,
+                    color = stateTint ?: MiuixTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                )
+            },
+            insideMargin = PaddingValues(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
         )
-        CodexDivider()
-        ValueRow(
-            label = stringResource(R.string.exec_command_duration_label),
-            value = duration,
-            monospace = true,
+        HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+        BasicComponent(
+            title = stringResource(R.string.exec_command_exit_label),
+            endActions = {
+                Text(
+                    text = (exitCode).ifEmpty { "—" },
+                    modifier = Modifier.weight(1f, fill = false),
+                    fontSize = UiType.Detail,
+                    lineHeight = UiType.DetailLine,
+                    fontFamily = FontFamily.Monospace,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                )
+            },
+            insideMargin = PaddingValues(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
         )
-        CodexDivider()
-        ValueRow(
-            label = stringResource(R.string.exec_command_process_row_label),
-            value = processRow,
-            monospace = true,
+        HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+        BasicComponent(
+            title = stringResource(R.string.exec_command_duration_label),
+            endActions = {
+                Text(
+                    text = (duration).ifEmpty { "—" },
+                    modifier = Modifier.weight(1f, fill = false),
+                    fontSize = UiType.Detail,
+                    lineHeight = UiType.DetailLine,
+                    fontFamily = FontFamily.Monospace,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                )
+            },
+            insideMargin = PaddingValues(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
+        )
+        HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+        BasicComponent(
+            title = stringResource(R.string.exec_command_process_row_label),
+            endActions = {
+                Text(
+                    text = (processRow).ifEmpty { "—" },
+                    modifier = Modifier.weight(1f, fill = false),
+                    fontSize = UiType.Detail,
+                    lineHeight = UiType.DetailLine,
+                    fontFamily = FontFamily.Monospace,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                )
+            },
+            insideMargin = PaddingValues(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
         )
         if (status is ExecRunStatus.Failed) {
-            CodexDivider()
+            HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
             Text(
                 text = status.reason,
-                modifier = Modifier.padding(
-                    horizontal = UiConsts.Space4,
-                    vertical = UiConsts.Space8,
-                ),
+                modifier =
+                    Modifier.padding(
+                        horizontal = UiConsts.Space4,
+                        vertical = UiConsts.Space8,
+                    ),
                 fontSize = UiType.Meta,
                 lineHeight = UiType.MetaLine,
                 color = colors.error,
@@ -562,67 +774,168 @@ private fun ExecOutputCard(
             )
         }
         if (processId != null) {
-            CodexDivider()
-            CodexTextField(
-                value = stdinText,
-                onValueChange = onStdinChange,
-                label = stringResource(R.string.exec_command_stdin_label),
-                placeholder = stringResource(R.string.exec_command_stdin_placeholder),
-            )
-            Spacer(Modifier.height(UiConsts.Space8))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(UiConsts.Space6),
-            ) {
-                CodexButton(
-                    text = stringResource(R.string.exec_command_stdin_send),
-                    onClick = { onWrite(stdinText.toByteArray(), false) },
-                    size = CodexButtonSize.Compact,
-                    role = ButtonRole.Secondary,
-                    enabled = stdinText.isNotEmpty(),
+            HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = stringResource(R.string.exec_command_stdin_label),
+                    fontSize = UiType.Meta,
+                    lineHeight = UiType.MetaLine,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    maxLines = 1,
                 )
-                CodexButton(
-                    text = stringResource(R.string.exec_command_stdin_close),
-                    onClick = { onWrite(ByteArray(0), true) },
-                    size = CodexButtonSize.Compact,
-                    role = ButtonRole.Secondary,
-                )
-                CodexButton(
-                    text = stringResource(R.string.exec_command_terminate),
-                    onClick = onTerminate,
-                    size = CodexButtonSize.Compact,
-                    role = ButtonRole.Destructive,
+                Spacer(Modifier.height(UiConsts.Space4))
+                TextField(
+                    value = stdinText,
+                    onValueChange = onStdinChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = stringResource(R.string.exec_command_stdin_placeholder),
+                    useLabelAsPlaceholder = true,
+                    singleLine = true,
                 )
             }
             Spacer(Modifier.height(UiConsts.Space8))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(UiConsts.Space6),
             ) {
-                CodexTextField(
-                    value = rowsText,
-                    onValueChange = onRowsChange,
-                    modifier = Modifier.weight(1f),
-                    label = stringResource(R.string.exec_command_rows_label),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                )
+                Button(
+                    onClick = { onWrite(stdinText.toByteArray(), false) },
+                    enabled = stdinText.isNotEmpty(),
+                    colors = ButtonDefaults.buttonColors(),
+                    cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                    minWidth = 0.dp,
+                    minHeight = UiConsts.ButtonHeightCompact,
+                    insideMargin =
+                        PaddingValues(
+                            horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                            vertical = 0.dp,
+                        ),
+                ) {
+                    Text(
+                        text = stringResource(R.string.exec_command_stdin_send),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Button(
+                    onClick = { onWrite(ByteArray(0), true) },
+                    colors = ButtonDefaults.buttonColors(),
+                    cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                    minWidth = 0.dp,
+                    minHeight = UiConsts.ButtonHeightCompact,
+                    insideMargin =
+                        PaddingValues(
+                            horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                            vertical = 0.dp,
+                        ),
+                ) {
+                    Text(
+                        text = stringResource(R.string.exec_command_stdin_close),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Button(
+                    onClick = onTerminate,
+                    modifier =
+                        Modifier.squircleBorder(
+                            UiConsts.OutlineThickness,
+                            MiuixTheme.colorScheme.error.copy(alpha = 0.5f),
+                            UiConsts.ButtonHeightCompact / 2,
+                        ),
+                    colors =
+                        ButtonColors(
+                            color = Color.Transparent,
+                            disabledColor =
+                                MiuixTheme.colorScheme.disabledOnSurface.copy(alpha = 0.1f),
+                            contentColor = MiuixTheme.colorScheme.error,
+                            disabledContentColor = MiuixTheme.colorScheme.disabledOnSurface,
+                        ),
+                    cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                    minWidth = 0.dp,
+                    minHeight = UiConsts.ButtonHeightCompact,
+                    insideMargin =
+                        PaddingValues(
+                            horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                            vertical = 0.dp,
+                        ),
+                ) {
+                    Text(
+                        text = stringResource(R.string.exec_command_terminate),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Spacer(Modifier.height(UiConsts.Space8))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    Text(
+                        text = stringResource(R.string.exec_command_rows_label),
+                        fontSize = UiType.Meta,
+                        lineHeight = UiType.MetaLine,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        maxLines = 1,
+                    )
+                    Spacer(Modifier.height(UiConsts.Space4))
+                    TextField(
+                        value = rowsText,
+                        onValueChange = onRowsChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = "",
+                        useLabelAsPlaceholder = true,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                }
                 Spacer(Modifier.width(UiConsts.Space8))
-                CodexTextField(
-                    value = colsText,
-                    onValueChange = onColsChange,
-                    modifier = Modifier.weight(1f),
-                    label = stringResource(R.string.exec_command_cols_label),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                )
+                Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    Text(
+                        text = stringResource(R.string.exec_command_cols_label),
+                        fontSize = UiType.Meta,
+                        lineHeight = UiType.MetaLine,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        maxLines = 1,
+                    )
+                    Spacer(Modifier.height(UiConsts.Space4))
+                    TextField(
+                        value = colsText,
+                        onValueChange = onColsChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = "",
+                        useLabelAsPlaceholder = true,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                }
                 Spacer(Modifier.width(UiConsts.Space8))
-                CodexButton(
-                    text = stringResource(R.string.exec_command_resize),
+                Button(
                     onClick = onResize,
-                    size = CodexButtonSize.Compact,
-                    role = ButtonRole.Secondary,
                     enabled = rows != null && cols != null,
-                )
+                    colors = ButtonDefaults.buttonColors(),
+                    cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                    minWidth = 0.dp,
+                    minHeight = UiConsts.ButtonHeightCompact,
+                    insideMargin =
+                        PaddingValues(
+                            horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                            vertical = 0.dp,
+                        ),
+                ) {
+                    Text(
+                        text = stringResource(R.string.exec_command_resize),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
         if (notice != null) {
@@ -646,8 +959,8 @@ private fun ExecOutputCard(
  *
  * The pty has its own stdin and resize controls, and they are `process/writeStdin` and
  * `process/resizePty` rather than the `command/exec` pair above. The two families are separate on
- * the wire: a one-shot command is addressed by the id the caller supplied to `command/exec`, while a
- * spawned process is addressed by the id `process/spawn` *returned*. Sending a spawned process's
+ * the wire: a one-shot command is addressed by the id the caller supplied to `command/exec`, while
+ * a spawned process is addressed by the id `process/spawn` *returned*. Sending a spawned process's
  * bytes through `command/exec/write` would name a request the server never saw, so the controls
  * cannot be shared however alike they look.
  */
@@ -671,10 +984,29 @@ private fun TerminalCard(
     var rows by remember(processId) { mutableStateOf("24") }
     var cols by remember(processId) { mutableStateOf("80") }
     val colors = MiuixTheme.colorScheme
-    SectionCard(
-        title = stringResource(R.string.exec_command_terminal_title),
-        icon = MiuixIcons.Notes,
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
+        BasicComponent(
+            title = stringResource(R.string.exec_command_terminal_title),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Notes,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            insideMargin = PaddingValues(0.dp),
+        )
+        Spacer(Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.exec_command_terminal_note),
             modifier = Modifier.padding(vertical = UiConsts.Space4),
@@ -682,98 +1014,225 @@ private fun TerminalCard(
             lineHeight = UiType.FootnoteLine,
             color = colors.onSurfaceVariantSummary,
         )
-        CodexTextField(
-            value = start,
-            onValueChange = onStartChange,
-            label = stringResource(R.string.exec_command_terminal_start_label),
-            placeholder = stringResource(R.string.exec_command_terminal_start_placeholder),
-        )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.exec_command_terminal_start_label),
+                fontSize = UiType.Meta,
+                lineHeight = UiType.MetaLine,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+            )
+            Spacer(Modifier.height(UiConsts.Space4))
+            TextField(
+                value = start,
+                onValueChange = onStartChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(R.string.exec_command_terminal_start_placeholder),
+                useLabelAsPlaceholder = true,
+                singleLine = true,
+            )
+        }
         Spacer(Modifier.height(UiConsts.Space8))
-        CodexTextField(
-            value = cwd,
-            onValueChange = onCwdChange,
-            label = stringResource(R.string.exec_command_terminal_cwd_label),
-            placeholder = cwdFallback,
-        )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.exec_command_terminal_cwd_label),
+                fontSize = UiType.Meta,
+                lineHeight = UiType.MetaLine,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+            )
+            Spacer(Modifier.height(UiConsts.Space4))
+            TextField(
+                value = cwd,
+                onValueChange = onCwdChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = cwdFallback,
+                useLabelAsPlaceholder = true,
+                singleLine = true,
+            )
+        }
         Spacer(Modifier.height(UiConsts.Space10))
-        CodexButton(
-            text = stringResource(R.string.exec_command_terminal_spawn),
+        Button(
             onClick = onSpawn,
             modifier = Modifier.fillMaxWidth(),
-            role = ButtonRole.Primary,
             enabled = start.isNotBlank(),
-        )
-        CodexDivider()
-        ValueRow(
-            label = stringResource(R.string.exec_command_terminal_process_label),
-            value = processId.orEmpty(),
-            monospace = true,
+            colors = ButtonDefaults.buttonColorsPrimary(),
+            cornerRadius = UiConsts.ButtonHeight / 2,
+            minWidth = 0.dp,
+            minHeight = UiConsts.ButtonHeight,
+            insideMargin =
+                PaddingValues(horizontal = UiConsts.ButtonPaddingHorizontal, vertical = 0.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.exec_command_terminal_spawn),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+        BasicComponent(
+            title = stringResource(R.string.exec_command_terminal_process_label),
+            endActions = {
+                Text(
+                    text = (processId.orEmpty()).ifEmpty { "—" },
+                    modifier = Modifier.weight(1f, fill = false),
+                    fontSize = UiType.Detail,
+                    lineHeight = UiType.DetailLine,
+                    fontFamily = FontFamily.Monospace,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                )
+            },
+            insideMargin = PaddingValues(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
         )
         if (processId != null) {
-            CodexDivider()
+            HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(UiConsts.Space6),
             ) {
                 Text(
-                    text = stringResource(
-                        if (exited) {
-                            R.string.exec_command_terminal_exited
-                        } else {
-                            R.string.exec_command_terminal_live
-                        },
-                    ),
+                    text =
+                        stringResource(
+                            if (exited) {
+                                R.string.exec_command_terminal_exited
+                            } else {
+                                R.string.exec_command_terminal_live
+                            }
+                        ),
                     modifier = Modifier.weight(1f),
                     fontSize = UiType.Meta,
                     lineHeight = UiType.MetaLine,
                     color = if (exited) colors.onSurfaceVariantSummary else successColor(),
                 )
-                CodexButton(
-                    text = stringResource(R.string.exec_command_terminal_kill),
+                Button(
                     onClick = onKill,
-                    size = CodexButtonSize.Compact,
-                    role = ButtonRole.Destructive,
-                )
+                    modifier =
+                        Modifier.squircleBorder(
+                            UiConsts.OutlineThickness,
+                            MiuixTheme.colorScheme.error.copy(alpha = 0.5f),
+                            UiConsts.ButtonHeightCompact / 2,
+                        ),
+                    colors =
+                        ButtonColors(
+                            color = Color.Transparent,
+                            disabledColor =
+                                MiuixTheme.colorScheme.disabledOnSurface.copy(alpha = 0.1f),
+                            contentColor = MiuixTheme.colorScheme.error,
+                            disabledContentColor = MiuixTheme.colorScheme.disabledOnSurface,
+                        ),
+                    cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                    minWidth = 0.dp,
+                    minHeight = UiConsts.ButtonHeightCompact,
+                    insideMargin =
+                        PaddingValues(
+                            horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                            vertical = 0.dp,
+                        ),
+                ) {
+                    Text(
+                        text = stringResource(R.string.exec_command_terminal_kill),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
         if (processId != null && !exited) {
-            CodexDivider()
-            CodexTextField(
-                value = line,
-                onValueChange = { line = it },
-                label = stringResource(R.string.exec_command_terminal_stdin_label),
-                placeholder = stringResource(R.string.exec_command_terminal_stdin_placeholder),
-                onImeAction = {
-                    if (line.isNotEmpty()) {
-                        onWrite(line + "\n")
-                        line = ""
-                    }
-                },
-            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = stringResource(R.string.exec_command_terminal_stdin_label),
+                    fontSize = UiType.Meta,
+                    lineHeight = UiType.MetaLine,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    maxLines = 1,
+                )
+                Spacer(Modifier.height(UiConsts.Space4))
+                TextField(
+                    value = line,
+                    onValueChange = { line = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = stringResource(R.string.exec_command_terminal_stdin_placeholder),
+                    useLabelAsPlaceholder = true,
+                    singleLine = true,
+                    keyboardActions =
+                        KeyboardActions(
+                            onDone = {
+                                if (line.isNotEmpty()) {
+                                    onWrite(line + "\n")
+                                    line = ""
+                                }
+                            },
+                            onGo = {
+                                if (line.isNotEmpty()) {
+                                    onWrite(line + "\n")
+                                    line = ""
+                                }
+                            },
+                            onSend = {
+                                if (line.isNotEmpty()) {
+                                    onWrite(line + "\n")
+                                    line = ""
+                                }
+                            },
+                        ),
+                )
+            }
             Spacer(Modifier.height(UiConsts.Space6))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(UiConsts.Space6),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CodexButton(
-                    text = stringResource(R.string.exec_command_terminal_stdin_send),
+                Button(
                     onClick = {
                         if (line.isNotEmpty()) {
                             onWrite(line + "\n")
                             line = ""
                         }
                     },
-                    size = CodexButtonSize.Compact,
                     enabled = line.isNotEmpty(),
-                )
-                CodexButton(
-                    text = stringResource(R.string.exec_command_terminal_stdin_eof),
+                    colors = ButtonDefaults.buttonColorsPrimary(),
+                    cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                    minWidth = 0.dp,
+                    minHeight = UiConsts.ButtonHeightCompact,
+                    insideMargin =
+                        PaddingValues(
+                            horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                            vertical = 0.dp,
+                        ),
+                ) {
+                    Text(
+                        text = stringResource(R.string.exec_command_terminal_stdin_send),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Button(
                     onClick = onCloseStdin,
-                    size = CodexButtonSize.Compact,
-                    role = ButtonRole.Secondary,
-                )
+                    colors = ButtonDefaults.buttonColors(),
+                    cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                    minWidth = 0.dp,
+                    minHeight = UiConsts.ButtonHeightCompact,
+                    insideMargin =
+                        PaddingValues(
+                            horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                            vertical = 0.dp,
+                        ),
+                ) {
+                    Text(
+                        text = stringResource(R.string.exec_command_terminal_stdin_eof),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             Spacer(Modifier.height(UiConsts.Space8))
             Row(
@@ -781,20 +1240,43 @@ private fun TerminalCard(
                 horizontalArrangement = Arrangement.spacedBy(UiConsts.Space6),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CodexTextField(
-                    value = rows,
-                    onValueChange = { rows = it.filter(Char::isDigit).take(4) },
-                    label = stringResource(R.string.exec_command_terminal_rows),
-                    modifier = Modifier.weight(1f),
-                )
-                CodexTextField(
-                    value = cols,
-                    onValueChange = { cols = it.filter(Char::isDigit).take(4) },
-                    label = stringResource(R.string.exec_command_terminal_cols),
-                    modifier = Modifier.weight(1f),
-                )
-                CodexButton(
-                    text = stringResource(R.string.exec_command_terminal_resize),
+                Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    Text(
+                        text = stringResource(R.string.exec_command_terminal_rows),
+                        fontSize = UiType.Meta,
+                        lineHeight = UiType.MetaLine,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        maxLines = 1,
+                    )
+                    Spacer(Modifier.height(UiConsts.Space4))
+                    TextField(
+                        value = rows,
+                        onValueChange = { rows = it.filter(Char::isDigit).take(4) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = "",
+                        useLabelAsPlaceholder = true,
+                        singleLine = true,
+                    )
+                }
+                Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    Text(
+                        text = stringResource(R.string.exec_command_terminal_cols),
+                        fontSize = UiType.Meta,
+                        lineHeight = UiType.MetaLine,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        maxLines = 1,
+                    )
+                    Spacer(Modifier.height(UiConsts.Space4))
+                    TextField(
+                        value = cols,
+                        onValueChange = { cols = it.filter(Char::isDigit).take(4) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = "",
+                        useLabelAsPlaceholder = true,
+                        singleLine = true,
+                    )
+                }
+                Button(
                     onClick = {
                         val r = rows.toIntOrNull()
                         val c = cols.toIntOrNull()
@@ -802,10 +1284,24 @@ private fun TerminalCard(
                         // zero field disables the button rather than sending one.
                         if (r != null && c != null && r > 0 && c > 0) onResizePty(r, c)
                     },
-                    size = CodexButtonSize.Compact,
-                    role = ButtonRole.Secondary,
                     enabled = (rows.toIntOrNull() ?: 0) > 0 && (cols.toIntOrNull() ?: 0) > 0,
-                )
+                    colors = ButtonDefaults.buttonColors(),
+                    cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                    minWidth = 0.dp,
+                    minHeight = UiConsts.ButtonHeightCompact,
+                    insideMargin =
+                        PaddingValues(
+                            horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                            vertical = 0.dp,
+                        ),
+                ) {
+                    Text(
+                        text = stringResource(R.string.exec_command_terminal_resize),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
         if (output.isNotEmpty()) {
@@ -841,26 +1337,27 @@ private fun MonospacePane(text: String) {
     // next frame and the extent is read in the snapshot that produced it. Reading `maxValue` here
     // would chase a value that is still the previous frame's, leaving the last line off screen.
     LaunchedEffect(vertical) {
-        snapshotFlow { text }.collect {
-            withFrameNanos { }
-            val extent = Snapshot.withoutReadObservation { vertical.maxValue }
-            if (extent > 0) vertical.scrollTo(extent)
-        }
+        snapshotFlow { text }
+            .collect {
+                withFrameNanos {}
+                val extent = Snapshot.withoutReadObservation { vertical.maxValue }
+                if (extent > 0) vertical.scrollTo(extent)
+            }
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = UiConsts.Space24, max = 240.dp)
-            .clip(shape)
-            .background(codeSurface()),
+        modifier =
+            Modifier.fillMaxWidth()
+                .heightIn(min = UiConsts.Space24, max = 240.dp)
+                .clip(shape)
+                .background(codeSurface())
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(vertical)
-                .horizontalScroll(horizontal)
-                .padding(horizontal = UiConsts.Space8, vertical = UiConsts.Space7),
+            modifier =
+                Modifier.fillMaxWidth()
+                    .verticalScroll(vertical)
+                    .horizontalScroll(horizontal)
+                    .padding(horizontal = UiConsts.Space8, vertical = UiConsts.Space7)
         ) {
             Text(
                 text = text,
@@ -882,7 +1379,8 @@ private fun MonospacePane(text: String) {
  */
 private fun decodeOutput(base64: String): String = runCatching {
     Base64.getDecoder().decode(base64).decodeToString()
-}.getOrElse { base64 }
+}
+    .getOrElse { base64 }
 
 /**
  * Split a shell-ish command line into argv for `process/spawn`.

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,13 +13,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.cy.codex.R
-import com.cy.codex.ButtonRole
-import com.cy.codex.CodexButton
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonColors
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -27,26 +33,28 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * Mirrors the option list `codex-rs/tui/src/bottom_pane/approval_overlay.rs` builds for all four
  * request families: the *same* pill row sits under every dialog, so a command approval and an MCP
  * form cannot disagree about what "允许" looks like.
- *
- * The pills are [CodexButton] and nothing else. They used to be two more hand-rolled controls —
- * one 36dp with an inline scale transform, one 38dp with no horizontal padding at all — sitting
- * next to a third definition in `overlays/`. Three heights and three corner systems inside one
- * dialog is what made the decision row look assembled rather than designed.
  */
 
-/** One button of a [DecisionRow]: the label the protocol supplied plus where it sits in the order. */
+/** Approval choices retain their hierarchy while miuix owns the button behavior. */
+enum class DecisionRole {
+    Primary,
+    Secondary,
+    Destructive,
+}
+
+/** The protocol label and hierarchy of one approval choice. */
 data class DecisionAction(
     val label: String,
-    val role: ButtonRole = ButtonRole.Secondary,
+    val role: DecisionRole = DecisionRole.Secondary,
     val onClick: () -> Unit,
 )
 
 /**
  * A wrapping row of pill buttons.
  *
- * Wraps instead of scrolling: four decisions (`允许` / `本会话总是允许` / `拒绝` / `取消本轮`) do not
- * fit on a phone in one line, and a horizontally scrolling decision bar hides the destructive
- * escape hatch off-screen.
+ * Wraps instead of scrolling: four decisions (`允许` / `本会话总是允许` / `拒绝` / `取消本轮`) do not fit on a
+ * phone in one line, and a horizontally scrolling decision bar hides the destructive escape hatch
+ * off-screen.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -61,13 +69,46 @@ fun DecisionRow(
         verticalArrangement = Arrangement.spacedBy(UiConsts.Space8),
     ) {
         decisions.forEach { action ->
-            CodexButton(
-                text = action.label,
+            Button(
                 onClick = action.onClick,
-                role = action.role,
+                modifier =
+                    Modifier.then(
+                        if (action.role == DecisionRole.Destructive)
+                            Modifier.squircleBorder(
+                                UiConsts.OutlineThickness,
+                                if (!busy) MiuixTheme.colorScheme.error.copy(alpha = 0.5f)
+                                else MiuixTheme.colorScheme.outline.copy(alpha = 0.18f),
+                                UiConsts.ButtonHeight / 2,
+                            )
+                        else Modifier
+                    ),
                 enabled = !busy,
+                colors =
+                    when (action.role) {
+                        DecisionRole.Primary -> ButtonDefaults.buttonColorsPrimary()
+                        DecisionRole.Secondary -> ButtonDefaults.buttonColors()
+                        DecisionRole.Destructive ->
+                            ButtonColors(
+                                color = Color.Transparent,
+                                disabledColor =
+                                    MiuixTheme.colorScheme.disabledOnSurface.copy(alpha = 0.1f),
+                                contentColor = MiuixTheme.colorScheme.error,
+                                disabledContentColor = MiuixTheme.colorScheme.disabledOnSurface,
+                            )
+                    },
+                cornerRadius = UiConsts.ButtonHeight / 2,
                 minWidth = UiConsts.ButtonMinWidth,
-            )
+                minHeight = UiConsts.ButtonHeight,
+                insideMargin =
+                    PaddingValues(horizontal = UiConsts.ButtonPaddingHorizontal, vertical = 0.dp),
+            ) {
+                Text(
+                    text = action.label,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -100,8 +141,8 @@ internal fun RemainingQueueLine(remainingQueue: Int) {
  * required field) that has to keep the primary action visible but disabled, which a decision list
  * has no notion of.
  *
- * The two buttons split the dialog's width evenly, so the confirm action is always the same size
- * as the escape next to it whichever label happens to be longer.
+ * The two buttons split the dialog's width evenly, so the confirm action is always the same size as
+ * the escape next to it whichever label happens to be longer.
  */
 @Composable
 internal fun FormButtons(
@@ -117,22 +158,44 @@ internal fun FormButtons(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(modifier = Modifier.weight(1f)) {
-            CodexButton(
-                text = stringResource(R.string.decision_bar_cancel),
+            Button(
                 onClick = onCancel,
-                role = ButtonRole.Secondary,
-                enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
-            )
+                enabled = !busy,
+                colors = ButtonDefaults.buttonColors(),
+                cornerRadius = UiConsts.ButtonHeight / 2,
+                minWidth = 0.dp,
+                minHeight = UiConsts.ButtonHeight,
+                insideMargin =
+                    PaddingValues(horizontal = UiConsts.ButtonPaddingHorizontal, vertical = 0.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.decision_bar_cancel),
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         Box(modifier = Modifier.weight(1f)) {
-            CodexButton(
-                text = confirmLabel,
+            Button(
                 onClick = onConfirm,
-                role = ButtonRole.Primary,
-                enabled = enabled && !busy,
                 modifier = Modifier.fillMaxWidth(),
-            )
+                enabled = enabled && !busy,
+                colors = ButtonDefaults.buttonColorsPrimary(),
+                cornerRadius = UiConsts.ButtonHeight / 2,
+                minWidth = 0.dp,
+                minHeight = UiConsts.ButtonHeight,
+                insideMargin =
+                    PaddingValues(horizontal = UiConsts.ButtonPaddingHorizontal, vertical = 0.dp),
+            ) {
+                Text(
+                    text = confirmLabel,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

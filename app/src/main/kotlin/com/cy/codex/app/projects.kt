@@ -2,9 +2,10 @@ package com.cy.codex.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,29 +19,22 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.cy.codex.ActionRow
 import com.cy.codex.AppEvent
 import com.cy.codex.CatalogState
-import com.cy.codex.CodexButton
-import com.cy.codex.CodexDivider
-import com.cy.codex.CodexTextField
-import com.cy.codex.EmptyState
 import com.cy.codex.R
-import com.cy.codex.SectionCard
-import com.cy.codex.SurfaceBackButton
-import com.cy.codex.SurfaceHeader
+import com.cy.codex.ThreadStatusTone
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
-import com.cy.codex.ValueRow
-import com.cy.codex.codeSurface
 import com.cy.codex.label
 import com.cy.codex.protocol.AppServerClient
 import com.cy.codex.protocol.protocol.v2.EnvironmentInfoResponse
@@ -49,17 +43,23 @@ import com.cy.codex.protocol.protocol.v2.EnvironmentStatusResponse
 import com.cy.codex.protocol.protocol.v2.ProjectEntry
 import com.cy.codex.raisedSurface
 import com.cy.codex.statusDotColor
-import com.cy.codex.ThreadStatusTone
-import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
-import top.yukonga.miuix.kmp.icon.extended.Delete
+import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
 import top.yukonga.miuix.kmp.icon.extended.FolderFill
 import top.yukonga.miuix.kmp.icon.extended.Link
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -95,11 +95,24 @@ fun ProjectsScreen(
     var addingEnvironment by remember { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxSize().background(colors.background)) {
-        SurfaceHeader(
+        BasicComponent(
             title = stringResource(R.string.projects_screen_title),
-            subtitle = stringResource(R.string.runtime_project_count, catalog.projects.size),
-            leading = { SurfaceBackButton(stringResource(R.string.projects_screen_back), onBack) },
-            trailing = {
+            summary = stringResource(R.string.runtime_project_count, catalog.projects.size),
+            startAction = {
+                IconButton(
+                    onClick = onBack,
+                    minWidth = UiConsts.IconButtonSize,
+                    minHeight = UiConsts.IconButtonSize,
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.ChevronBackward,
+                        contentDescription = stringResource(R.string.projects_screen_back),
+                        modifier = Modifier.size(UiConsts.IconHeader),
+                        tint = MiuixTheme.colorScheme.primary,
+                    )
+                }
+            },
+            endActions = {
                 IconButton(
                     onClick = { creating = true },
                     minWidth = UiConsts.IconButtonSize,
@@ -115,12 +128,12 @@ fun ProjectsScreen(
             },
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = UiConsts.ScreenMargin)
-                .padding(bottom = UiConsts.PageBottomInset),
+            modifier =
+                Modifier.weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = UiConsts.ScreenMargin)
+                    .padding(bottom = UiConsts.PageBottomInset),
             verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
         ) {
             ProjectsCard(
@@ -138,14 +151,38 @@ fun ProjectsScreen(
             rechecked?.let { fresh ->
                 // Only the *count* can move while the page is open — threads get filed under a
                 // project from the session list — so the card reports that and nothing else.
-                SectionCard(
-                    title = stringResource(R.string.projects_screen_rechecked, fresh.name),
-                    icon = MiuixIcons.FolderFill,
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadius = UiConsts.SectionCorner,
+                    insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+                    colors =
+                        CardDefaults.defaultColors(
+                            color = raisedSurface(),
+                            contentColor = MiuixTheme.colorScheme.onSurface,
+                        ),
                 ) {
-                    ValueRow(
-                        label = stringResource(R.string.projects_screen_path_label),
-                        value = fresh.path,
-                        monospace = true,
+                    BasicComponent(
+                        title = stringResource(R.string.projects_screen_rechecked, fresh.name),
+                        startAction = {
+                            Icon(
+                                imageVector = MiuixIcons.FolderFill,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MiuixTheme.colorScheme.primary,
+                            )
+                        },
+                    )
+
+                    BasicComponent(
+                        title = stringResource(R.string.projects_screen_path_label),
+                        endActions = {
+                            Text(
+                                text = fresh.path.ifEmpty { "—" },
+                                fontFamily = FontFamily.Monospace,
+                                color = MiuixTheme.colorScheme.onSurface,
+                                textAlign = TextAlign.End,
+                            )
+                        },
                     )
                 }
             }
@@ -216,20 +253,81 @@ private fun ProjectsCard(
     val colors = MiuixTheme.colorScheme
     var selected by remember { mutableStateOf<String?>(null) }
 
-    SectionCard(
-        title = stringResource(R.string.projects_screen_projects),
-        icon = MiuixIcons.FolderFill,
-        trailing = projects.size.toString(),
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
+        BasicComponent(
+            title = stringResource(R.string.projects_screen_projects),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.FolderFill,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            endActions = {
+                Text(
+                    text = projects.size.toString(),
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+            },
+        )
+
         if (projects.isEmpty()) {
-            EmptyState(
-                icon = MiuixIcons.FolderFill,
-                title = stringResource(R.string.projects_screen_empty),
-                detail = stringResource(R.string.projects_screen_empty_detail),
-            )
+            Column(
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .padding(vertical = UiConsts.Space24, horizontal = UiConsts.Space16),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    modifier =
+                        Modifier.size(UiConsts.IconBoxLarge)
+                            .squircleBackground(
+                                color = raisedSurface(),
+                                cornerRadius = UiConsts.CornerCard,
+                            ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.FolderFill,
+                        contentDescription = null,
+                        modifier = Modifier.size(UiConsts.IconHeader),
+                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
+                Spacer(Modifier.height(UiConsts.Space12))
+                Text(
+                    text = stringResource(R.string.projects_screen_empty),
+                    fontSize = UiType.RowTitle,
+                    lineHeight = UiType.RowTitleLine,
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(UiConsts.Space4))
+                Text(
+                    text = stringResource(R.string.projects_screen_empty_detail),
+                    fontSize = UiType.Meta,
+                    lineHeight = UiType.MetaLine,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
         projects.forEachIndexed { index, project ->
-            if (index > 0) CodexDivider()
+            if (index > 0)
+                HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
             ProjectRow(
                 project = project,
                 expanded = selected == project.id,
@@ -243,10 +341,19 @@ private fun ProjectsCard(
                 onOpen = { onOpen(project) },
             )
         }
-        ActionRow(
+        ArrowPreference(
             title = stringResource(R.string.projects_screen_import),
-            subtitle = stringResource(R.string.projects_screen_import_detail),
-            icon = MiuixIcons.Link,
+            summary = stringResource(R.string.projects_screen_import_detail),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Link,
+                    contentDescription = null,
+                    modifier = Modifier.size(UiConsts.IconPreference),
+                    tint =
+                        if (true) MiuixTheme.colorScheme.primary
+                        else MiuixTheme.colorScheme.disabledOnSurface,
+                )
+            },
             onClick = onImport,
         )
     }
@@ -267,56 +374,75 @@ private fun ProjectRow(
 ) {
     val colors = MiuixTheme.colorScheme
     Column(modifier = Modifier.fillMaxWidth()) {
-        ActionRow(
+        ArrowPreference(
             title = project.name,
-            subtitle = project.path.ifEmpty { null },
+            summary = project.path.ifEmpty { null },
             onClick = onToggle,
         )
         if (expanded) {
             FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = UiConsts.Space4, end = UiConsts.Space4, bottom = UiConsts.Space8),
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .padding(
+                            start = UiConsts.Space4,
+                            end = UiConsts.Space4,
+                            bottom = UiConsts.Space8,
+                        ),
                 horizontalArrangement = Arrangement.spacedBy(UiConsts.Space6),
                 verticalArrangement = Arrangement.spacedBy(UiConsts.Space6),
             ) {
-                CodexButton(
-                    text = stringResource(R.string.runtime_new_thread),
+                Button(
                     onClick = onOpen,
-                    size = com.cy.codex.CodexButtonSize.Compact,
-                )
-                CodexButton(
-                    text = stringResource(R.string.projects_screen_edit),
+                    modifier = Modifier,
+                    enabled = true,
+                    colors = ButtonDefaults.buttonColorsPrimary(),
+                ) {
+                    Text(text = stringResource(R.string.runtime_new_thread), maxLines = 1)
+                }
+                Button(
                     onClick = onEdit,
-                    size = com.cy.codex.CodexButtonSize.Compact,
-                    role = com.cy.codex.ButtonRole.Secondary,
-                )
-                CodexButton(
-                    text = stringResource(R.string.projects_screen_move_up),
+                    modifier = Modifier,
+                    enabled = true,
+                    colors = ButtonDefaults.buttonColors(),
+                ) {
+                    Text(text = stringResource(R.string.projects_screen_edit), maxLines = 1)
+                }
+                Button(
                     onClick = { onMove(-1) },
-                    size = com.cy.codex.CodexButtonSize.Compact,
-                    role = com.cy.codex.ButtonRole.Secondary,
+                    modifier = Modifier,
                     enabled = !first,
-                )
-                CodexButton(
-                    text = stringResource(R.string.projects_screen_move_down),
+                    colors = ButtonDefaults.buttonColors(),
+                ) {
+                    Text(text = stringResource(R.string.projects_screen_move_up), maxLines = 1)
+                }
+                Button(
                     onClick = { onMove(1) },
-                    size = com.cy.codex.CodexButtonSize.Compact,
-                    role = com.cy.codex.ButtonRole.Secondary,
+                    modifier = Modifier,
                     enabled = !last,
-                )
-                CodexButton(
-                    text = stringResource(R.string.projects_screen_recheck),
+                    colors = ButtonDefaults.buttonColors(),
+                ) {
+                    Text(text = stringResource(R.string.projects_screen_move_down), maxLines = 1)
+                }
+                Button(
                     onClick = onRecheck,
-                    size = com.cy.codex.CodexButtonSize.Compact,
-                    role = com.cy.codex.ButtonRole.Secondary,
-                )
-                CodexButton(
-                    text = stringResource(R.string.projects_screen_delete),
+                    modifier = Modifier,
+                    enabled = true,
+                    colors = ButtonDefaults.buttonColors(),
+                ) {
+                    Text(text = stringResource(R.string.projects_screen_recheck), maxLines = 1)
+                }
+                Button(
                     onClick = onDelete,
-                    size = com.cy.codex.CodexButtonSize.Compact,
-                    role = com.cy.codex.ButtonRole.Destructive,
-                )
+                    modifier = Modifier,
+                    enabled = true,
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            color = Color.Transparent,
+                            contentColor = MiuixTheme.colorScheme.error,
+                        ),
+                ) {
+                    Text(text = stringResource(R.string.projects_screen_delete), maxLines = 1)
+                }
             }
         }
     }
@@ -337,29 +463,98 @@ private fun EnvironmentsCard(
     onOpen: (String) -> Unit,
     onAdd: () -> Unit,
 ) {
-    SectionCard(
-        title = stringResource(R.string.projects_screen_environments),
-        icon = MiuixIcons.Link,
-        trailing = environments.size.toString(),
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
+        BasicComponent(
+            title = stringResource(R.string.projects_screen_environments),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Link,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            endActions = {
+                Text(
+                    text = environments.size.toString(),
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+            },
+        )
+
         if (environments.isEmpty()) {
-            EmptyState(
-                icon = MiuixIcons.Link,
-                title = stringResource(R.string.projects_screen_no_environments),
-                detail = stringResource(R.string.projects_screen_no_environments_detail),
-            )
+            Column(
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .padding(vertical = UiConsts.Space24, horizontal = UiConsts.Space16),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    modifier =
+                        Modifier.size(UiConsts.IconBoxLarge)
+                            .squircleBackground(
+                                color = raisedSurface(),
+                                cornerRadius = UiConsts.CornerCard,
+                            ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.Link,
+                        contentDescription = null,
+                        modifier = Modifier.size(UiConsts.IconHeader),
+                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
+                Spacer(Modifier.height(UiConsts.Space12))
+                Text(
+                    text = stringResource(R.string.projects_screen_no_environments),
+                    fontSize = UiType.RowTitle,
+                    lineHeight = UiType.RowTitleLine,
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(UiConsts.Space4))
+                Text(
+                    text = stringResource(R.string.projects_screen_no_environments_detail),
+                    fontSize = UiType.Meta,
+                    lineHeight = UiType.MetaLine,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
         environments.forEach { id ->
-            ActionRow(
+            ArrowPreference(
                 title = id,
-                subtitle = stringResource(R.string.projects_screen_environment_detail),
+                summary = stringResource(R.string.projects_screen_environment_detail),
                 onClick = { onOpen(id) },
             )
         }
-        ActionRow(
+        ArrowPreference(
             title = stringResource(R.string.projects_screen_add_environment),
-            subtitle = stringResource(R.string.projects_screen_add_environment_detail),
-            icon = MiuixIcons.Add,
+            summary = stringResource(R.string.projects_screen_add_environment_detail),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(UiConsts.IconPreference),
+                    tint =
+                        if (true) MiuixTheme.colorScheme.primary
+                        else MiuixTheme.colorScheme.disabledOnSurface,
+                )
+            },
             onClick = onAdd,
         )
     }
@@ -368,8 +563,8 @@ private fun EnvironmentsCard(
 /**
  * One environment, read by id.
  *
- * The two reads are separate calls with very different costs — `environment/info` starts nothing and
- * `environment/status` refuses to recover a connection — so the page runs both and reports them
+ * The two reads are separate calls with very different costs — `environment/info` starts nothing
+ * and `environment/status` refuses to recover a connection — so the page runs both and reports them
  * side by side rather than presenting one merged "state".
  */
 @Composable
@@ -387,11 +582,16 @@ fun EnvironmentDetailScreen(
 
     fun read() {
         scope.launch {
-            client.readEnvironmentInfo(environmentId)
+            client
+                .readEnvironmentInfo(environmentId)
                 .onSuccess { info = it }
                 .onFailure { failed = it.message }
-            client.readEnvironmentStatus(environmentId)
-                .onSuccess { status = it; failed = null }
+            client
+                .readEnvironmentStatus(environmentId)
+                .onSuccess {
+                    status = it
+                    failed = null
+                }
                 .onFailure { failed = it.message }
         }
     }
@@ -399,85 +599,195 @@ fun EnvironmentDetailScreen(
     LaunchedEffect(environmentId) { read() }
 
     Column(modifier = modifier.fillMaxSize().background(colors.background)) {
-        SurfaceHeader(
+        BasicComponent(
             title = environmentId,
-            subtitle = status?.status?.label() ?: stringResource(R.string.environment_detail_loading),
-            leading = { SurfaceBackButton(stringResource(R.string.projects_screen_back), onBack) },
+            summary =
+                status?.status?.label() ?: stringResource(R.string.environment_detail_loading),
+            startAction = {
+                IconButton(
+                    onClick = onBack,
+                    minWidth = UiConsts.IconButtonSize,
+                    minHeight = UiConsts.IconButtonSize,
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.ChevronBackward,
+                        contentDescription = stringResource(R.string.projects_screen_back),
+                        modifier = Modifier.size(UiConsts.IconHeader),
+                        tint = MiuixTheme.colorScheme.primary,
+                    )
+                }
+            },
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = UiConsts.ScreenMargin)
-                .padding(bottom = UiConsts.PageBottomInset),
+            modifier =
+                Modifier.weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = UiConsts.ScreenMargin)
+                    .padding(bottom = UiConsts.PageBottomInset),
             verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
         ) {
-            SectionCard(
-                title = stringResource(R.string.environment_detail_state),
-                icon = MiuixIcons.Link,
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = UiConsts.SectionCorner,
+                insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+                colors =
+                    CardDefaults.defaultColors(
+                        color = raisedSurface(),
+                        contentColor = MiuixTheme.colorScheme.onSurface,
+                    ),
             ) {
-                val kind = status?.status
-                ValueRow(
-                    label = stringResource(R.string.environment_detail_status),
-                    value = kind?.label() ?: stringResource(R.string.environment_detail_unknown),
-                    tint = kind?.let { statusDotColor(it.tone()) },
+                BasicComponent(
+                    title = stringResource(R.string.environment_detail_state),
+                    startAction = {
+                        Icon(
+                            imageVector = MiuixIcons.Link,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MiuixTheme.colorScheme.primary,
+                        )
+                    },
                 )
-                CodexDivider()
-                ValueRow(
-                    label = stringResource(R.string.environment_detail_error),
-                    value = status?.error.orEmpty(),
+
+                val kind = status?.status
+                BasicComponent(
+                    title = stringResource(R.string.environment_detail_status),
+                    endActions = {
+                        Text(
+                            text =
+                                kind?.label()
+                                    ?: stringResource(R.string.environment_detail_unknown).ifEmpty {
+                                        "—"
+                                    },
+                            color =
+                                kind?.let { statusDotColor(it.tone()) }
+                                    ?: MiuixTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.End,
+                        )
+                    },
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+                BasicComponent(
+                    title = stringResource(R.string.environment_detail_error),
+                    endActions = {
+                        Text(
+                            text = status?.error.orEmpty().ifEmpty { "—" },
+                            color = MiuixTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.End,
+                        )
+                    },
                 )
             }
-            SectionCard(
-                title = stringResource(R.string.environment_detail_shell),
-                icon = MiuixIcons.FolderFill,
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = UiConsts.SectionCorner,
+                insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+                colors =
+                    CardDefaults.defaultColors(
+                        color = raisedSurface(),
+                        contentColor = MiuixTheme.colorScheme.onSurface,
+                    ),
             ) {
-                ValueRow(
-                    label = stringResource(R.string.environment_detail_shell_name),
-                    value = info?.shell?.name.orEmpty(),
+                BasicComponent(
+                    title = stringResource(R.string.environment_detail_shell),
+                    startAction = {
+                        Icon(
+                            imageVector = MiuixIcons.FolderFill,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MiuixTheme.colorScheme.primary,
+                        )
+                    },
                 )
-                CodexDivider()
-                ValueRow(
-                    label = stringResource(R.string.environment_detail_shell_path),
-                    value = info?.shell?.path.orEmpty(),
-                    monospace = true,
+
+                BasicComponent(
+                    title = stringResource(R.string.environment_detail_shell_name),
+                    endActions = {
+                        Text(
+                            text = info?.shell?.name.orEmpty().ifEmpty { "—" },
+                            color = MiuixTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.End,
+                        )
+                    },
                 )
-                CodexDivider()
-                ValueRow(
-                    label = stringResource(R.string.environment_detail_cwd),
-                    value = info?.cwd.orEmpty(),
-                    monospace = true,
+                HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+                BasicComponent(
+                    title = stringResource(R.string.environment_detail_shell_path),
+                    endActions = {
+                        Text(
+                            text = info?.shell?.path.orEmpty().ifEmpty { "—" },
+                            fontFamily = FontFamily.Monospace,
+                            color = MiuixTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.End,
+                        )
+                    },
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+                BasicComponent(
+                    title = stringResource(R.string.environment_detail_cwd),
+                    endActions = {
+                        Text(
+                            text = info?.cwd.orEmpty().ifEmpty { "—" },
+                            fontFamily = FontFamily.Monospace,
+                            color = MiuixTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.End,
+                        )
+                    },
                 )
             }
             if (failed != null) {
-                SectionCard(
-                    title = stringResource(R.string.environment_detail_unreachable),
-                    icon = MiuixIcons.Link,
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadius = UiConsts.SectionCorner,
+                    insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+                    colors =
+                        CardDefaults.defaultColors(
+                            color = raisedSurface(),
+                            contentColor = MiuixTheme.colorScheme.onSurface,
+                        ),
                 ) {
+                    BasicComponent(
+                        title = stringResource(R.string.environment_detail_unreachable),
+                        startAction = {
+                            Icon(
+                                imageVector = MiuixIcons.Link,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MiuixTheme.colorScheme.primary,
+                            )
+                        },
+                    )
+
                     Text(
                         text = failed.orEmpty(),
-                        modifier = Modifier.padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
+                        modifier =
+                            Modifier.padding(
+                                horizontal = UiConsts.Space4,
+                                vertical = UiConsts.Space8,
+                            ),
                         fontSize = UiType.Meta,
                         lineHeight = UiType.MetaLine,
                         color = colors.error,
                     )
                 }
             }
-            CodexButton(
-                text = stringResource(R.string.environment_detail_recheck),
+            Button(
                 onClick = { read() },
                 modifier = Modifier.fillMaxWidth(),
-                role = com.cy.codex.ButtonRole.Secondary,
-            )
+                enabled = true,
+                colors = ButtonDefaults.buttonColors(),
+            ) {
+                Text(text = stringResource(R.string.environment_detail_recheck), maxLines = 1)
+            }
         }
     }
 }
 
 /** Colour the status dot the way every other status in the app is coloured. */
-private fun EnvironmentStatusKind.tone(): ThreadStatusTone = when (this) {
-    EnvironmentStatusKind.Ready -> ThreadStatusTone.Done
-    EnvironmentStatusKind.Pending -> ThreadStatusTone.Running
-    EnvironmentStatusKind.Disconnected -> ThreadStatusTone.Waiting
-    EnvironmentStatusKind.Unknown -> ThreadStatusTone.Failed
-}
+private fun EnvironmentStatusKind.tone(): ThreadStatusTone =
+    when (this) {
+        EnvironmentStatusKind.Ready -> ThreadStatusTone.Done
+        EnvironmentStatusKind.Pending -> ThreadStatusTone.Running
+        EnvironmentStatusKind.Disconnected -> ThreadStatusTone.Waiting
+        EnvironmentStatusKind.Unknown -> ThreadStatusTone.Failed
+    }

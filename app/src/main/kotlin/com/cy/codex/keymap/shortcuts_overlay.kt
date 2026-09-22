@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,10 +33,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cy.codex.R
-import com.cy.codex.SquircleShape
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
-import com.cy.codex.floatingSurface
 import com.cy.codex.glassTint
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -78,39 +77,36 @@ private val CardMaxHeight = 560.dp
 @Composable
 fun ShortcutsOverlay(state: ShortcutsHelpState, modifier: Modifier = Modifier) {
     if (!state.visible) return
-    val shape = remember { SquircleShape(UiConsts.DrawerCorner) }
+    val shape = remember { RoundedCornerShape(UiConsts.DrawerCorner) }
     val scrimInteraction = remember { MutableInteractionSource() }
     val cardInteraction = remember { MutableInteractionSource() }
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = UiConsts.ScrimAlpha))
-            .clickable(
-                interactionSource = scrimInteraction,
-                indication = null,
-                onClick = state::dismiss,
-            ),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = UiConsts.ScrimAlpha))
+                .clickable(
+                    interactionSource = scrimInteraction,
+                    indication = null,
+                    onClick = state::dismiss,
+                ),
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier
-                .widthIn(max = CardMaxWidth)
-                .padding(horizontal = UiConsts.ScreenMargin)
-                .floatingSurface(
-                    shape = shape,
-                    tint = glassTint(alpha = 0.96f),
-                    elevation = 18.dp,
-                )
-                .clip(shape)
-                // Swallows the tap that would otherwise reach the scrim behind the card.
-                .clickable(
-                    interactionSource = cardInteraction,
-                    indication = null,
-                    onClick = {},
-                )
-                .heightIn(max = CardMaxHeight)
-                .padding(horizontal = 20.dp, vertical = 18.dp)
-                .verticalScroll(rememberScrollState()),
+            modifier =
+                Modifier.widthIn(max = CardMaxWidth)
+                    .padding(horizontal = UiConsts.ScreenMargin)
+                    .background(glassTint(alpha = 0.96f), shape)
+                    .clip(shape)
+                    // Swallows the tap that would otherwise reach the scrim behind the card.
+                    .clickable(
+                        interactionSource = cardInteraction,
+                        indication = null,
+                        onClick = {},
+                    )
+                    .heightIn(max = CardMaxHeight)
+                    .padding(horizontal = 20.dp, vertical = 18.dp)
+                    .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
@@ -128,9 +124,18 @@ fun ShortcutsOverlay(state: ShortcutsHelpState, modifier: Modifier = Modifier) {
             }
             ShortcutGroup(stringResource(R.string.shortcuts_overlay_group_composer)) {
                 ShortcutRow("Enter", stringResource(R.string.shortcuts_overlay_composer_submit))
-                ShortcutRow("Shift+Enter", stringResource(R.string.shortcuts_overlay_composer_newline))
-                ShortcutRow("Ctrl+J  Alt+Enter", stringResource(R.string.shortcuts_overlay_composer_newline))
-                ShortcutRow("Ctrl+R  Ctrl+S", stringResource(R.string.shortcuts_overlay_composer_history))
+                ShortcutRow(
+                    "Shift+Enter",
+                    stringResource(R.string.shortcuts_overlay_composer_newline),
+                )
+                ShortcutRow(
+                    "Ctrl+J  Alt+Enter",
+                    stringResource(R.string.shortcuts_overlay_composer_newline),
+                )
+                ShortcutRow(
+                    "Ctrl+R  Ctrl+S",
+                    stringResource(R.string.shortcuts_overlay_composer_history),
+                )
                 ShortcutRow("Ctrl+O", stringResource(R.string.shortcuts_overlay_composer_copy))
                 ShortcutRow("Ctrl+G", stringResource(R.string.shortcuts_overlay_composer_editor))
                 ShortcutRow("?", stringResource(R.string.shortcuts_overlay_composer_help))
@@ -151,7 +156,9 @@ fun ShortcutsOverlay(state: ShortcutsHelpState, modifier: Modifier = Modifier) {
     }
 }
 
-/** One titled section of the overlay; the rows come in as content so the group owns only the title. */
+/**
+ * One titled section of the overlay; the rows come in as content so the group owns only the title.
+ */
 @Composable
 private fun ShortcutGroup(title: String, rows: @Composable () -> Unit) {
     Spacer(Modifier.height(10.dp))
@@ -169,9 +176,7 @@ private fun ShortcutGroup(title: String, rows: @Composable () -> Unit) {
 @Composable
 private fun ShortcutRow(keys: String, label: String) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(

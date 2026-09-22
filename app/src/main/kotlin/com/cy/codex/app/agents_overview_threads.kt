@@ -23,13 +23,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.cy.codex.R
+import com.cy.codex.UiConsts
+import com.cy.codex.UiType
+import com.cy.codex.history_cell.ThreadItemCell
 import com.cy.codex.protocol.AppServerClient
 import com.cy.codex.protocol.protocol.item.ThreadItem
 import com.cy.codex.status.BackChevron
-import com.cy.codex.history_cell.ThreadItemCell
-import com.cy.codex.SurfaceHeader
-import com.cy.codex.UiConsts
-import com.cy.codex.UiType
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
@@ -49,8 +49,8 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * contains no subagents, so "entering the agent" looked like the agent had disappeared. Reading it
  * into a page leaves the session the user came from exactly where it was.
  *
- * The transcript is rendered with the same cells as the chat, so a subagent's messages, commands and
- * patches look like they do everywhere else.
+ * The transcript is rendered with the same cells as the chat, so a subagent's messages, commands
+ * and patches look like they do everywhere else.
  */
 @Composable
 fun SubAgentThreadScreen(
@@ -64,11 +64,12 @@ fun SubAgentThreadScreen(
      */
     roster: List<AgentRosterEntry> = emptyList(),
     onSwitchAgent: (String) -> Unit = {},
-    contentPadding: PaddingValues = PaddingValues(
-        start = UiConsts.TranscriptGutter,
-        end = UiConsts.TranscriptGutter,
-        bottom = UiConsts.PageBottomInset,
-    ),
+    contentPadding: PaddingValues =
+        PaddingValues(
+            start = UiConsts.TranscriptGutter,
+            end = UiConsts.TranscriptGutter,
+            bottom = UiConsts.PageBottomInset,
+        ),
 ) {
     val colors = MiuixTheme.colorScheme
     var items by remember(threadId) { mutableStateOf<List<ThreadItem>>(emptyList()) }
@@ -79,7 +80,8 @@ fun SubAgentThreadScreen(
     val navigable = roster.size > 1 && index >= 0
 
     LaunchedEffect(threadId) {
-        client.readThread(com.cy.codex.protocol.protocol.v2.ThreadReadParams(threadId)).onSuccess { response ->
+        client.readThread(com.cy.codex.protocol.protocol.v2.ThreadReadParams(threadId)).onSuccess {
+            response ->
             items = response.items
             name = response.thread.name
         }
@@ -87,17 +89,21 @@ fun SubAgentThreadScreen(
     }
 
     Column(modifier = modifier.fillMaxSize().background(colors.background)) {
-        SurfaceHeader(
+        BasicComponent(
             title = name ?: stringResource(R.string.sub_agent_thread_fallback_title),
-            subtitle = stringResource(R.string.sub_agent_thread_subtitle),
-            leading = { BackChevron(onClick = onBack) },
-            trailing = {
+            summary = stringResource(R.string.sub_agent_thread_subtitle),
+            startAction = { BackChevron(onClick = onBack) },
+            endActions = {
                 if (navigable) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         AgentNavButton(
                             icon = MiuixIcons.ChevronBackward,
                             label = stringResource(R.string.sub_agent_thread_previous),
-                            onClick = { onSwitchAgent(roster[(index - 1 + roster.size) % roster.size].threadId) },
+                            onClick = {
+                                onSwitchAgent(
+                                    roster[(index - 1 + roster.size) % roster.size].threadId
+                                )
+                            },
                         )
                         AgentNavButton(
                             icon = MiuixIcons.ChevronForward,
@@ -129,7 +135,10 @@ fun SubAgentThreadScreen(
             verticalArrangement = Arrangement.spacedBy(TranscriptGap),
         ) {
             items(items, key = { it.id }) { item ->
-                ThreadItemCell(item = item, assistantLabel = stringResource(R.string.sub_agent_thread_assistant))
+                ThreadItemCell(
+                    item = item,
+                    assistantLabel = stringResource(R.string.sub_agent_thread_assistant),
+                )
             }
         }
     }
@@ -158,7 +167,11 @@ private fun AgentNavButton(
     label: String,
     onClick: () -> Unit,
 ) {
-    IconButton(onClick = onClick, minWidth = UiConsts.IconButtonSize, minHeight = UiConsts.IconButtonSize) {
+    IconButton(
+        onClick = onClick,
+        minWidth = UiConsts.IconButtonSize,
+        minHeight = UiConsts.IconButtonSize,
+    ) {
         Icon(
             imageVector = icon,
             contentDescription = label,

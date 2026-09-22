@@ -21,6 +21,10 @@ docs/                    工具链说明与待办
 scripts/                 真机冒烟脚本
 ```
 
+界面直接使用 [miuix](https://github.com/compose-miuix-ui/miuix) 的按钮、输入框、卡片、
+偏好行和弹层；复杂布局在业务页面组合这些组件。`app/src/main/kotlin/com/cy/codex/style.kt`
+只保留弹层与页面共用的边距计算，尺寸与颜色分别由 `UiConsts` 和主题提供。
+
 ## 构建
 
 需要 JDK 21、Android SDK 37、NDK r30、Rust 1.95.0 与 1.97.1（`rustup`）及两者的

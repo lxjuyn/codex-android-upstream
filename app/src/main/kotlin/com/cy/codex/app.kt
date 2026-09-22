@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -122,6 +123,7 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
+import top.yukonga.miuix.kmp.basic.Surface as MiuixSurface
 import top.yukonga.miuix.kmp.nav.core.NavBackStack
 import top.yukonga.miuix.kmp.nav.core.NavCornerClipMode
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
@@ -2667,20 +2669,6 @@ private fun handleHardwareKey(
 }
 
 /**
- * The frame every pushed page is drawn in.
- *
- * A page is a card, not a screen swap: it stops [UiConsts.SheetTopGap] short of the top edge, keeps
- * [sheetSideMargin] at either side, and reaches the bottom one. That geometry comes from
- * [SheetFrame], the same composable the modal sheets are laid out in, because a page and a sheet are
- * one object seen at two sizes — they had already drifted to 20dp and 14dp off the edge with two
- * different shadows while each owned its own copy of the numbers.
- *
- * The band the page does not cover is live: tapping it closes the page, which is exactly what the
- * same tap does to a sheet. A swipe down and the system back gesture still work — this is a third
- * way out, not a replacement for the other two, and it is the one a thumb reaches for first on a
- * device whose only navigation control is a gesture.
- */
-/**
  * Fold the import notifications' per-type results into the progress bar's shape.
  *
  * The wire reports successes and failures per item type and nothing else — there is no total — so
@@ -2694,15 +2682,18 @@ private fun externalImportProgress(
     return ImportProgress(done, total, results.joinToString(", ") { it.itemType })
 }
 
+/** A pushed page keeps a tappable band around its top and sides for dismissal. */
 @Composable
 private fun SheetPage(
     onDismiss: () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    val shape = remember { SheetShape(UiConsts.DrawerCorner) }
     val outsideInteraction = remember { MutableInteractionSource() }
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val pageWidth = minOf(maxWidth - sheetSideMargin(), UiConsts.SheetMaxWidth)
+        val pageWidth = minOf(
+            (maxWidth - sheetSideMargin() * 2).coerceAtLeast(0.dp),
+            UiConsts.SheetMaxWidth,
+        )
         // Only the band the page does not cover takes the tap. A sheet can put a scrim over the whole
         // window because it is modal; a page is not — the transcript behind it stays mounted — so
         // this is a hit target around the page rather than a layer over everything.
@@ -2729,10 +2720,18 @@ private fun SheetPage(
                 .fillMaxWidth()
                 .height(UiConsts.SheetTopGap),
         )
-        SheetFrame(
-            shape = shape,
-            tint = panelColor(),
-            fillHeight = true,
+        MiuixSurface(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = UiConsts.SheetTopGap)
+                .width(pageWidth)
+                .fillMaxHeight(),
+            shape = RoundedCornerShape(
+                topStart = UiConsts.DrawerCorner,
+                topEnd = UiConsts.DrawerCorner,
+            ),
+            color = panelColor(),
+            shadowElevation = UiConsts.SheetElevation,
         ) {
             content()
         }

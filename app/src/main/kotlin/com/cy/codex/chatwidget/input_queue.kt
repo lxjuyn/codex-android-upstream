@@ -1,6 +1,7 @@
 package com.cy.codex.chatwidget
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,17 +24,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import com.cy.codex.app.FormField
-import com.cy.codex.app.FormSheet
 import com.cy.codex.R
-import com.cy.codex.SquircleShape
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
-import com.cy.codex.floatingSurface
+import com.cy.codex.app.FormField
+import com.cy.codex.app.FormSheet
 import com.cy.codex.glassTint
-import com.cy.codex.pressableRow
 import com.cy.codex.protocol.protocol.v2.QueuedSubmission
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.ArrowUpDown
@@ -67,72 +67,78 @@ fun QueuedMessages(
     // The entry being edited, held as the entry and not as its text: an edit has to write back the
     // *whole* input list, and the text alone would drop a queued attachment on the way through.
     var editing by remember { mutableStateOf<QueuedSubmission?>(null) }
-    val shape = remember { SquircleShape(UiConsts.PanelCorner) }
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .floatingSurface(shape = shape, tint = glassTint(0.94f), elevation = UiConsts.PanelElevation)
-            .clip(shape)
-            .padding(start = UiConsts.Space12, end = UiConsts.Space10, top = UiConsts.Space8, bottom = UiConsts.Space10),
-        verticalArrangement = Arrangement.spacedBy(UiConsts.Space7),
+    val shape = remember { RoundedCornerShape(UiConsts.PanelCorner) }
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = shape,
+        color = glassTint(0.94f),
+        shadowElevation = UiConsts.PanelElevation,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = MiuixIcons.Basic.ArrowUpDown,
-                contentDescription = null,
-                modifier = Modifier.size(UiConsts.IconChevron),
-                tint = colors.primary,
-            )
-            Spacer(Modifier.width(UiConsts.Space7))
-            Text(
-                text = stringResource(R.string.queued_messages_header, messages.size),
-                modifier = Modifier.weight(1f),
-                fontSize = UiType.Subtitle,
-                lineHeight = UiType.SubtitleLine,
-                fontWeight = FontWeight.Medium,
-                color = colors.onSurface,
-                maxLines = 1,
-            )
-            // Clearing is the one bulk action; it is only offered while more than one row is shown,
-            // because a single row already has its own remove chip one line below.
-            if (messages.size > 1) {
-                QueuedChip(
-                    text = stringResource(R.string.queued_messages_clear),
-                    tint = colors.onSurfaceVariantSummary,
-                    onClick = onClear,
-                )
-                Spacer(Modifier.width(UiConsts.Space6))
-            }
-            Box(
-                modifier = Modifier
-                    .size(UiConsts.IconButtonCompact)
-                    .pressableRow(
-                        shape = CircleShape,
-                        container = colors.onSurface.copy(alpha = 0.06f),
-                        onClick = onDismiss,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
+        Column(
+            modifier =
+                Modifier.padding(
+                    start = UiConsts.Space12,
+                    end = UiConsts.Space10,
+                    top = UiConsts.Space8,
+                    bottom = UiConsts.Space10,
+                ),
+            verticalArrangement = Arrangement.spacedBy(UiConsts.Space7),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = MiuixIcons.Basic.Close,
-                    contentDescription = stringResource(R.string.queued_messages_collapse),
+                    imageVector = MiuixIcons.Basic.ArrowUpDown,
+                    contentDescription = null,
                     modifier = Modifier.size(UiConsts.IconChevron),
-                    tint = colors.onSurfaceVariantSummary,
+                    tint = colors.primary,
+                )
+                Spacer(Modifier.width(UiConsts.Space7))
+                Text(
+                    text = stringResource(R.string.queued_messages_header, messages.size),
+                    modifier = Modifier.weight(1f),
+                    fontSize = UiType.Subtitle,
+                    lineHeight = UiType.SubtitleLine,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.onSurface,
+                    maxLines = 1,
+                )
+                // Clearing is the one bulk action; it is only offered while more than one row is
+                // shown,
+                // because a single row already has its own remove chip one line below.
+                if (messages.size > 1) {
+                    QueuedChip(
+                        text = stringResource(R.string.queued_messages_clear),
+                        tint = colors.onSurfaceVariantSummary,
+                        onClick = onClear,
+                    )
+                    Spacer(Modifier.width(UiConsts.Space6))
+                }
+                IconButton(
+                    onClick = onDismiss,
+                    minWidth = UiConsts.IconButtonCompact,
+                    minHeight = UiConsts.IconButtonCompact,
+                    backgroundColor = colors.onSurface.copy(alpha = 0.06f),
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.Basic.Close,
+                        contentDescription = stringResource(R.string.queued_messages_collapse),
+                        modifier = Modifier.size(UiConsts.IconChevron),
+                        tint = colors.onSurfaceVariantSummary,
+                    )
+                }
+            }
+            messages.forEachIndexed { index, entry ->
+                QueuedMessageRow(
+                    index = index,
+                    entry = entry,
+                    first = index == 0,
+                    last = index == messages.lastIndex,
+                    onStart = { onStart(entry) },
+                    onMoveUp = { onMove(entry, -1) },
+                    onMoveDown = { onMove(entry, 1) },
+                    onRemove = { onRemove(entry) },
+                    onEdit = { editing = entry },
                 )
             }
-        }
-        messages.forEachIndexed { index, entry ->
-            QueuedMessageRow(
-                index = index,
-                entry = entry,
-                first = index == 0,
-                last = index == messages.lastIndex,
-                onStart = { onStart(entry) },
-                onMoveUp = { onMove(entry, -1) },
-                onMoveDown = { onMove(entry, 1) },
-                onRemove = { onRemove(entry) },
-                onEdit = { editing = entry },
-            )
         }
     }
 
@@ -140,13 +146,14 @@ fun QueuedMessages(
         FormSheet(
             title = stringResource(R.string.queued_messages_edit),
             subtitle = stringResource(R.string.queued_messages_edit_detail),
-            fields = listOf(
-                FormField(
-                    key = "body",
-                    label = stringResource(R.string.queued_messages_edit_label),
-                    initial = entry.preview,
+            fields =
+                listOf(
+                    FormField(
+                        key = "body",
+                        label = stringResource(R.string.queued_messages_edit_label),
+                        initial = entry.preview,
+                    )
                 ),
-            ),
             confirmLabel = stringResource(R.string.queued_messages_edit_save),
             onDismiss = { editing = null },
             onSubmit = { values ->
@@ -172,19 +179,19 @@ private fun QueuedMessageRow(
     val colors = MiuixTheme.colorScheme
     val shape = remember { RoundedCornerShape(UiConsts.RowCorner) }
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(colors.onSurface.copy(alpha = 0.045f))
-            .padding(horizontal = UiConsts.Space9, vertical = UiConsts.Space7),
+        modifier =
+            Modifier.fillMaxWidth()
+                .clip(shape)
+                .background(colors.onSurface.copy(alpha = 0.045f))
+                .padding(horizontal = UiConsts.Space9, vertical = UiConsts.Space7),
         verticalArrangement = Arrangement.spacedBy(UiConsts.Space6),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier
-                    .size(UiConsts.QueueIndexSize)
-                    .clip(CircleShape)
-                    .background(colors.primary.copy(alpha = 0.16f)),
+                modifier =
+                    Modifier.size(UiConsts.QueueIndexSize)
+                        .clip(CircleShape)
+                        .background(colors.primary.copy(alpha = 0.16f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -263,13 +270,14 @@ private fun QueuedChip(
     val alpha = if (enabled) 0.14f else 0.06f
     Text(
         text = text,
-        modifier = Modifier
-            .pressableRow(
-                shape = RoundedCornerShape(percent = UiConsts.PillCorner),
-                container = tint.copy(alpha = alpha),
-                onClick = { if (enabled) onClick() },
-            )
-            .padding(horizontal = UiConsts.Space10, vertical = UiConsts.Space4),
+        modifier =
+            Modifier.background(
+                    tint.copy(alpha = alpha),
+                    RoundedCornerShape(percent = UiConsts.PillCorner),
+                )
+                .clip(RoundedCornerShape(percent = UiConsts.PillCorner))
+                .combinedClickable(enabled = enabled, onClick = onClick)
+                .padding(horizontal = UiConsts.Space10, vertical = UiConsts.Space4),
         fontSize = UiType.Action,
         lineHeight = UiType.ActionLine,
         fontWeight = FontWeight.Medium,

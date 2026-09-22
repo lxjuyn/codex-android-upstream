@@ -2,8 +2,7 @@ package com.cy.codex.history_cell
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +14,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -30,20 +31,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.cy.codex.MarkdownStream
+import com.cy.codex.MarkdownStreamText
+import com.cy.codex.MarkdownText
 import com.cy.codex.R
+import com.cy.codex.UiConsts
+import com.cy.codex.UiType
+import com.cy.codex.copyToClipboard
 import com.cy.codex.protocol.protocol.item.AgentMessageItem
 import com.cy.codex.protocol.protocol.item.UserMessageItem
 import com.cy.codex.protocol.protocol.v2.AsyncUserInputQuestion
 import com.cy.codex.protocol.protocol.v2.UserInput
-import com.cy.codex.MarkdownStream
-import com.cy.codex.MarkdownStreamText
-import com.cy.codex.MarkdownText
-import com.cy.codex.SquircleShape
-import com.cy.codex.UiConsts
-import com.cy.codex.UiType
-import com.cy.codex.copyToClipboard
-import com.cy.codex.pressableRow
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
@@ -52,6 +50,7 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Copy
 import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.icon.extended.Send
+import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -62,7 +61,6 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * markdown body. The streaming variant appends the TUI's block caret while deltas are still
  * arriving.
  */
-
 @Composable
 fun UserMessageCell(
     item: UserMessageItem,
@@ -76,9 +74,8 @@ fun UserMessageCell(
     lineHeight: TextUnit = UiType.MessageLine,
 ) {
     val colors = MiuixTheme.colorScheme
-    val text = item.content.filterIsInstance<UserInput.Text>()
-        .joinToString("\n\n") { it.text }
-        .trim()
+    val text =
+        item.content.filterIsInstance<UserInput.Text>().joinToString("\n\n") { it.text }.trim()
     val attachments = item.content.filterNot { it is UserInput.Text }
     if (text.isEmpty() && attachments.isEmpty()) return
 
@@ -87,11 +84,11 @@ fun UserMessageCell(
         horizontalArrangement = Arrangement.End,
     ) {
         Column(
-            modifier = Modifier
-                .widthIn(max = UiConsts.UserBubbleMaxWidth)
-                .clip(SquircleShape(corner))
-                .background(colors.surfaceContainerHighest)
-                .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+            modifier =
+                Modifier.widthIn(max = UiConsts.UserBubbleMaxWidth)
+                    .squircleClip(corner)
+                    .background(colors.surfaceContainerHighest)
+                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
             horizontalAlignment = Alignment.End,
         ) {
             if (attachments.isNotEmpty()) {
@@ -194,25 +191,27 @@ private fun AttachmentChip(
     lineHeight: TextUnit = UiType.CardTitle,
 ) {
     val colors = MiuixTheme.colorScheme
-    val label = when (input) {
-        is UserInput.Image -> stringResource(R.string.messages_cell_attachment_image)
-        is UserInput.LocalImage -> stringResource(R.string.messages_cell_attachment_local_image)
-        is UserInput.Audio -> stringResource(R.string.messages_cell_attachment_audio)
-        is UserInput.LocalAudio -> stringResource(R.string.messages_cell_attachment_local_audio)
-        is UserInput.Skill ->
-            stringResource(R.string.messages_cell_attachment_skill, input.name)
-        is UserInput.Mention -> stringResource(
-            R.string.messages_cell_attachment_mention,
-            input.path.ifEmpty { input.name },
-        )
-        is UserInput.Text -> input.text
-    }
+    val label =
+        when (input) {
+            is UserInput.Image -> stringResource(R.string.messages_cell_attachment_image)
+            is UserInput.LocalImage -> stringResource(R.string.messages_cell_attachment_local_image)
+            is UserInput.Audio -> stringResource(R.string.messages_cell_attachment_audio)
+            is UserInput.LocalAudio -> stringResource(R.string.messages_cell_attachment_local_audio)
+            is UserInput.Skill ->
+                stringResource(R.string.messages_cell_attachment_skill, input.name)
+            is UserInput.Mention ->
+                stringResource(
+                    R.string.messages_cell_attachment_mention,
+                    input.path.ifEmpty { input.name },
+                )
+            is UserInput.Text -> input.text
+        }
     Text(
         text = label,
-        modifier = Modifier
-            .clip(RoundedCornerShape(corner))
-            .background(colors.primary.copy(alpha = 0.12f))
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        modifier =
+            Modifier.clip(RoundedCornerShape(corner))
+                .background(colors.primary.copy(alpha = 0.12f))
+                .padding(horizontal = horizontalPadding, vertical = verticalPadding),
         fontSize = fontSize,
         lineHeight = lineHeight,
         color = colors.primary,
@@ -226,8 +225,8 @@ private fun AttachmentChip(
  * waiting on the user never reads as plain prose.
  *
  * Mirrors `codex-rs/tui/src/bottom_pane/async_questions/`: an option is one tap, a free-text answer
- * is always reachable — the "None of the above" row on a question that has options, the only row
- * on one that does not — and the submitted answer goes back as an ordinary user message framed with
+ * is always reachable — the "None of the above" row on a question that has options, the only row on
+ * one that does not — and the submitted answer goes back as an ordinary user message framed with
  * the question it answers ([AsyncQuestions.answeredText]), which is what `go_next_or_submit` does
  * upstream. Answering locks the question locally; the list itself is a snapshot of the message, so
  * only a replayed item can show it again.
@@ -269,11 +268,11 @@ private fun QuestionList(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .border(borderWidth, colors.outline.copy(alpha = 0.55f), shape)
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        modifier =
+            Modifier.fillMaxWidth()
+                .clip(shape)
+                .border(borderWidth, colors.outline.copy(alpha = 0.55f), shape)
+                .padding(horizontal = horizontalPadding, vertical = verticalPadding),
         verticalArrangement = Arrangement.spacedBy(questionSpacing),
     ) {
         bounded.forEachIndexed { questionIndex, question ->
@@ -329,7 +328,9 @@ private fun QuestionList(
                     QuestionAnswerField(
                         value = drafts[questionIndex].orEmpty(),
                         onValueChange = { drafts[questionIndex] = it },
-                        onSubmit = { submit(questionIndex, question.title, drafts[questionIndex].orEmpty()) },
+                        onSubmit = {
+                            submit(questionIndex, question.title, drafts[questionIndex].orEmpty())
+                        },
                     )
                 }
             }
@@ -352,17 +353,18 @@ private fun QuestionOptionRow(
 ) {
     val colors = MiuixTheme.colorScheme
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pressableRow(
-                shape = optionShape,
-                container = if (selected) colors.primary.copy(alpha = 0.1f) else Color.Transparent,
-                onClick = onClick,
-            )
-            .padding(
-                horizontal = horizontalPadding,
-                vertical = verticalPadding,
-            ),
+        modifier =
+            Modifier.fillMaxWidth()
+                .background(
+                    if (selected) colors.primary.copy(alpha = 0.1f) else Color.Transparent,
+                    optionShape,
+                )
+                .clip(optionShape)
+                .combinedClickable(onClick = onClick)
+                .padding(
+                    horizontal = horizontalPadding,
+                    vertical = verticalPadding,
+                ),
         verticalAlignment = Alignment.Top,
     ) {
         Text(

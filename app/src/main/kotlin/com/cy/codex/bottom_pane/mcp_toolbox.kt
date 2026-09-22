@@ -5,14 +5,17 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,20 +29,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cy.codex.AppEvent
-import com.cy.codex.ButtonRole
-import com.cy.codex.CodexButton
-import com.cy.codex.CodexDivider
-import com.cy.codex.CodexSwitchRow
-import com.cy.codex.CodexTextField
 import com.cy.codex.R
-import com.cy.codex.SectionCard
-import com.cy.codex.SurfaceBackButton
-import com.cy.codex.SurfaceHeader
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
-import com.cy.codex.ValueRow
 import com.cy.codex.codeSurface
 import com.cy.codex.history_cell.ToolResultBlocks
 import com.cy.codex.history_cell.projectMcpResult
@@ -47,14 +43,26 @@ import com.cy.codex.protocol.AppServerClient
 import com.cy.codex.protocol.AppServerEvent
 import com.cy.codex.protocol.protocol.v2.McpResourceReadResponse
 import com.cy.codex.protocol.protocol.v2.McpServerToolCallResponse
+import com.cy.codex.raisedSurface
 import com.cy.codex.successColor
 import com.cy.codex.warningColor
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
 import top.yukonga.miuix.kmp.icon.extended.File
 import top.yukonga.miuix.kmp.icon.extended.Link
 import top.yukonga.miuix.kmp.icon.extended.Tasks
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -135,7 +143,8 @@ fun McpToolboxScreen(
         if (uri.isEmpty() || reading) return
         reading = true
         scope.launch {
-            client.readMcpResource(server, uri)
+            client
+                .readMcpResource(server, uri)
                 .onSuccess {
                     resource = it
                     resourceFailure = null
@@ -160,11 +169,12 @@ fun McpToolboxScreen(
         if (name.isEmpty() || calling) return
         calling = true
         scope.launch {
-            client.callMcpTool(
-                server = server,
-                tool = name,
-                arguments = toolArguments.ifBlank { NoArguments },
-            )
+            client
+                .callMcpTool(
+                    server = server,
+                    tool = name,
+                    arguments = toolArguments.ifBlank { NoArguments },
+                )
                 .onSuccess {
                     toolResult = it
                     toolFailure = null
@@ -177,23 +187,33 @@ fun McpToolboxScreen(
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(colors.background),
-    ) {
-        SurfaceHeader(
+    Column(modifier = modifier.fillMaxSize().background(colors.background)) {
+        BasicComponent(
             title = stringResource(R.string.mcp_toolbox_title),
-            subtitle = server,
-            leading = { SurfaceBackButton(stringResource(R.string.mcp_toolbox_back), onBack) },
+            summary = server,
+            startAction = {
+                IconButton(
+                    onClick = onBack,
+                    minWidth = UiConsts.IconButtonSize,
+                    minHeight = UiConsts.IconButtonSize,
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.ChevronBackward,
+                        contentDescription = stringResource(R.string.mcp_toolbox_back),
+                        modifier = Modifier.size(UiConsts.IconHeader),
+                        tint = MiuixTheme.colorScheme.primary,
+                    )
+                }
+            },
+            insideMargin = PaddingValues(14.dp, 10.dp),
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = UiConsts.ScreenMargin)
-                .padding(bottom = UiConsts.PageBottomInset),
+            modifier =
+                Modifier.weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = UiConsts.ScreenMargin)
+                    .padding(bottom = UiConsts.PageBottomInset),
             verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
         ) {
             ResourceCard(
@@ -235,25 +255,71 @@ private fun ResourceCard(
     failure: String?,
     onRead: () -> Unit,
 ) {
-    SectionCard(
-        title = stringResource(R.string.mcp_toolbox_resource_section),
-        icon = MiuixIcons.File,
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
-        CodexTextField(
-            value = uri,
-            onValueChange = onUriChange,
-            label = stringResource(R.string.mcp_toolbox_resource_uri),
-            placeholder = stringResource(R.string.mcp_toolbox_resource_uri_placeholder),
-            onImeAction = onRead,
+        BasicComponent(
+            title = stringResource(R.string.mcp_toolbox_resource_section),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.File,
+                    contentDescription = null,
+                    modifier = Modifier.size(UiConsts.IconInline),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            insideMargin = PaddingValues(0.dp),
         )
         Spacer(Modifier.height(UiConsts.Space8))
-        CodexButton(
-            text = stringResource(R.string.mcp_toolbox_resource_read),
+
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.mcp_toolbox_resource_uri),
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            )
+            Spacer(Modifier.height(UiConsts.Space4))
+            TextField(
+                value = uri,
+                onValueChange = onUriChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(R.string.mcp_toolbox_resource_uri_placeholder),
+                useLabelAsPlaceholder = true,
+                singleLine = true,
+                keyboardActions =
+                    KeyboardActions(
+                        onDone = { onRead() },
+                        onGo = { onRead() },
+                        onSend = { onRead() },
+                    ),
+            )
+        }
+        Spacer(Modifier.height(UiConsts.Space8))
+        Button(
             onClick = onRead,
             modifier = Modifier.fillMaxWidth(),
-            role = ButtonRole.Secondary,
             enabled = uri.isNotBlank() && !reading,
-        )
+            colors = ButtonDefaults.buttonColors(),
+            cornerRadius = UiConsts.ButtonHeight / 2,
+            minWidth = 0.dp,
+            minHeight = UiConsts.ButtonHeight,
+            insideMargin =
+                PaddingValues(horizontal = UiConsts.ButtonPaddingHorizontal, vertical = 0.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.mcp_toolbox_resource_read),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         if (failure != null) {
             Spacer(Modifier.height(UiConsts.Space8))
             ServerFailure(text = failure)
@@ -263,15 +329,34 @@ private fun ResourceCard(
             // one a single-uri request returns in practice.
             val content = response.contents.firstOrNull()
             Spacer(Modifier.height(UiConsts.Space8))
-            ValueRow(
-                label = stringResource(R.string.mcp_toolbox_resource_uri_label),
-                value = content?.uri.orEmpty(),
-                monospace = true,
+            BasicComponent(
+                title = stringResource(R.string.mcp_toolbox_resource_uri_label),
+                endActions = {
+                    Text(
+                        text = content?.uri.orEmpty().ifEmpty { "—" },
+                        fontFamily = if (true) FontFamily.Monospace else null,
+                        color = MiuixTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.End,
+                        fontSize = UiType.Detail,
+                    )
+                },
+                insideMargin =
+                    PaddingValues(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
             )
-            CodexDivider()
-            ValueRow(
-                label = stringResource(R.string.mcp_toolbox_resource_mime),
-                value = content?.mimeType.orEmpty(),
+            HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+            BasicComponent(
+                title = stringResource(R.string.mcp_toolbox_resource_mime),
+                endActions = {
+                    Text(
+                        text = content?.mimeType.orEmpty().ifEmpty { "—" },
+                        fontFamily = null,
+                        color = MiuixTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.End,
+                        fontSize = UiType.Detail,
+                    )
+                },
+                insideMargin =
+                    PaddingValues(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
             )
             Spacer(Modifier.height(UiConsts.Space8))
             val body = content?.text
@@ -312,33 +397,88 @@ private fun ToolCard(
 ) {
     val colors = MiuixTheme.colorScheme
     val emptyOutput = stringResource(R.string.mcp_toolbox_result_empty)
-    SectionCard(
-        title = stringResource(R.string.mcp_toolbox_tool_section),
-        icon = MiuixIcons.Tasks,
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
-        CodexTextField(
-            value = tool,
-            onValueChange = onToolChange,
-            label = stringResource(R.string.mcp_toolbox_tool_name),
-            placeholder = stringResource(R.string.mcp_toolbox_tool_name_placeholder),
-            onImeAction = onCall,
+        BasicComponent(
+            title = stringResource(R.string.mcp_toolbox_tool_section),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Tasks,
+                    contentDescription = null,
+                    modifier = Modifier.size(UiConsts.IconInline),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            insideMargin = PaddingValues(0.dp),
         )
         Spacer(Modifier.height(UiConsts.Space8))
-        CodexTextField(
-            value = arguments,
-            onValueChange = onArgumentsChange,
-            label = stringResource(R.string.mcp_toolbox_tool_arguments),
-            placeholder = stringResource(R.string.mcp_toolbox_tool_arguments_placeholder),
-            singleLine = false,
-        )
+
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.mcp_toolbox_tool_name),
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            )
+            Spacer(Modifier.height(UiConsts.Space4))
+            TextField(
+                value = tool,
+                onValueChange = onToolChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(R.string.mcp_toolbox_tool_name_placeholder),
+                useLabelAsPlaceholder = true,
+                singleLine = true,
+                keyboardActions =
+                    KeyboardActions(
+                        onDone = { onCall() },
+                        onGo = { onCall() },
+                        onSend = { onCall() },
+                    ),
+            )
+        }
         Spacer(Modifier.height(UiConsts.Space8))
-        CodexButton(
-            text = stringResource(R.string.mcp_toolbox_tool_call),
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.mcp_toolbox_tool_arguments),
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            )
+            Spacer(Modifier.height(UiConsts.Space4))
+            TextField(
+                value = arguments,
+                onValueChange = onArgumentsChange,
+                singleLine = false,
+                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(R.string.mcp_toolbox_tool_arguments_placeholder),
+                useLabelAsPlaceholder = true,
+            )
+        }
+        Spacer(Modifier.height(UiConsts.Space8))
+        Button(
             onClick = onCall,
             modifier = Modifier.fillMaxWidth(),
-            role = ButtonRole.Secondary,
             enabled = tool.isNotBlank() && !calling,
-        )
+            colors = ButtonDefaults.buttonColors(),
+            cornerRadius = UiConsts.ButtonHeight / 2,
+            minWidth = 0.dp,
+            minHeight = UiConsts.ButtonHeight,
+            insideMargin =
+                PaddingValues(horizontal = UiConsts.ButtonPaddingHorizontal, vertical = 0.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.mcp_toolbox_tool_call),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         if (failure != null) {
             Spacer(Modifier.height(UiConsts.Space8))
             ServerFailure(text = failure)
@@ -346,11 +486,12 @@ private fun ToolCard(
         if (response != null) {
             Spacer(Modifier.height(UiConsts.Space8))
             Text(
-                text = if (response.isError) {
-                    stringResource(R.string.mcp_toolbox_tool_error)
-                } else {
-                    stringResource(R.string.mcp_toolbox_tool_ok)
-                },
+                text =
+                    if (response.isError) {
+                        stringResource(R.string.mcp_toolbox_tool_error)
+                    } else {
+                        stringResource(R.string.mcp_toolbox_tool_ok)
+                    },
                 modifier = Modifier.padding(horizontal = UiConsts.Space4),
                 fontSize = UiType.Meta,
                 lineHeight = UiType.MetaLine,
@@ -384,14 +525,34 @@ private fun StreamCard(
     events: List<String>,
     onStreamingChange: (Boolean) -> Unit,
 ) {
-    SectionCard(
-        title = stringResource(R.string.mcp_toolbox_stream_section),
-        icon = MiuixIcons.Link,
-        trailing = events.size.toString(),
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
-        CodexSwitchRow(
+        BasicComponent(
+            title = stringResource(R.string.mcp_toolbox_stream_section),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Link,
+                    contentDescription = null,
+                    modifier = Modifier.size(UiConsts.IconInline),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            insideMargin = PaddingValues(0.dp),
+            endActions = { Text(text = events.size.toString(), maxLines = 1) },
+        )
+        Spacer(Modifier.height(UiConsts.Space8))
+
+        SwitchPreference(
             title = stringResource(R.string.mcp_toolbox_stream_switch),
-            subtitle = stringResource(R.string.mcp_toolbox_stream_switch_detail),
+            summary = stringResource(R.string.mcp_toolbox_stream_switch_detail),
             checked = streaming,
             onCheckedChange = onStreamingChange,
         )
@@ -421,11 +582,11 @@ private fun ServerFailure(text: String) {
     val colors = MiuixTheme.colorScheme
     Text(
         text = text,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(OutputShape)
-            .background(colors.error.copy(alpha = 0.12f))
-            .padding(horizontal = UiConsts.Space8, vertical = UiConsts.Space6),
+        modifier =
+            Modifier.fillMaxWidth()
+                .clip(OutputShape)
+                .background(colors.error.copy(alpha = 0.12f))
+                .padding(horizontal = UiConsts.Space8, vertical = UiConsts.Space6),
         fontSize = UiType.Meta,
         lineHeight = UiType.MetaLine,
         color = colors.error,
@@ -442,14 +603,14 @@ private fun ServerFailure(text: String) {
 @Composable
 private fun MonospaceOutput(text: String) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(OutputShape)
-            .background(codeSurface())
-            .heightIn(min = OutputMinHeight, max = OutputMaxHeight)
-            .verticalScroll(rememberScrollState())
-            .horizontalScroll(rememberScrollState())
-            .padding(UiConsts.Space10),
+        modifier =
+            Modifier.fillMaxWidth()
+                .clip(OutputShape)
+                .background(codeSurface())
+                .heightIn(min = OutputMinHeight, max = OutputMaxHeight)
+                .verticalScroll(rememberScrollState())
+                .horizontalScroll(rememberScrollState())
+                .padding(UiConsts.Space10)
     ) {
         Text(
             text = text,
@@ -480,8 +641,8 @@ private val OutputMaxHeight = 260.dp
 /**
  * How many stream events the page keeps.
  *
- * Enough to see a burst arrive and still read the start of it, small enough that a server
- * notifying on every request cannot turn this page into an unbounded transcript of its own.
+ * Enough to see a burst arrive and still read the start of it, small enough that a server notifying
+ * on every request cannot turn this page into an unbounded transcript of its own.
  */
 private const val StreamEventLimit = 50
 

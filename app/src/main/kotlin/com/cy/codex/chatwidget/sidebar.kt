@@ -1,13 +1,12 @@
 package com.cy.codex.chatwidget
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -40,24 +39,23 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.cy.codex.R
-import com.cy.codex.ExpandBar
 import com.cy.codex.Motion
-import com.cy.codex.pressableRow
-import com.cy.codex.raisedSurface
-import com.cy.codex.SquircleShape
+import com.cy.codex.R
 import com.cy.codex.UiConsts
-import com.cy.codex.statusDotColor
 import com.cy.codex.UiType
+import com.cy.codex.panelColor
+import com.cy.codex.raisedSurface
+import com.cy.codex.statusDotColor
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.ChevronForward
 import top.yukonga.miuix.kmp.icon.extended.FolderFill
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.extended.Sidebar
+import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -101,90 +99,98 @@ fun SidebarPanel(
     modifier: Modifier = Modifier,
 ) {
     val sizeSpec = Motion.PanelDp
-    // The silhouette is one continuous shape the whole way: a 48dp chip and a 700dp drawer share the
-    // same squircle, and only its radius moves. Swapping between two shapes at the halfway point made
-    // the corners jump while the panel was still animating.
-    val corner by animateDpAsState(
-        targetValue = if (expanded) UiConsts.DrawerCorner else UiConsts.ChipCorner,
-        animationSpec = sizeSpec,
-        label = "sidebarCorner",
-    )
-    val shape = remember(corner) { SquircleShape(corner) }
-    val width by animateDpAsState(
-        targetValue = if (expanded) panelWidth else collapsedWidth,
-        animationSpec = sizeSpec,
-        label = "sidebarWidth",
-    )
-    val height by animateDpAsState(
-        targetValue = if (expanded) maxPanelHeight else collapsedHeight,
-        animationSpec = sizeSpec,
-        label = "sidebarHeight",
-    )
-    val listAlpha by animateFloatAsState(
-        targetValue = if (expanded) 1f else 0f,
-        animationSpec = if (expanded) Motion.ListFadeIn else Motion.ListFadeOut,
-        label = "sidebarListAlpha",
-    )
+    // Animating one corner radius keeps the collapsed chip and expanded panel continuous.
+    val corner by
+        animateDpAsState(
+            targetValue = if (expanded) UiConsts.DrawerCorner else UiConsts.ChipCorner,
+            animationSpec = sizeSpec,
+            label = "sidebarCorner",
+        )
+    val shape = remember(corner) { RoundedCornerShape(corner) }
+    val width by
+        animateDpAsState(
+            targetValue = if (expanded) panelWidth else collapsedWidth,
+            animationSpec = sizeSpec,
+            label = "sidebarWidth",
+        )
+    val height by
+        animateDpAsState(
+            targetValue = if (expanded) maxPanelHeight else collapsedHeight,
+            animationSpec = sizeSpec,
+            label = "sidebarHeight",
+        )
+    val listAlpha by
+        animateFloatAsState(
+            targetValue = if (expanded) 1f else 0f,
+            animationSpec = if (expanded) Motion.ListFadeIn else Motion.ListFadeOut,
+            label = "sidebarListAlpha",
+        )
     val projectsTitle = stringResource(R.string.sidebar_projects_header)
-    val items = remember(actions, projects, projectsCollapsed, expandedProjects, projectsTitle) {
-        sidebarItems(actions, projects, projectsCollapsed, expandedProjects, projectsTitle)
-    }
+    val items =
+        remember(actions, projects, projectsCollapsed, expandedProjects, projectsTitle) {
+            sidebarItems(actions, projects, projectsCollapsed, expandedProjects, projectsTitle)
+        }
     // The list never scrolls itself: every move happens under the finger that asked for it.
     // Scrolling the selected session into view used to run while the bar was still growing — with a
     // zero-height viewport LazyColumn always answered "not visible" and the offset was clamped as
     // the viewport grew, so a tap aimed at the row being revealed landed on its neighbour.
     val listState = rememberLazyListState()
 
-    ExpandBar(
-        width = width,
-        height = height,
+    Surface(
+        modifier = modifier.width(width).height(height),
         shape = shape,
-        expanded = expanded,
-        onExpandRequest = { onExpandedChange(true) },
-        elevation = if (expanded) expandedElevation else collapsedElevation,
-        modifier = modifier,
+        color = panelColor(),
+        shadowElevation = if (expanded) expandedElevation else collapsedElevation,
     ) {
-        SidebarHeader(
-            expanded = expanded,
-            onToggle = { onExpandedChange(!expanded) },
-            onOpenSettings = onOpenSettings,
-        )
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .alpha(listAlpha),
-            contentPadding = listPadding,
-            verticalArrangement = Arrangement.spacedBy(listItemGap),
+        Column(
+            modifier =
+                Modifier.then(
+                    if (expanded) Modifier else Modifier.clickable { onExpandedChange(true) }
+                )
         ) {
-            items(items.size, key = { items[it].key }) { index ->
-                when (val item = items[index]) {
-                    is SidebarItem.Header -> SectionHeader(
-                        title = item.title,
-                        collapsed = item.collapsed,
-                        onClick = onToggleProjects,
-                    )
+            SidebarHeader(
+                expanded = expanded,
+                onToggle = { onExpandedChange(!expanded) },
+                onOpenSettings = onOpenSettings,
+            )
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxWidth().weight(1f).alpha(listAlpha),
+                contentPadding = listPadding,
+                verticalArrangement = Arrangement.spacedBy(listItemGap),
+            ) {
+                items(items.size, key = { items[it].key }) { index ->
+                    when (val item = items[index]) {
+                        is SidebarItem.Header ->
+                            SectionHeader(
+                                title = item.title,
+                                collapsed = item.collapsed,
+                                onClick = onToggleProjects,
+                            )
 
-                    is SidebarItem.Gap -> Spacer(Modifier.height(sectionGap))
+                        is SidebarItem.Gap -> Spacer(Modifier.height(sectionGap))
 
-                    is SidebarItem.Action -> ActionRow(entry = item.entry, onClick = { onAction(item.entry) })
+                        is SidebarItem.Action ->
+                            ActionRow(entry = item.entry, onClick = { onAction(item.entry) })
 
-                    is SidebarItem.Project -> ProjectRow(
-                        project = item.project,
-                        expanded = item.expanded,
-                        onClick = { onToggleProject(item.project.id) },
-                    )
+                        is SidebarItem.Project ->
+                            ProjectRow(
+                                project = item.project,
+                                expanded = item.expanded,
+                                onClick = { onToggleProject(item.project.id) },
+                            )
 
-                    is SidebarItem.Session -> SessionRow(
-                        session = item.session,
-                        selected = item.session.id == selectedSessionId,
-                        onClick = { onSessionSelected(item.session.id) },
-                    )
+                        is SidebarItem.Session ->
+                            SessionRow(
+                                session = item.session,
+                                selected = item.session.id == selectedSessionId,
+                                onClick = { onSessionSelected(item.session.id) },
+                            )
+                    }
                 }
             }
+            Spacer(Modifier.height(listBottomGap))
         }
-        Spacer(Modifier.height(listBottomGap))
     }
 }
 
@@ -207,50 +213,56 @@ private fun SidebarHeader(
     val colors = MiuixTheme.colorScheme
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val pressOverlay by animateColorAsState(
-        targetValue = if (pressed) colors.onBackground.copy(alpha = 0.08f) else Color.Transparent,
-        animationSpec = tween(durationMillis = if (pressed) pressInDurationMs else pressOutDurationMs),
-        label = "sidebarTogglePress",
-    )
-    val titleAlpha by animateFloatAsState(
-        targetValue = if (expanded) 1f else 0f,
-        animationSpec = tween(
-            durationMillis = if (expanded) titleFadeInDurationMs else titleFadeOutDurationMs,
-        ),
-        label = "sidebarTitleAlpha",
-    )
+    val pressOverlay by
+        animateColorAsState(
+            targetValue =
+                if (pressed) colors.onBackground.copy(alpha = 0.08f) else Color.Transparent,
+            animationSpec =
+                tween(durationMillis = if (pressed) pressInDurationMs else pressOutDurationMs),
+            label = "sidebarTogglePress",
+        )
+    val titleAlpha by
+        animateFloatAsState(
+            targetValue = if (expanded) 1f else 0f,
+            animationSpec =
+                tween(
+                    durationMillis = if (expanded) titleFadeInDurationMs else titleFadeOutDurationMs
+                ),
+            label = "sidebarTitleAlpha",
+        )
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(UiConsts.ChipSize + headerExtraHeight)
-            .padding(horizontal = headerPadding),
+        modifier =
+            Modifier.fillMaxWidth()
+                .height(UiConsts.ChipSize + headerExtraHeight)
+                .padding(horizontal = headerPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier
-                .size(UiConsts.ChipSize)
-                .clip(CircleShape)
-                .then(
-                    if (expanded) {
-                        Modifier.clickable(
-                            interactionSource = interactionSource,
-                            indication = null,
-                            onClick = onToggle,
-                        )
-                    } else {
-                        Modifier
-                    },
-                )
-                .background(pressOverlay, CircleShape),
+            modifier =
+                Modifier.size(UiConsts.ChipSize)
+                    .clip(CircleShape)
+                    .then(
+                        if (expanded) {
+                            Modifier.clickable(
+                                interactionSource = interactionSource,
+                                indication = null,
+                                onClick = onToggle,
+                            )
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .background(pressOverlay, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = MiuixIcons.Sidebar,
-                contentDescription = if (expanded) {
-                    stringResource(R.string.sidebar_collapse)
-                } else {
-                    stringResource(R.string.sidebar_expand)
-                },
+                contentDescription =
+                    if (expanded) {
+                        stringResource(R.string.sidebar_collapse)
+                    } else {
+                        stringResource(R.string.sidebar_expand)
+                    },
                 modifier = Modifier.size(UiConsts.ChipIcon),
                 tint = colors.primary,
             )
@@ -258,9 +270,7 @@ private fun SidebarHeader(
         Spacer(Modifier.width(iconGap))
         Text(
             text = stringResource(R.string.sidebar_title),
-            modifier = Modifier
-                .weight(1f)
-                .alpha(titleAlpha),
+            modifier = Modifier.weight(1f).alpha(titleAlpha),
             fontSize = titleSize,
             lineHeight = titleLineHeight,
             fontWeight = FontWeight.Medium,
@@ -269,11 +279,13 @@ private fun SidebarHeader(
             softWrap = false,
         )
         // Settings lives here rather than in the status card: this drawer is the app's navigation,
-        // and the status card is a read-out of one session. A settings entry inside it mixed the two
+        // and the status card is a read-out of one session. A settings entry inside it mixed the
+        // two
         // jobs, and every other list that used to be down here is now a row inside that page.
         //
         // Only composed while the drawer is open. An alpha-0 icon is still hit-testable, and in the
-        // 48dp-wide collapsed bar this button lays out exactly on top of the toggle — so tapping the
+        // 48dp-wide collapsed bar this button lays out exactly on top of the toggle — so tapping
+        // the
         // collapsed chip opened settings and the drawer could not be opened at all.
         if (expanded) {
             Box(modifier = Modifier.alpha(titleAlpha)) {
@@ -301,7 +313,8 @@ private fun SectionHeader(
     onClick: () -> Unit,
     corner: Dp = UiConsts.CornerControl,
     horizontalPadding: Dp = 6.dp,
-    contentPadding: PaddingValues = PaddingValues(start = 8.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
+    contentPadding: PaddingValues =
+        PaddingValues(start = 8.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
     titleSize: TextUnit = UiType.Subtitle,
     titleLineHeight: TextUnit = UiType.SheetTitle,
     chevronSize: Dp = 14.dp,
@@ -312,28 +325,32 @@ private fun SectionHeader(
     val colors = MiuixTheme.colorScheme
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val pressOverlay by animateColorAsState(
-        targetValue = if (pressed) colors.onBackground.copy(alpha = 0.08f) else Color.Transparent,
-        animationSpec = tween(durationMillis = if (pressed) pressInDurationMs else pressOutDurationMs),
-        label = "sectionPress",
-    )
-    val chevronRotation by animateFloatAsState(
-        targetValue = if (collapsed) 90f else -90f,
-        animationSpec = tween(durationMillis = chevronDurationMs),
-        label = "sectionChevron",
-    )
+    val pressOverlay by
+        animateColorAsState(
+            targetValue =
+                if (pressed) colors.onBackground.copy(alpha = 0.08f) else Color.Transparent,
+            animationSpec =
+                tween(durationMillis = if (pressed) pressInDurationMs else pressOutDurationMs),
+            label = "sectionPress",
+        )
+    val chevronRotation by
+        animateFloatAsState(
+            targetValue = if (collapsed) 90f else -90f,
+            animationSpec = tween(durationMillis = chevronDurationMs),
+            label = "sectionChevron",
+        )
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = horizontalPadding)
-            .clip(RoundedCornerShape(corner))
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-            )
-            .background(pressOverlay, RoundedCornerShape(corner))
-            .padding(contentPadding),
+        modifier =
+            Modifier.fillMaxWidth()
+                .padding(horizontal = horizontalPadding)
+                .clip(RoundedCornerShape(corner))
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick,
+                )
+                .background(pressOverlay, RoundedCornerShape(corner))
+                .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -345,14 +362,13 @@ private fun SectionHeader(
         )
         Icon(
             imageVector = MiuixIcons.ChevronForward,
-            contentDescription = if (collapsed) {
-                stringResource(R.string.sidebar_expand_section, title)
-            } else {
-                stringResource(R.string.sidebar_collapse_section, title)
-            },
-            modifier = Modifier
-                .size(chevronSize)
-                .graphicsLayer { rotationZ = chevronRotation },
+            contentDescription =
+                if (collapsed) {
+                    stringResource(R.string.sidebar_expand_section, title)
+                } else {
+                    stringResource(R.string.sidebar_collapse_section, title)
+                },
+            modifier = Modifier.size(chevronSize).graphicsLayer { rotationZ = chevronRotation },
             tint = colors.onSurfaceVariantSummary,
         )
     }
@@ -371,14 +387,11 @@ private fun ActionRow(
 ) {
     val colors = MiuixTheme.colorScheme
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pressableRow(
-                shape = RoundedCornerShape(corner),
-                container = Color.Transparent,
-                onClick = onClick,
-            )
-            .padding(contentPadding),
+        modifier =
+            Modifier.fillMaxWidth()
+                .squircleSurface(color = Color.Transparent, cornerRadius = corner)
+                .combinedClickable(onClick = onClick)
+                .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -417,20 +430,18 @@ private fun ProjectRow(
     chevronDurationMs: Int = Motion.DisclosureMs,
 ) {
     val colors = MiuixTheme.colorScheme
-    val chevronRotation by animateFloatAsState(
-        targetValue = if (expanded) 90f else 0f,
-        animationSpec = tween(durationMillis = chevronDurationMs),
-        label = "projectChevron",
-    )
+    val chevronRotation by
+        animateFloatAsState(
+            targetValue = if (expanded) 90f else 0f,
+            animationSpec = tween(durationMillis = chevronDurationMs),
+            label = "projectChevron",
+        )
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pressableRow(
-                shape = RoundedCornerShape(corner),
-                container = Color.Transparent,
-                onClick = onClick,
-            )
-            .padding(contentPadding),
+        modifier =
+            Modifier.fillMaxWidth()
+                .squircleSurface(color = Color.Transparent, cornerRadius = corner)
+                .combinedClickable(onClick = onClick)
+                .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -461,14 +472,13 @@ private fun ProjectRow(
         }
         Icon(
             imageVector = MiuixIcons.ChevronForward,
-            contentDescription = if (expanded) {
-                stringResource(R.string.sidebar_collapse_project, project.name)
-            } else {
-                stringResource(R.string.sidebar_expand_project, project.name)
-            },
-            modifier = Modifier
-                .size(chevronSize)
-                .graphicsLayer { rotationZ = chevronRotation },
+            contentDescription =
+                if (expanded) {
+                    stringResource(R.string.sidebar_collapse_project, project.name)
+                } else {
+                    stringResource(R.string.sidebar_expand_project, project.name)
+                },
+            modifier = Modifier.size(chevronSize).graphicsLayer { rotationZ = chevronRotation },
             tint = colors.onSurfaceVariantActions,
         )
     }
@@ -481,7 +491,8 @@ private fun SessionRow(
     onClick: () -> Unit,
     startIndent: Dp = UiConsts.RowIndent,
     corner: Dp = UiConsts.CornerRow,
-    contentPadding: PaddingValues = PaddingValues(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
+    contentPadding: PaddingValues =
+        PaddingValues(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
     dotSize: Dp = 7.dp,
     dotGap: Dp = 12.dp,
     titleSize: TextUnit = UiType.CardTitle,
@@ -492,28 +503,28 @@ private fun SessionRow(
 ) {
     val colors = MiuixTheme.colorScheme
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = startIndent)
-            .pressableRow(
-                shape = RoundedCornerShape(corner),
-                container = if (selected) raisedSurface() else Color.Transparent,
-                onClick = onClick,
-            )
-            .padding(contentPadding),
+        modifier =
+            Modifier.fillMaxWidth()
+                .padding(start = startIndent)
+                .squircleSurface(
+                    color = if (selected) raisedSurface() else Color.Transparent,
+                    cornerRadius = corner,
+                )
+                .combinedClickable(onClick = onClick)
+                .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier
-                .size(dotSize)
-                .clip(CircleShape)
-                .background(
-                    when {
-                        session.running -> statusDotColor(com.cy.codex.ThreadStatusTone.Running)
-                        session.archived -> colors.onSurfaceVariantSummary.copy(alpha = 0.5f)
-                        else -> colors.onSurfaceVariantSummary
-                    },
-                ),
+            modifier =
+                Modifier.size(dotSize)
+                    .clip(CircleShape)
+                    .background(
+                        when {
+                            session.running -> statusDotColor(com.cy.codex.ThreadStatusTone.Running)
+                            session.archived -> colors.onSurfaceVariantSummary.copy(alpha = 0.5f)
+                            else -> colors.onSurfaceVariantSummary
+                        }
+                    )
         )
         Spacer(Modifier.width(dotGap))
         Text(

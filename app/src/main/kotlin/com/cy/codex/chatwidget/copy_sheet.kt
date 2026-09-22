@@ -1,20 +1,36 @@
 package com.cy.codex.chatwidget
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
-import com.cy.codex.ButtonRole
-import com.cy.codex.CodexButton
-import com.cy.codex.ModalSheet
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import com.cy.codex.R
+import com.cy.codex.UiConsts
+import com.cy.codex.UiType
 import com.cy.codex.copyToClipboard
 import com.cy.codex.extractCodeBlocks
 import com.cy.codex.protocol.protocol.item.AgentMessageItem
+import com.cy.codex.sheetColor
+import com.cy.codex.sheetSideMargin
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * The `/copy` picker.
@@ -31,63 +47,131 @@ fun CopySheet(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    val codeBlocks = remember(response?.id, response?.text) {
-        extractCodeBlocks(response?.text.orEmpty())
-    }
-    ModalSheet(
+    val codeBlocks =
+        remember(response?.id, response?.text) {
+            extractCodeBlocks(response?.text.orEmpty())
+        }
+    WindowBottomSheet(
         show = true,
-        onDismiss = onDismiss,
-        onDismissFinished = onDismiss,
+        onDismissRequest = onDismiss,
         title = stringResource(R.string.copy_sheet_title),
+        backgroundColor = sheetColor(),
+        cornerRadius = UiConsts.SheetCorner,
+        sheetMaxWidth = UiConsts.SheetMaxWidth,
+        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
+        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
     ) {
-        if (response == null && status == null) {
-            Text(
-                text = stringResource(R.string.copy_sheet_nothing),
-                modifier = Modifier.fillMaxWidth(),
-                fontSize = com.cy.codex.UiType.SheetBody,
-                lineHeight = com.cy.codex.UiType.SheetBodyLine,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
-            return@ModalSheet
-        }
-        if (response != null && response.text.isNotBlank()) {
-            val label = stringResource(R.string.copy_sheet_whole_response)
-            CodexButton(
-                text = label,
-                onClick = {
-                    copyToClipboard(context, response.text, label)
-                    onDismiss()
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        codeBlocks.forEachIndexed { index, (language, code) ->
-            val label = if (language.isNullOrBlank()) {
-                stringResource(R.string.copy_sheet_code_block, index + 1)
-            } else {
-                stringResource(R.string.copy_sheet_code_block_language, index + 1, language)
+        Column(
+            modifier =
+                Modifier.fillMaxWidth()
+                    .heightIn(
+                        max =
+                            LocalWindowInfo.current.containerDpSize.height *
+                                UiConsts.SheetHeightFraction
+                    )
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = UiConsts.SheetPadding),
+            verticalArrangement = Arrangement.spacedBy(UiConsts.Space6),
+        ) {
+            if (response == null && status == null) {
+                Text(
+                    text = stringResource(R.string.copy_sheet_nothing),
+                    modifier = Modifier.fillMaxWidth(),
+                    fontSize = com.cy.codex.UiType.SheetBody,
+                    lineHeight = com.cy.codex.UiType.SheetBodyLine,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+                return@WindowBottomSheet
             }
-            CodexButton(
-                text = label,
-                onClick = {
-                    copyToClipboard(context, code, label)
-                    onDismiss()
-                },
-                role = ButtonRole.Secondary,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        status?.let {
-            val label = stringResource(R.string.copy_sheet_status)
-            CodexButton(
-                text = label,
-                onClick = {
-                    copyToClipboard(context, it, label)
-                    onDismiss()
-                },
-                role = ButtonRole.Secondary,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            if (response != null && response.text.isNotBlank()) {
+                val label = stringResource(R.string.copy_sheet_whole_response)
+                Button(
+                    onClick = {
+                        copyToClipboard(context, response.text, label)
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColorsPrimary(),
+                    cornerRadius = UiConsts.ButtonHeight / 2,
+                    minHeight = UiConsts.ButtonHeight,
+                    insideMargin =
+                        PaddingValues(
+                            horizontal = UiConsts.ButtonPaddingHorizontal,
+                            vertical = 0.dp,
+                        ),
+                ) {
+                    Text(
+                        text = label,
+                        fontSize = UiType.Action,
+                        lineHeight = UiType.ActionLine,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            codeBlocks.forEachIndexed { index, (language, code) ->
+                val label =
+                    if (language.isNullOrBlank()) {
+                        stringResource(R.string.copy_sheet_code_block, index + 1)
+                    } else {
+                        stringResource(R.string.copy_sheet_code_block_language, index + 1, language)
+                    }
+                Button(
+                    onClick = {
+                        copyToClipboard(context, code, label)
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(),
+                    cornerRadius = UiConsts.ButtonHeight / 2,
+                    minHeight = UiConsts.ButtonHeight,
+                    insideMargin =
+                        PaddingValues(
+                            horizontal = UiConsts.ButtonPaddingHorizontal,
+                            vertical = 0.dp,
+                        ),
+                ) {
+                    Text(
+                        text = label,
+                        fontSize = UiType.Action,
+                        lineHeight = UiType.ActionLine,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            status?.let {
+                val label = stringResource(R.string.copy_sheet_status)
+                Button(
+                    onClick = {
+                        copyToClipboard(context, it, label)
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(),
+                    cornerRadius = UiConsts.ButtonHeight / 2,
+                    minHeight = UiConsts.ButtonHeight,
+                    insideMargin =
+                        PaddingValues(
+                            horizontal = UiConsts.ButtonPaddingHorizontal,
+                            vertical = 0.dp,
+                        ),
+                ) {
+                    Text(
+                        text = label,
+                        fontSize = UiType.Action,
+                        lineHeight = UiType.ActionLine,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
     }
 }

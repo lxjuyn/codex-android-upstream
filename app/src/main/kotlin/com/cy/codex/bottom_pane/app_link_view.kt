@@ -3,6 +3,7 @@ package com.cy.codex.bottom_pane
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,23 +25,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.cy.codex.AppEvent
-import com.cy.codex.ButtonRole
 import com.cy.codex.CatalogState
-import com.cy.codex.CodexButton
-import com.cy.codex.CodexButtonSize
-import com.cy.codex.CodexDivider
-import com.cy.codex.CodexSwitchRow
 import com.cy.codex.R
-import com.cy.codex.SectionCard
-import com.cy.codex.SurfaceHeader
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
-import com.cy.codex.ValueRow
 import com.cy.codex.protocol.AppServerClient
 import com.cy.codex.protocol.protocol.v2.AppInfo
+import com.cy.codex.raisedSurface
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
@@ -48,6 +50,7 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
 import top.yukonga.miuix.kmp.icon.extended.Community
 import top.yukonga.miuix.kmp.icon.extended.GridView
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -87,52 +90,111 @@ fun AppsScreen(
         scope.launch { client.listInstalledApps().onSuccess { narrowed = it } }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(colors.background),
-    ) {
-        SurfaceHeader(
+    Column(modifier = modifier.fillMaxSize().background(colors.background)) {
+        BasicComponent(
             title = stringResource(R.string.apps_screen_title),
-            subtitle = stringResource(R.string.apps_screen_subtitle, installed.size, marketplace.size),
-            leading = { AppsBackButton(onBack) },
+            summary =
+                stringResource(R.string.apps_screen_subtitle, installed.size, marketplace.size),
+            startAction = { AppsBackButton(onBack) },
+            insideMargin = PaddingValues(14.dp, 10.dp),
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = UiConsts.ScreenMargin)
-                .padding(bottom = UiConsts.PageBottomInset),
+            modifier =
+                Modifier.weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = UiConsts.ScreenMargin)
+                    .padding(bottom = UiConsts.PageBottomInset),
             verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
         ) {
-            CodexSwitchRow(
+            SwitchPreference(
                 title = stringResource(R.string.apps_screen_installed_only),
-                subtitle = stringResource(R.string.apps_screen_installed_only_detail),
+                summary = stringResource(R.string.apps_screen_installed_only_detail),
                 checked = installedOnly,
                 onCheckedChange = ::setInstalledOnly,
             )
             if (reread.isNotEmpty()) {
-                SectionCard(
-                    title = stringResource(R.string.apps_screen_reread),
-                    icon = MiuixIcons.Community,
-                    trailing = reread.size.toString(),
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadius = UiConsts.SectionCorner,
+                    insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+                    colors =
+                        CardDefaults.defaultColors(
+                            color = raisedSurface(),
+                            contentColor = MiuixTheme.colorScheme.onSurface,
+                        ),
                 ) {
+                    BasicComponent(
+                        title = stringResource(R.string.apps_screen_reread),
+                        startAction = {
+                            Icon(
+                                imageVector = MiuixIcons.Community,
+                                contentDescription = null,
+                                modifier = Modifier.size(UiConsts.IconInline),
+                                tint = MiuixTheme.colorScheme.primary,
+                            )
+                        },
+                        insideMargin = PaddingValues(0.dp),
+                        endActions = { Text(text = reread.size.toString(), maxLines = 1) },
+                    )
+                    Spacer(Modifier.height(UiConsts.Space8))
+
                     reread.forEachIndexed { index, app ->
-                        if (index > 0) CodexDivider()
-                        ValueRow(
-                            label = app.name,
-                            value = if (app.installed) {
-                                stringResource(R.string.apps_screen_installed)
-                            } else {
-                                stringResource(R.string.apps_screen_not_installed)
+                        if (index > 0)
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = UiConsts.Space1)
+                            )
+                        BasicComponent(
+                            title = app.name,
+                            endActions = {
+                                Text(
+                                    text =
+                                        if (app.installed) {
+                                                stringResource(R.string.apps_screen_installed)
+                                            } else {
+                                                stringResource(R.string.apps_screen_not_installed)
+                                            }
+                                            .ifEmpty { "—" },
+                                    fontFamily = null,
+                                    color = MiuixTheme.colorScheme.onSurface,
+                                    textAlign = TextAlign.End,
+                                    fontSize = UiType.Detail,
+                                )
                             },
+                            insideMargin =
+                                PaddingValues(
+                                    horizontal = UiConsts.Space4,
+                                    vertical = UiConsts.Space7,
+                                ),
                         )
                     }
                 }
             }
             if (apps.isEmpty()) {
-                SectionCard(title = stringResource(R.string.apps_screen_title), icon = MiuixIcons.GridView) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadius = UiConsts.SectionCorner,
+                    insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+                    colors =
+                        CardDefaults.defaultColors(
+                            color = raisedSurface(),
+                            contentColor = MiuixTheme.colorScheme.onSurface,
+                        ),
+                ) {
+                    BasicComponent(
+                        title = stringResource(R.string.apps_screen_title),
+                        startAction = {
+                            Icon(
+                                imageVector = MiuixIcons.GridView,
+                                contentDescription = null,
+                                modifier = Modifier.size(UiConsts.IconInline),
+                                tint = MiuixTheme.colorScheme.primary,
+                            )
+                        },
+                        insideMargin = PaddingValues(0.dp),
+                    )
+                    Spacer(Modifier.height(UiConsts.Space8))
+
                     Text(
                         text = stringResource(R.string.apps_screen_empty),
                         modifier = Modifier.padding(vertical = UiConsts.Space4),
@@ -178,7 +240,31 @@ private fun AppsGroupCard(
     onReread: (String) -> Unit,
 ) {
     val colors = MiuixTheme.colorScheme
-    SectionCard(title = title, icon = MiuixIcons.GridView, trailing = entries.size.toString()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
+    ) {
+        BasicComponent(
+            title = title,
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.GridView,
+                    contentDescription = null,
+                    modifier = Modifier.size(UiConsts.IconInline),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            insideMargin = PaddingValues(0.dp),
+            endActions = { Text(text = entries.size.toString(), maxLines = 1) },
+        )
+        Spacer(Modifier.height(UiConsts.Space8))
+
         if (entries.isEmpty()) {
             Text(
                 text = emptyText,
@@ -204,9 +290,9 @@ private fun AppsRow(
 ) {
     val colors = MiuixTheme.colorScheme
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
+        modifier =
+            Modifier.fillMaxWidth()
+                .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -241,31 +327,66 @@ private fun AppsRow(
         // Re-reading one app is `app/read` with a single id: after a write, the server's copy of
         // that row is the only one that can say whether the install actually took, and re-listing
         // every app to find out would be a request per row.
-        CodexButton(
-            text = stringResource(R.string.apps_screen_reread_one),
+        Button(
             onClick = { onReread(app.id) },
-            role = ButtonRole.Secondary,
-            size = CodexButtonSize.Compact,
-        )
+            modifier = Modifier,
+            enabled = true,
+            colors = ButtonDefaults.buttonColors(),
+            cornerRadius = UiConsts.ButtonHeightCompact / 2,
+            minWidth = 0.dp,
+            minHeight = UiConsts.ButtonHeightCompact,
+            insideMargin =
+                PaddingValues(
+                    horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                    vertical = 0.dp,
+                ),
+        ) {
+            Text(
+                text = stringResource(R.string.apps_screen_reread_one),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         Spacer(Modifier.width(UiConsts.Space6))
         // Installing is the one thing this page can do for an app, so the marketplace chip is the
         // accent pill and "Installed" — a state, not an action — is the outlined one.
-        CodexButton(
-            text = if (app.installed) {
-                stringResource(R.string.apps_screen_installed)
-            } else {
-                stringResource(R.string.apps_screen_install)
-            },
+        Button(
             onClick = { onEvent(AppEvent.SetAppInstalled(app.id, !app.installed)) },
-            role = if (app.installed) ButtonRole.Secondary else ButtonRole.Primary,
-            size = CodexButtonSize.Compact,
-        )
+            colors =
+                if (app.installed) ButtonDefaults.buttonColors()
+                else ButtonDefaults.buttonColorsPrimary(),
+            cornerRadius = UiConsts.ButtonHeightCompact / 2,
+            minWidth = 0.dp,
+            minHeight = UiConsts.ButtonHeightCompact,
+            insideMargin =
+                PaddingValues(
+                    horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                    vertical = 0.dp,
+                ),
+        ) {
+            Text(
+                text =
+                    if (app.installed) {
+                        stringResource(R.string.apps_screen_installed)
+                    } else {
+                        stringResource(R.string.apps_screen_install)
+                    },
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
 @Composable
 private fun AppsBackButton(onBack: () -> Unit) {
-    IconButton(onClick = onBack, minWidth = UiConsts.IconButtonSize, minHeight = UiConsts.IconButtonSize) {
+    IconButton(
+        onClick = onBack,
+        minWidth = UiConsts.IconButtonSize,
+        minHeight = UiConsts.IconButtonSize,
+    ) {
         Icon(
             imageVector = MiuixIcons.ChevronBackward,
             contentDescription = stringResource(R.string.apps_screen_back),
@@ -276,4 +397,5 @@ private fun AppsBackButton(onBack: () -> Unit) {
 }
 
 @Composable
-private fun AppsDivider() = CodexDivider()
+private fun AppsDivider() =
+    HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))

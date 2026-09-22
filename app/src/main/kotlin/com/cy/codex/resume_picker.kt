@@ -27,32 +27,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.cy.codex.ActionRow
-import com.cy.codex.AppEvent
-import com.cy.codex.ButtonRole
-import com.cy.codex.CodexApp
-import com.cy.codex.CodexButton
-import com.cy.codex.CodexButtonSize
-import com.cy.codex.CodexDivider
-import com.cy.codex.CodexTextField
-import com.cy.codex.R
-import com.cy.codex.SectionCard
-import com.cy.codex.SurfaceHeader
-import com.cy.codex.ThreadStatusTone
-import com.cy.codex.UiConsts
-import com.cy.codex.UiType
 import com.cy.codex.app.FormField
 import com.cy.codex.app.FormSheet
 import com.cy.codex.chatwidget.SidebarModel
 import com.cy.codex.chatwidget.StatusChip
-import com.cy.codex.pressableRow
 import com.cy.codex.protocol.protocol.item.AgentMessageItem
 import com.cy.codex.protocol.protocol.item.ThreadItem
 import com.cy.codex.protocol.protocol.item.UserMessageItem
@@ -60,16 +45,21 @@ import com.cy.codex.protocol.protocol.v2.Thread
 import com.cy.codex.protocol.protocol.v2.ThreadReadParams
 import com.cy.codex.protocol.protocol.v2.ThreadSection
 import com.cy.codex.protocol.protocol.v2.UserInput
-import com.cy.codex.raisedSurface
 import com.cy.codex.status.BackChevron
-import com.cy.codex.statusDotColor
-import com.cy.codex.tone
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.GridView
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** How many lines an expanded card's transcript preview shows; the upstream cap is six. */
@@ -79,7 +69,10 @@ internal const val ResumePreviewLineLimit = 6
 internal data class ResumePreviewLine(val speaker: ResumePreviewSpeaker, val text: String)
 
 /** Who spoke one [ResumePreviewLine]. */
-internal enum class ResumePreviewSpeaker { User, Assistant }
+internal enum class ResumePreviewSpeaker {
+    User,
+    Assistant,
+}
 
 /**
  * A thread's ordering timestamp.
@@ -108,37 +101,40 @@ internal fun threadMatchesQuery(thread: Thread, query: String): Boolean {
  * stable, so rows sharing a timestamp keep the order the server sent them in.
  */
 internal fun resumeThreads(threads: List<Thread>, query: String): List<Thread> =
-    threads.filter { threadMatchesQuery(it, query) }
-        .sortedByDescending { threadRecency(it) }
+    threads.filter { threadMatchesQuery(it, query) }.sortedByDescending { threadRecency(it) }
 
 /**
  * The newest user/assistant messages of one thread, one line each, oldest first.
  *
- * Mirrors the expanded preview of `codex-rs/tui/src/resume_picker_transcript_preview.rs`: only
- * user and assistant text counts, the newest messages win, and the result is capped at [limit].
- * Each message is reduced to its first non-blank line, the same shape the history browser uses.
+ * Mirrors the expanded preview of `codex-rs/tui/src/resume_picker_transcript_preview.rs`: only user
+ * and assistant text counts, the newest messages win, and the result is capped at [limit]. Each
+ * message is reduced to its first non-blank line, the same shape the history browser uses.
  */
 internal fun transcriptPreviewLines(
     items: List<ThreadItem>,
     limit: Int = ResumePreviewLineLimit,
 ): List<ResumePreviewLine> {
     if (limit <= 0) return emptyList()
-    return items.mapNotNull { item ->
-        when (item) {
-            is UserMessageItem -> item.content
-                .filterIsInstance<UserInput.Text>()
-                .joinToString(" ") { it.text }
-                .let { previewLine(ResumePreviewSpeaker.User, it) }
+    return items
+        .mapNotNull { item ->
+            when (item) {
+                is UserMessageItem ->
+                    item.content
+                        .filterIsInstance<UserInput.Text>()
+                        .joinToString(" ") { it.text }
+                        .let { previewLine(ResumePreviewSpeaker.User, it) }
 
-            is AgentMessageItem -> previewLine(ResumePreviewSpeaker.Assistant, item.text)
-            else -> null
+                is AgentMessageItem -> previewLine(ResumePreviewSpeaker.Assistant, item.text)
+                else -> null
+            }
         }
-    }.takeLast(limit)
+        .takeLast(limit)
 }
 
 /** The first non-blank line of one message, or null when the message carries no visible text. */
 private fun previewLine(speaker: ResumePreviewSpeaker, text: String): ResumePreviewLine? =
-    text.lineSequence()
+    text
+        .lineSequence()
         .firstOrNull { it.isNotBlank() }
         ?.trim()
         ?.let { ResumePreviewLine(speaker, it) }
@@ -146,7 +142,9 @@ private fun previewLine(speaker: ResumePreviewSpeaker, text: String): ResumePrev
 /** One expanded card's preview read: in flight, the latest answer, or why it has none. */
 private sealed interface ResumePreviewState {
     data object Loading : ResumePreviewState
+
     data object Failed : ResumePreviewState
+
     data class Loaded(val lines: List<ResumePreviewLine>) : ResumePreviewState
 }
 
@@ -154,8 +152,8 @@ private sealed interface ResumePreviewState {
  * Session picker and lifecycle actions.
  *
  * Mirrors `codex-rs/tui/src/resume_picker.rs` and `app/session_picker.rs`: the list of threads the
- * server knows about, with the per-session actions the protocol exposes
- * (`thread/fork`, `thread/archive`, `thread/unarchive`, `thread/name/set`, `thread/delete`).
+ * server knows about, with the per-session actions the protocol exposes (`thread/fork`,
+ * `thread/archive`, `thread/unarchive`, `thread/name/set`, `thread/delete`).
  */
 @Composable
 fun SessionListScreen(
@@ -186,12 +184,13 @@ fun SessionListScreen(
     var expandedThreadId by remember { mutableStateOf<String?>(null) }
     val previews = remember { mutableStateMapOf<String, ResumePreviewState>() }
 
-    val visible = remember(threads.threads, threads.archivedIds, showArchived, query) {
-        resumeThreads(
-            threads.threads.filter { showArchived || it.id !in threads.archivedIds },
-            query,
-        )
-    }
+    val visible =
+        remember(threads.threads, threads.archivedIds, showArchived, query) {
+            resumeThreads(
+                threads.threads.filter { showArchived || it.id !in threads.archivedIds },
+                query,
+            )
+        }
 
     fun toggleExpanded(threadId: String) {
         if (expandedThreadId == threadId) {
@@ -202,60 +201,76 @@ fun SessionListScreen(
         if (previews.containsKey(threadId)) return
         previews[threadId] = ResumePreviewState.Loading
         scope.launch {
-            previews[threadId] = app.client.readThread(ThreadReadParams(threadId)).fold(
-                onSuccess = { ResumePreviewState.Loaded(transcriptPreviewLines(it.items)) },
-                onFailure = { ResumePreviewState.Failed },
-            )
+            previews[threadId] =
+                app.client
+                    .readThread(ThreadReadParams(threadId))
+                    .fold(
+                        onSuccess = { ResumePreviewState.Loaded(transcriptPreviewLines(it.items)) },
+                        onFailure = { ResumePreviewState.Failed },
+                    )
         }
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        SurfaceHeader(
+        BasicComponent(
             title = stringResource(R.string.session_list_title),
-            subtitle = stringResource(R.string.session_list_subtitle, visible.size),
-            leading = {
+            summary = stringResource(R.string.session_list_subtitle, visible.size),
+            startAction = {
                 BackChevron(
                     onClick = onBack,
                     description = stringResource(R.string.session_list_back),
                 )
             },
-            trailing = {
+            endActions = {
                 // The chip is a toggle, not a tone: it says which half of the list is on screen, so
                 // it takes the button roles instead of a status colour and its dot.
-                CodexButton(
-                    text = stringResource(
-                        if (showArchived) {
-                            R.string.session_list_filter_archived
-                        } else {
-                            R.string.session_list_filter_active
-                        },
-                    ),
+                Button(
                     onClick = { app.onAppEvent(AppEvent.SetThreadListScope(!showArchived)) },
-                    role = if (showArchived) ButtonRole.Primary else ButtonRole.Secondary,
-                    size = CodexButtonSize.Compact,
-                )
+                    modifier = Modifier,
+                    enabled = true,
+                    colors =
+                        if (showArchived) ButtonDefaults.buttonColorsPrimary()
+                        else ButtonDefaults.buttonColors(),
+                ) {
+                    Text(
+                        text =
+                            stringResource(
+                                if (showArchived) {
+                                    R.string.session_list_filter_archived
+                                } else {
+                                    R.string.session_list_filter_active
+                                }
+                            ),
+                        maxLines = 1,
+                    )
+                }
             },
         )
 
-        CodexTextField(
+        TextField(
             value = query,
             onValueChange = { query = it },
-            modifier = Modifier.padding(
-                start = horizontalPadding,
-                end = horizontalPadding,
-                top = UiConsts.Space8,
-                bottom = UiConsts.Space6,
-            ),
-            placeholder = stringResource(R.string.resume_picker_search_hint),
+            modifier =
+                Modifier.padding(
+                        start = horizontalPadding,
+                        end = horizontalPadding,
+                        top = UiConsts.Space8,
+                        bottom = UiConsts.Space6,
+                    )
+                    .fillMaxWidth(),
+            label = stringResource(R.string.resume_picker_search_hint),
+            useLabelAsPlaceholder = true,
+            singleLine = true,
         )
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = horizontalPadding,
-                end = horizontalPadding,
-                bottom = bottomPadding,
-            ),
+            contentPadding =
+                PaddingValues(
+                    start = horizontalPadding,
+                    end = horizontalPadding,
+                    bottom = bottomPadding,
+                ),
             verticalArrangement = Arrangement.spacedBy(rowSpacing),
         ) {
             item(key = "sections") {
@@ -270,8 +285,18 @@ fun SessionListScreen(
             if (visible.isEmpty()) {
                 item(key = "empty") {
                     Column(verticalArrangement = Arrangement.spacedBy(UiConsts.Space12)) {
-                        Text(stringResource(R.string.runtime_ready), color = colors.onSurfaceVariantSummary)
-                        CodexButton(stringResource(R.string.runtime_new_thread), { app.onAppEvent(AppEvent.NewThread()) })
+                        Text(
+                            stringResource(R.string.runtime_ready),
+                            color = colors.onSurfaceVariantSummary,
+                        )
+                        Button(
+                            onClick = { app.onAppEvent(AppEvent.NewThread()) },
+                            modifier = Modifier,
+                            enabled = true,
+                            colors = ButtonDefaults.buttonColorsPrimary(),
+                        ) {
+                            Text(text = stringResource(R.string.runtime_new_thread), maxLines = 1)
+                        }
                     }
                 }
             }
@@ -279,7 +304,8 @@ fun SessionListScreen(
                 val thread = visible[index]
                 SessionCard(
                     title = thread.name ?: thread.id.takeLast(8),
-                    preview = thread.preview.ifBlank { stringResource(R.string.session_list_no_preview) },
+                    preview =
+                        thread.preview.ifBlank { stringResource(R.string.session_list_no_preview) },
                     cwd = thread.cwd,
                     branch = thread.gitInfo?.branch,
                     updatedAt = thread.updatedAt,
@@ -301,7 +327,9 @@ fun SessionListScreen(
                         renamed = null
                     },
                     onArchiveToggle = {
-                        app.onAppEvent(AppEvent.ArchiveThread(thread.id, thread.id !in threads.archivedIds))
+                        app.onAppEvent(
+                            AppEvent.ArchiveThread(thread.id, thread.id !in threads.archivedIds)
+                        )
                     },
                     onDelete = { app.onAppEvent(AppEvent.DeleteThread(thread.id)) },
                     sections = threads.sections,
@@ -319,12 +347,13 @@ fun SessionListScreen(
     if (creatingSection) {
         FormSheet(
             title = stringResource(R.string.session_list_section_new),
-            fields = listOf(
-                FormField(
-                    key = "name",
-                    label = stringResource(R.string.session_list_section_name),
+            fields =
+                listOf(
+                    FormField(
+                        key = "name",
+                        label = stringResource(R.string.session_list_section_name),
+                    )
                 ),
-            ),
             confirmLabel = stringResource(R.string.session_list_section_create),
             onDismiss = { creatingSection = false },
             onSubmit = { values ->
@@ -377,19 +406,22 @@ private fun SessionCard(
     val colors = MiuixTheme.colorScheme
     val shape = remember(corner) { RoundedCornerShape(corner) }
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(raisedSurface())
-            .clickable(onClick = onOpen)
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        modifier =
+            Modifier.fillMaxWidth()
+                .clip(shape)
+                .background(raisedSurface())
+                .clickable(onClick = onOpen)
+                .padding(horizontal = horizontalPadding, vertical = verticalPadding)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier
-                    .size(statusDotSize)
-                    .clip(CircleShape)
-                    .background(if (archived) colors.onSurfaceVariantSummary.copy(alpha = 0.5f) else statusDotColor(ThreadStatusTone.Idle)),
+                modifier =
+                    Modifier.size(statusDotSize)
+                        .clip(CircleShape)
+                        .background(
+                            if (archived) colors.onSurfaceVariantSummary.copy(alpha = 0.5f)
+                            else statusDotColor(ThreadStatusTone.Idle)
+                        )
             )
             Spacer(Modifier.width(statusDotSpacing))
             if (renameDraft != null) {
@@ -437,11 +469,13 @@ private fun SessionCard(
         )
         Spacer(Modifier.height(previewMetaSpacing))
         Text(
-            text = listOfNotNull(
-                cwd,
-                branch?.let { stringResource(R.string.session_list_branch, it) },
-                SidebarModel.relativeTime(updatedAt),
-            ).joinToString(stringResource(R.string.session_list_meta_separator)),
+            text =
+                listOfNotNull(
+                        cwd,
+                        branch?.let { stringResource(R.string.session_list_branch, it) },
+                        SidebarModel.relativeTime(updatedAt),
+                    )
+                    .joinToString(stringResource(R.string.session_list_meta_separator)),
             fontSize = metaFontSize,
             lineHeight = metaLineHeight,
             color = colors.onSurfaceVariantSummary,
@@ -457,15 +491,19 @@ private fun SessionCard(
             }
             SessionAction(stringResource(R.string.session_list_fork), onFork)
             SessionAction(
-                label = stringResource(
-                    if (archived) R.string.session_list_unarchive else R.string.session_list_archive,
-                ),
+                label =
+                    stringResource(
+                        if (archived) R.string.session_list_unarchive
+                        else R.string.session_list_archive
+                    ),
                 onClick = onArchiveToggle,
             )
             SessionAction(
-                label = stringResource(
-                    if (expanded) R.string.resume_picker_collapse else R.string.resume_picker_expand,
-                ),
+                label =
+                    stringResource(
+                        if (expanded) R.string.resume_picker_collapse
+                        else R.string.resume_picker_expand
+                    ),
                 onClick = onToggleExpand,
             )
         }
@@ -508,32 +546,41 @@ private fun SessionCard(
 @Composable
 private fun TranscriptPreview(state: ResumePreviewState?) {
     when (state) {
-        null, ResumePreviewState.Loading -> PreviewLine(
-            text = stringResource(R.string.resume_picker_preview_loading),
-        )
+        null,
+        ResumePreviewState.Loading ->
+            PreviewLine(text = stringResource(R.string.resume_picker_preview_loading))
 
-        ResumePreviewState.Failed -> PreviewLine(
-            text = stringResource(R.string.resume_picker_preview_failed),
-            error = true,
-        )
+        ResumePreviewState.Failed ->
+            PreviewLine(
+                text = stringResource(R.string.resume_picker_preview_failed),
+                error = true,
+            )
 
-        is ResumePreviewState.Loaded -> if (state.lines.isEmpty()) {
-            PreviewLine(text = stringResource(R.string.resume_picker_preview_empty))
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(UiConsts.Space2)) {
-                state.lines.forEach { line ->
-                    PreviewLine(
-                        text = when (line.speaker) {
-                            ResumePreviewSpeaker.User ->
-                                stringResource(R.string.resume_picker_preview_user, line.text)
+        is ResumePreviewState.Loaded ->
+            if (state.lines.isEmpty()) {
+                PreviewLine(text = stringResource(R.string.resume_picker_preview_empty))
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(UiConsts.Space2)) {
+                    state.lines.forEach { line ->
+                        PreviewLine(
+                            text =
+                                when (line.speaker) {
+                                    ResumePreviewSpeaker.User ->
+                                        stringResource(
+                                            R.string.resume_picker_preview_user,
+                                            line.text,
+                                        )
 
-                            ResumePreviewSpeaker.Assistant ->
-                                stringResource(R.string.resume_picker_preview_assistant, line.text)
-                        },
-                    )
+                                    ResumePreviewSpeaker.Assistant ->
+                                        stringResource(
+                                            R.string.resume_picker_preview_assistant,
+                                            line.text,
+                                        )
+                                }
+                        )
+                    }
                 }
             }
-        }
     }
 }
 
@@ -569,18 +616,44 @@ private fun SectionsCard(
     val colors = MiuixTheme.colorScheme
     var draft by remember(renaming) { mutableStateOf("") }
 
-    SectionCard(
-        title = stringResource(R.string.session_list_sections),
-        icon = MiuixIcons.GridView,
-        trailing = sections.size.toString(),
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
+        BasicComponent(
+            title = stringResource(R.string.session_list_sections),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.GridView,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            endActions = {
+                Text(
+                    text = sections.size.toString(),
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+            },
+        )
+
         sections.forEachIndexed { index, section ->
-            if (index > 0) CodexDivider()
+            if (index > 0)
+                HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
             if (renaming == section.id) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
                     horizontalArrangement = Arrangement.spacedBy(UiConsts.Space6),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -604,9 +677,9 @@ private fun SectionsCard(
                 }
             } else {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
                     horizontalArrangement = Arrangement.spacedBy(UiConsts.Space6),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -635,10 +708,19 @@ private fun SectionsCard(
                 }
             }
         }
-        ActionRow(
+        ArrowPreference(
             title = stringResource(R.string.session_list_section_new),
-            subtitle = stringResource(R.string.session_list_section_new_detail),
-            icon = MiuixIcons.Add,
+            summary = stringResource(R.string.session_list_section_new_detail),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(UiConsts.IconPreference),
+                    tint =
+                        if (true) MiuixTheme.colorScheme.primary
+                        else MiuixTheme.colorScheme.disabledOnSurface,
+                )
+            },
             onClick = onCreate,
         )
     }
@@ -647,8 +729,8 @@ private fun SectionsCard(
 /**
  * One lifecycle action of a session card.
  *
- * The label is the whole pill: [CodexButton] has no icon slot, so the four actions say what they do
- * in words instead of carrying a glyph each.
+ * The label is the whole pill: the button has no icon slot, so the four actions say what they do in
+ * words instead of carrying a glyph each.
  */
 @Composable
 private fun SessionAction(
@@ -656,10 +738,18 @@ private fun SessionAction(
     onClick: () -> Unit,
     destructive: Boolean = false,
 ) {
-    CodexButton(
-        text = label,
+    Button(
         onClick = onClick,
-        role = if (destructive) ButtonRole.Destructive else ButtonRole.Secondary,
-        size = CodexButtonSize.Compact,
-    )
+        modifier = Modifier,
+        enabled = true,
+        colors =
+            if (destructive)
+                ButtonDefaults.buttonColors(
+                    color = Color.Transparent,
+                    contentColor = MiuixTheme.colorScheme.error,
+                )
+            else ButtonDefaults.buttonColors(),
+    ) {
+        Text(text = label, maxLines = 1)
+    }
 }

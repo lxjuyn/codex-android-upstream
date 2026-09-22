@@ -4,9 +4,7 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
@@ -51,7 +49,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,28 +58,25 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.core.content.FileProvider
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import com.cy.codex.AppEvent
 import com.cy.codex.CodexApp
-import com.cy.codex.CodexButton
+import com.cy.codex.CollapsibleSection
 import com.cy.codex.ComposerHistory
 import com.cy.codex.MarkdownStream
 import com.cy.codex.Motion
 import com.cy.codex.R
 import com.cy.codex.SessionDiagnostic
 import com.cy.codex.SessionState
-import com.cy.codex.SquircleShape
 import com.cy.codex.Surface
 import com.cy.codex.ThreadStatusTone
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
-import com.cy.codex.app.AgentPickerSheet
 import com.cy.codex.app.AgentRosterEntry
 import com.cy.codex.app.AgentsOverview
 import com.cy.codex.app.rememberAgentRoster
@@ -94,8 +88,7 @@ import com.cy.codex.bottom_pane.Composer
 import com.cy.codex.bottom_pane.TurnActivityBar
 import com.cy.codex.bottom_pane.activeToolDetail
 import com.cy.codex.bottom_pane.isConnectorAuth
-import com.cy.codex.chatwidget.QueuedMessages
-import com.cy.codex.floatingSurface
+import com.cy.codex.copyToClipboard
 import com.cy.codex.glassTint
 import com.cy.codex.history_cell.CommandExecutionCell
 import com.cy.codex.history_cell.DiagnosticCell
@@ -113,20 +106,21 @@ import com.cy.codex.protocol.protocol.v2.CollaborationMode
 import com.cy.codex.protocol.protocol.v2.CommandExecutionStatus
 import com.cy.codex.protocol.protocol.v2.ThreadAttachment
 import com.cy.codex.protocol.protocol.v2.UserInput
-import com.cy.codex.CollapsibleSection
-import com.cy.codex.copyToClipboard
 import com.cy.codex.raisedSurface
-import java.io.File
-import kotlinx.coroutines.launch
 import com.cy.codex.status.DiffCard
 import com.cy.codex.status.StatusCard
 import com.cy.codex.status.StatusCardButton
 import com.cy.codex.status.StatusPanelState
 import com.cy.codex.statusDotColor
 import com.cy.codex.statusPillSurface
+import java.io.File
+import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
+import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.ProgressiveBlur
@@ -137,6 +131,7 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Close
 import top.yukonga.miuix.kmp.icon.extended.Community
 import top.yukonga.miuix.kmp.icon.extended.Refresh
+import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -183,22 +178,23 @@ fun ChatScreen(
     val threads = app.threads
     // `OpenDocument` rather than `GetContent`: the protocol takes an identity key the server can
     // read back later, and a document uri is one the app keeps a grant for across a restart.
-    val attachmentPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-    ) { uri ->
-        if (uri != null) {
-            app.importAttachment(uri)
+    val attachmentPicker =
+        rememberLauncherForActivityResult(contract = ActivityResultContracts.OpenDocument()) { uri
+            ->
+            if (uri != null) {
+                app.importAttachment(uri)
+            }
         }
-    }
     // `/export` with no path asks the system save dialog for a destination; the request flag is
     // consumed before launching so a recomposition cannot open it twice.
-    val exportPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/markdown"),
-    ) { uri ->
-        if (uri != null) {
-            app.exportTranscriptTo(uri)
+    val exportPicker =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.CreateDocument("text/markdown")
+        ) { uri ->
+            if (uri != null) {
+                app.exportTranscriptTo(uri)
+            }
         }
-    }
     LaunchedEffect(app.exportTranscriptRequest) {
         if (app.exportTranscriptRequest) {
             app.consumeTranscriptExportRequest()
@@ -223,12 +219,12 @@ fun ChatScreen(
     // Names the thread the way the sidebar and the resume picker do, for the cross-thread
     // approval notice; the state read happens where the notice renders.
     val threadNameOf: (String) -> String = { threadId ->
-        threads.threads.firstOrNull { it.id == threadId }
+        threads.threads
+            .firstOrNull { it.id == threadId }
             ?.let { thread ->
                 thread.name?.takeIf { it.isNotBlank() }
                     ?: thread.preview.take(48).takeIf { it.isNotBlank() }
-            }
-            ?: threadId.take(8)
+            } ?: threadId.take(8)
     }
     val backdrop = rememberLayerBackdrop {
         drawRect(colors.background)
@@ -237,47 +233,50 @@ fun ChatScreen(
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val density = LocalDensity.current
-        // The transcript column. On a wide window it is inset by the drawer's width *at all times* —
-        // centred while the drawer is shut, pushed across when it opens — so the text is wrapped once
+        // The transcript column. On a wide window it is inset by the drawer's width *at all times*
+        // —
+        // centred while the drawer is shut, pushed across when it opens — so the text is wrapped
+        // once
         // and never again. Opening the drawer then costs one composited translation instead of a
-        // full re-measure of every cell in the list. On a narrow window there is no room for a second
+        // full re-measure of every cell in the list. On a narrow window there is no room for a
+        // second
         // column, so the drawer goes back over the text the way it always did.
         val wide = maxWidth >= UiConsts.WideContentBreakpoint
         val drawerWidth = minOf(UiConsts.SidebarWidth, UiConsts.SidebarWidthCap)
         // Where the column's left edge sits while the drawer is open: clear of the drawer by
         // [UiConsts.ContentGap], not flush against it.
-        val contentStart = (UiConsts.ScreenMargin + drawerWidth + UiConsts.ContentGap)
-            .coerceAtMost(maxWidth)
-        val contentWidth = if (wide) {
-            (maxWidth - contentStart - UiConsts.ScreenMargin).coerceAtLeast(UiConsts.MinContentWidth)
-        } else {
-            maxWidth
-        }
+        val contentStart =
+            (UiConsts.ScreenMargin + drawerWidth + UiConsts.ContentGap).coerceAtMost(maxWidth)
+        val contentWidth =
+            if (wide) {
+                (maxWidth - contentStart - UiConsts.ScreenMargin).coerceAtLeast(
+                    UiConsts.MinContentWidth
+                )
+            } else {
+                maxWidth
+            }
         // Rest is centred; the open position is the same column translated, so the text is never
         // re-measured — the width above does not depend on whether the drawer is open.
         val centredStart = (maxWidth - contentWidth) / 2
-        val contentShift by animateDpAsState(
-            targetValue = if (wide && sidebarExpanded) contentStart - centredStart else 0.dp,
-            animationSpec = Motion.PanelDp,
-            label = "contentShift",
-        )
+        val contentShift by
+            animateDpAsState(
+                targetValue = if (wide && sidebarExpanded) contentStart - centredStart else 0.dp,
+                animationSpec = Motion.PanelDp,
+                label = "contentShift",
+            )
         // The backdrop layer spans the *window*, not the column. `layerBackdrop` only captures what
         // is drawn inside it, and everything that samples it — the composer across its full width,
         // the two progressive-blur bands — reaches past the column's edges. A layer as wide as the
         // column left those samples reading outside the captured texture, which is what put flat
         // colour blocks in the composer's glass. The background rect keeps the capture opaque under
         // the text, so the blur has no transparent pixels to smear colour into.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .layerBackdrop(backdrop),
-        ) {
+        Box(modifier = Modifier.fillMaxSize().layerBackdrop(backdrop)) {
             Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .width(contentWidth)
-                    .fillMaxHeight()
-                    .graphicsLayer { translationX = contentShift.toPx() },
+                modifier =
+                    Modifier.align(Alignment.TopCenter)
+                        .width(contentWidth)
+                        .fillMaxHeight()
+                        .graphicsLayer { translationX = contentShift.toPx() }
             ) {
                 TranscriptPane(
                     app = app,
@@ -292,28 +291,28 @@ fun ChatScreen(
         // Top and bottom progressive blur: the transcript fades under the floating chrome instead
         // of being cut off by it.
         Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .height(topInset + topBlurHeight)
-                .progressiveTextureBlur(
-                    backdrop = backdrop,
-                    shape = androidx.compose.ui.graphics.RectangleShape,
-                    blurRadius = topBlurRadius,
-                    gradient = ProgressiveBlur.Top.copy(endFraction = 0.92f),
-                ),
+            modifier =
+                Modifier.align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(topInset + topBlurHeight)
+                    .progressiveTextureBlur(
+                        backdrop = backdrop,
+                        shape = androidx.compose.ui.graphics.RectangleShape,
+                        blurRadius = topBlurRadius,
+                        gradient = ProgressiveBlur.Top.copy(endFraction = 0.92f),
+                    )
         )
         Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(bottomInset + bottomBlurHeight)
-                .progressiveTextureBlur(
-                    backdrop = backdrop,
-                    shape = androidx.compose.ui.graphics.RectangleShape,
-                    blurRadius = bottomBlurRadius,
-                    gradient = ProgressiveBlur.Bottom.copy(endFraction = 0.92f),
-                ),
+            modifier =
+                Modifier.align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(bottomInset + bottomBlurHeight)
+                    .progressiveTextureBlur(
+                        backdrop = backdrop,
+                        shape = androidx.compose.ui.graphics.RectangleShape,
+                        blurRadius = bottomBlurRadius,
+                        gradient = ProgressiveBlur.Bottom.copy(endFraction = 0.92f),
+                    )
         )
 
         // A drop after the first load keeps the transcript; this banner is the retry. It sits just
@@ -322,22 +321,22 @@ fun ChatScreen(
             ConnectionBanner(
                 message = message,
                 onRetry = app::reconnect,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(
-                        start = UiConsts.ScreenMargin,
-                        end = UiConsts.ScreenMargin,
-                        bottom = bottomInset + UiConsts.PromptBarHeight + UiConsts.ScreenMargin,
-                    ),
+                modifier =
+                    Modifier.align(Alignment.BottomCenter)
+                        .padding(
+                            start = UiConsts.ScreenMargin,
+                            end = UiConsts.ScreenMargin,
+                            bottom = bottomInset + UiConsts.PromptBarHeight + UiConsts.ScreenMargin,
+                        ),
             )
         }
 
         StatusCardButton(
             open = panelState.open,
             onClick = { panelState.toggle() },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(end = UiConsts.ScreenMargin, top = topInset + UiConsts.ScreenMargin),
+            modifier =
+                Modifier.align(Alignment.TopEnd)
+                    .padding(end = UiConsts.ScreenMargin, top = topInset + UiConsts.ScreenMargin),
         )
 
         // The right-hand panels. Two cards, not one: the diff card is *added* to the left of the
@@ -350,33 +349,38 @@ fun ChatScreen(
         // Both cards fit side by side on anything tablet-shaped; on a narrow window the diff takes
         // the whole strip and the status card steps aside rather than being pushed off-screen.
         val sideBySide = panelMax >= statusWidth + UiConsts.PanelGap + UiConsts.MinDiffPaneWidth
-        val diffWidth = if (sideBySide) {
-            minOf(UiConsts.DiffPaneWidth, panelMax - statusWidth - UiConsts.PanelGap)
-        } else {
-            minOf(UiConsts.DiffPaneWidth, panelMax)
-        }
+        val diffWidth =
+            if (sideBySide) {
+                minOf(UiConsts.DiffPaneWidth, panelMax - statusWidth - UiConsts.PanelGap)
+            } else {
+                minOf(UiConsts.DiffPaneWidth, panelMax)
+            }
         // Measured by the status card's layout and read by the diff card's own content below, so a
         // status remeasure invalidates the diff pane instead of this whole screen.
         val statusHeight = remember { mutableStateOf(0.dp) }
 
         AnimatedVisibility(
             visible = panelState.open,
-            enter = fadeIn(tween(panelEnterDurationMs, easing = Motion.EnterEasing)) + scaleIn(
-                initialScale = 0.9f,
-                transformOrigin = TransformOrigin(1f, 0f),
-                animationSpec = Motion.Panel,
-            ),
-            exit = fadeOut(tween(panelExitDurationMs, easing = Motion.ExitEasing)) + scaleOut(
-                targetScale = 0.94f,
-                transformOrigin = TransformOrigin(1f, 0f),
-                animationSpec = tween(panelExitDurationMs, easing = Motion.ExitEasing),
-            ),
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(
-                    end = UiConsts.ScreenMargin,
-                    top = topInset + UiConsts.ScreenMargin + panelTopOffset,
-                ),
+            enter =
+                fadeIn(tween(panelEnterDurationMs, easing = Motion.EnterEasing)) +
+                    scaleIn(
+                        initialScale = 0.9f,
+                        transformOrigin = TransformOrigin(1f, 0f),
+                        animationSpec = Motion.Panel,
+                    ),
+            exit =
+                fadeOut(tween(panelExitDurationMs, easing = Motion.ExitEasing)) +
+                    scaleOut(
+                        targetScale = 0.94f,
+                        transformOrigin = TransformOrigin(1f, 0f),
+                        animationSpec = tween(panelExitDurationMs, easing = Motion.ExitEasing),
+                    ),
+            modifier =
+                Modifier.align(Alignment.TopEnd)
+                    .padding(
+                        end = UiConsts.ScreenMargin,
+                        top = topInset + UiConsts.ScreenMargin + panelTopOffset,
+                    ),
         ) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(UiConsts.PanelGap),
@@ -391,14 +395,16 @@ fun ChatScreen(
                     visible = diffOpen && paneFile != null,
                     // Grows out of the status card's edge, leftwards: the new card is the one that
                     // moves, and the card beside it is the anchor it moves away from.
-                    enter = expandHorizontally(
-                        expandFrom = Alignment.End,
-                        animationSpec = tween(diffEnterDurationMs, easing = Motion.EnterEasing),
-                    ) + fadeIn(tween(diffEnterDurationMs, easing = Motion.EnterEasing)),
-                    exit = shrinkHorizontally(
-                        shrinkTowards = Alignment.End,
-                        animationSpec = tween(diffExitDurationMs, easing = Motion.ExitEasing),
-                    ) + fadeOut(tween(diffExitDurationMs, easing = Motion.ExitEasing)),
+                    enter =
+                        expandHorizontally(
+                            expandFrom = Alignment.End,
+                            animationSpec = tween(diffEnterDurationMs, easing = Motion.EnterEasing),
+                        ) + fadeIn(tween(diffEnterDurationMs, easing = Motion.EnterEasing)),
+                    exit =
+                        shrinkHorizontally(
+                            shrinkTowards = Alignment.End,
+                            animationSpec = tween(diffExitDurationMs, easing = Motion.ExitEasing),
+                        ) + fadeOut(tween(diffExitDurationMs, easing = Motion.ExitEasing)),
                 ) {
                     // The last opened file survives the close, so the card still has something to
                     // draw while it shrinks away.
@@ -436,30 +442,43 @@ fun ChatScreen(
                         onReviewer = { app.onAppEvent(AppEvent.SetApprovalsReviewer(it)) },
                         autoReviewAvailable = app.catalog.autoReviewAvailable,
                         onServiceTier = { app.onAppEvent(AppEvent.SetServiceTier(it)) },
-                        planAvailable = app.catalog.collaborationModes.any { it.mode == CollaborationMode.Plan },
+                        planAvailable =
+                            app.catalog.collaborationModes.any {
+                                it.mode == CollaborationMode.Plan
+                            },
                         onCollaborationMode = { app.onAppEvent(AppEvent.SetCollaborationMode(it)) },
                         onCompact = { app.onAppEvent(AppEvent.CompactThread(session.threadId)) },
                         onOpenAgents = { overviewOpen = true },
-                        onOpenAgent = { threadId -> app.openSurface(Surface.SubAgentThread(threadId)) },
-                        onOpenAgentInfo = { threadId -> app.openSurface(Surface.SubAgent(threadId)) },
-                        modifier = Modifier.onSizeChanged {
-                            statusHeight.value = with(density) { it.height.toDp() }
+                        onOpenAgent = { threadId ->
+                            app.openSurface(Surface.SubAgentThread(threadId))
                         },
+                        onOpenAgentInfo = { threadId ->
+                            app.openSurface(Surface.SubAgent(threadId))
+                        },
+                        modifier =
+                            Modifier.onSizeChanged {
+                                statusHeight.value = with(density) { it.height.toDp() }
+                            },
                     )
                 }
             }
         }
 
-        // The composer only steps aside for the drawer, and only on a wide window: it keeps the full
-        // width of the transcript column otherwise. It is a single bar, so re-measuring *it* is cheap
+        // The composer only steps aside for the drawer, and only on a wide window: it keeps the
+        // full
+        // width of the transcript column otherwise. It is a single bar, so re-measuring *it* is
+        // cheap
         // — the point of holding the transcript's width fixed is that the list underneath is not
         // re-measured with it.
-        val promptBarStartInset by animateDpAsState(
-            // The composer lines up with the column, so it starts at the same place the column does.
-            targetValue = if (wide && sidebarExpanded) contentStart - UiConsts.ScreenMargin else 0.dp,
-            animationSpec = Motion.PanelDp,
-            label = "promptBarStartInset",
-        )
+        val promptBarStartInset by
+            animateDpAsState(
+                // The composer lines up with the column, so it starts at the same place the column
+                // does.
+                targetValue =
+                    if (wide && sidebarExpanded) contentStart - UiConsts.ScreenMargin else 0.dp,
+                animationSpec = Motion.PanelDp,
+                label = "promptBarStartInset",
+            )
 
         ComposerDock(
             app = app,
@@ -481,7 +500,10 @@ fun ChatScreen(
             session = session,
             roster = roster,
             show = overviewOpen || overviewLeaving,
-            onSelect = { threadId -> app.openSurface(Surface.SubAgentThread(threadId)); overviewLeaving = true },
+            onSelect = { threadId ->
+                app.openSurface(Surface.SubAgentThread(threadId))
+                overviewLeaving = true
+            },
             onDismiss = { overviewLeaving = true },
             onDismissFinished = {
                 overviewLeaving = false
@@ -511,12 +533,11 @@ fun ChatScreen(
             collapsedHeight = UiConsts.ChipSize,
             // Same bottom line as the composer: the drawer and the composer are the two pieces
             // anchored to the bottom of the transcript, and they end together.
-            maxPanelHeight = (
-                maxHeight - topInset - UiConsts.ScreenMargin * 2
-                ).coerceAtLeast(minPanelHeight),
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = UiConsts.ScreenMargin, top = topInset + UiConsts.ScreenMargin),
+            maxPanelHeight =
+                (maxHeight - topInset - UiConsts.ScreenMargin * 2).coerceAtLeast(minPanelHeight),
+            modifier =
+                Modifier.align(Alignment.TopStart)
+                    .padding(start = UiConsts.ScreenMargin, top = topInset + UiConsts.ScreenMargin),
         )
 
         // Window-level, so it is on screen whatever else is open: the turn is blocked on it, and a
@@ -541,7 +562,7 @@ fun ChatScreen(
                         AppEvent.SetGoal(
                             objective = objective,
                             status = goal?.let { editedGoalStatus(it.status) },
-                        ),
+                        )
                     )
                 },
                 onSetStatus = { status -> app.onAppEvent(AppEvent.SetGoal(status = status)) },
@@ -577,9 +598,9 @@ fun ChatScreen(
 /**
  * The transcript surface: either the empty-runtime screen or the live transcript.
  *
- * Split out of [ChatScreen] so the session's transcript state — the item list, the diagnostics,
- * the plan and the streaming id — is read inside this scope. A streaming write then invalidates
- * this pane instead of the composer, the status panels and the drawer that surround it.
+ * Split out of [ChatScreen] so the session's transcript state — the item list, the diagnostics, the
+ * plan and the streaming id — is read inside this scope. A streaming write then invalidates this
+ * pane instead of the composer, the status panels and the drawer that surround it.
  */
 @Composable
 private fun TranscriptPane(
@@ -593,29 +614,33 @@ private fun TranscriptPane(
     val diagnostics = session.diagnostics
     // The empty/loading decision is a derived boolean: the underlying lists are written on every
     // delta, and this pane should only recompose when the decision itself flips.
-    val runtimeEmpty by remember(session) {
-        derivedStateOf {
-            (!session.open && !session.loading) ||
-                (session.open && items.isEmpty() && diagnostics.isEmpty() && !session.running)
+    val runtimeEmpty by
+        remember(session) {
+            derivedStateOf {
+                (!session.open && !session.loading) ||
+                    (session.open && items.isEmpty() && diagnostics.isEmpty() && !session.running)
+            }
         }
-    }
     if (!app.startupReady || runtimeEmpty) {
         RuntimeTranscript(
             app = app,
-            modifier = modifier.padding(
-                horizontal = UiConsts.ScreenMargin,
-                vertical = UiConsts.TranscriptTopInset + UiConsts.PromptBarHeight,
-            ),
+            modifier =
+                modifier.padding(
+                    horizontal = UiConsts.ScreenMargin,
+                    vertical = UiConsts.TranscriptTopInset + UiConsts.PromptBarHeight,
+                ),
         )
         return
     }
     // Remembered so a recomposition of this pane (a status flip, say) does not hand the list a new
     // lambda and force the rows to be rebuilt with it.
-    val isStreaming: (ThreadItem) -> Boolean = remember(session) {
-        // Deferred: the transcript asks per row whether it is the streaming one, so the reads of
-        // `running` and `streamingItemId` belong to the row's scope, not to this pane's.
-        { item -> session.running && item.id == session.streamingItemId }
-    }
+    val isStreaming: (ThreadItem) -> Boolean =
+        remember(session) {
+            // Deferred: the transcript asks per row whether it is the streaming one, so the reads
+            // of
+            // `running` and `streamingItemId` belong to the row's scope, not to this pane's.
+            { item -> session.running && item.id == session.streamingItemId }
+        }
     // The markdown buffer a row renders while its deltas are still arriving; looked up per row so
     // only the row that owns the stream reads that entry of the map.
     val streamFor: (String) -> MarkdownStream? = remember(session) { { id -> session.stream(id) } }
@@ -634,13 +659,17 @@ private fun TranscriptPane(
         canLoadEarlier = app.widget.canLoadEarlier,
         loadingEarlier = app.widget.loadingEarlier,
         onLoadEarlier = app.widget::loadEarlier,
-        contentPadding = PaddingValues(
-            start = UiConsts.TranscriptGutter,
-            end = UiConsts.TranscriptGutter,
-            top = topInset + UiConsts.TranscriptTopInset,
-            bottom = bottomInset + UiConsts.PromptBarHeight + UiConsts.ScreenMargin * 2 +
-                UiConsts.TranscriptBottomInset,
-        ),
+        contentPadding =
+            PaddingValues(
+                start = UiConsts.TranscriptGutter,
+                end = UiConsts.TranscriptGutter,
+                top = topInset + UiConsts.TranscriptTopInset,
+                bottom =
+                    bottomInset +
+                        UiConsts.PromptBarHeight +
+                        UiConsts.ScreenMargin * 2 +
+                        UiConsts.TranscriptBottomInset,
+            ),
     )
 }
 
@@ -653,12 +682,13 @@ private fun TranscriptPane(
 @Composable
 private fun ConnectionBanner(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MiuixTheme.colorScheme
-    val shape = remember { SquircleShape(UiConsts.PanelCorner) }
+    val shape = remember { RoundedCornerShape(UiConsts.PanelCorner) }
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .floatingSurface(shape = shape, tint = glassTint(0.94f), elevation = UiConsts.PanelElevation)
-            .padding(horizontal = UiConsts.Space12, vertical = UiConsts.Space10),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(glassTint(0.94f), shape)
+                .padding(horizontal = UiConsts.Space12, vertical = UiConsts.Space10),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -679,7 +709,27 @@ private fun ConnectionBanner(message: String, onRetry: () -> Unit, modifier: Mod
             )
         }
         Spacer(Modifier.width(UiConsts.Space10))
-        CodexButton(stringResource(R.string.connection_banner_retry), onRetry, size = com.cy.codex.CodexButtonSize.Compact)
+        Button(
+            onClick = onRetry,
+            colors = ButtonDefaults.buttonColorsPrimary(),
+            cornerRadius = UiConsts.ButtonHeightCompact / 2,
+            minHeight = UiConsts.ButtonHeightCompact,
+            insideMargin =
+                PaddingValues(
+                    horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                    vertical = 0.dp,
+                ),
+        ) {
+            Text(
+                text = stringResource(R.string.connection_banner_retry),
+                fontSize = UiType.Action,
+                lineHeight = UiType.ActionLine,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -693,10 +743,20 @@ private fun RuntimeTranscript(app: CodexApp, modifier: Modifier) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(UiConsts.Space12),
         ) {
-            Text("Codex", fontSize = UiType.Display, fontWeight = FontWeight.SemiBold, color = colors.onBackground)
+            Text(
+                "Codex",
+                fontSize = UiType.Display,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.onBackground,
+            )
             when {
                 app.startupLoading || app.creatingThread -> {
-                    Text(stringResource(if (app.creatingThread) R.string.runtime_creating_thread else R.string.runtime_starting))
+                    Text(
+                        stringResource(
+                            if (app.creatingThread) R.string.runtime_creating_thread
+                            else R.string.runtime_starting
+                        )
+                    )
                     // A genuine spinner, and the only animation this screen runs: it is composed
                     // only while the runtime is starting or a thread is being created, so an idle
                     // chat never holds it.
@@ -704,34 +764,135 @@ private fun RuntimeTranscript(app: CodexApp, modifier: Modifier) {
                 }
                 app.startupError != null -> {
                     Text(stringResource(R.string.runtime_startup_failed), color = colors.error)
-                    Text(app.startupError.orEmpty(), fontSize = UiType.Meta, color = colors.onSurfaceVariantSummary)
-                    CodexButton(stringResource(R.string.runtime_retry), app::bootstrap)
+                    Text(
+                        app.startupError.orEmpty(),
+                        fontSize = UiType.Meta,
+                        color = colors.onSurfaceVariantSummary,
+                    )
+                    Button(
+                        onClick = app::bootstrap,
+                        colors = ButtonDefaults.buttonColorsPrimary(),
+                        cornerRadius = UiConsts.ButtonHeight / 2,
+                        minHeight = UiConsts.ButtonHeight,
+                        insideMargin =
+                            PaddingValues(
+                                horizontal = UiConsts.ButtonPaddingHorizontal,
+                                vertical = 0.dp,
+                            ),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.runtime_retry),
+                            fontSize = UiType.Action,
+                            lineHeight = UiType.ActionLine,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
                 !session.open && session.threadId.isNotBlank() -> {
-                    Text(session.diagnostics.lastOrNull()?.detail.orEmpty(), fontSize = UiType.Meta, color = colors.error)
-                    CodexButton(stringResource(R.string.runtime_retry), { app.openThread(session.threadId) })
-                    CodexButton(stringResource(R.string.runtime_new_thread), { app.onAppEvent(AppEvent.NewThread()) })
+                    Text(
+                        session.diagnostics.lastOrNull()?.detail.orEmpty(),
+                        fontSize = UiType.Meta,
+                        color = colors.error,
+                    )
+                    Button(
+                        onClick = { app.openThread(session.threadId) },
+                        colors = ButtonDefaults.buttonColorsPrimary(),
+                        cornerRadius = UiConsts.ButtonHeight / 2,
+                        minHeight = UiConsts.ButtonHeight,
+                        insideMargin =
+                            PaddingValues(
+                                horizontal = UiConsts.ButtonPaddingHorizontal,
+                                vertical = 0.dp,
+                            ),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.runtime_retry),
+                            fontSize = UiType.Action,
+                            lineHeight = UiType.ActionLine,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Button(
+                        onClick = { app.onAppEvent(AppEvent.NewThread()) },
+                        colors = ButtonDefaults.buttonColorsPrimary(),
+                        cornerRadius = UiConsts.ButtonHeight / 2,
+                        minHeight = UiConsts.ButtonHeight,
+                        insideMargin =
+                            PaddingValues(
+                                horizontal = UiConsts.ButtonPaddingHorizontal,
+                                vertical = 0.dp,
+                            ),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.runtime_new_thread),
+                            fontSize = UiType.Action,
+                            lineHeight = UiType.ActionLine,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
                 app.catalog.account.account == null -> {
-                    CodexButton(stringResource(R.string.runtime_sign_in), { app.openSurface(Surface.Account) })
+                    Button(
+                        onClick = { app.openSurface(Surface.Account) },
+                        colors = ButtonDefaults.buttonColorsPrimary(),
+                        cornerRadius = UiConsts.ButtonHeight / 2,
+                        minHeight = UiConsts.ButtonHeight,
+                        insideMargin =
+                            PaddingValues(
+                                horizontal = UiConsts.ButtonPaddingHorizontal,
+                                vertical = 0.dp,
+                            ),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.runtime_sign_in),
+                            fontSize = UiType.Action,
+                            lineHeight = UiType.ActionLine,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
                 else -> {
-                    Text(stringResource(R.string.runtime_ready), fontSize = UiType.CardTitle, color = colors.onSurfaceVariantSummary)
-                    Text(session.config.cwd.ifBlank { app.defaultWorkspace }, fontSize = UiType.Meta, color = colors.onSurfaceVariantSummary)
+                    Text(
+                        stringResource(R.string.runtime_ready),
+                        fontSize = UiType.CardTitle,
+                        color = colors.onSurfaceVariantSummary,
+                    )
+                    Text(
+                        session.config.cwd.ifBlank { app.defaultWorkspace },
+                        fontSize = UiType.Meta,
+                        color = colors.onSurfaceVariantSummary,
+                    )
                 }
             }
         }
     }
 }
 
-private fun onApprovalDecision(app: CodexApp, request: ApprovalRequest, response: ApprovalResponse) {
+private fun onApprovalDecision(
+    app: CodexApp,
+    request: ApprovalRequest,
+    response: ApprovalResponse,
+) {
     app.onAppEvent(AppEvent.ResolveApproval(request.requestId, response))
     // A completed connector sign-in invalidates the app catalog: upstream asks for a forced
     // connector refresh on the same accept (`app_link_view.rs:complete_external_flow_and_close`).
-    if (request is ApprovalRequest.Elicitation &&
-        request.params.isConnectorAuth() &&
-        response is ApprovalResponse.Elicitation &&
-        response.action == com.cy.codex.protocol.ElicitationAction.Accept
+    if (
+        request is ApprovalRequest.Elicitation &&
+            request.params.isConnectorAuth() &&
+            response is ApprovalResponse.Elicitation &&
+            response.action == com.cy.codex.protocol.ElicitationAction.Accept
     ) {
         app.onAppEvent(AppEvent.ReloadApps)
     }
@@ -741,8 +902,8 @@ private fun onApprovalDecision(app: CodexApp, request: ApprovalRequest, response
  * One routing table for every "go to this page" id in the app.
  *
  * The drawer and the settings page both name destinations by id, and both have to land on the same
- * page: the entries moved out of the drawer into settings, and a routing table per caller is how the
- * two drift apart.
+ * page: the entries moved out of the drawer into settings, and a routing table per caller is how
+ * the two drift apart.
  */
 internal fun openSurfaceFor(app: CodexApp, id: String) {
     // The three routes that need a subject take it from the open session rather than from the id:
@@ -812,7 +973,9 @@ internal fun foldTranscriptRows(items: List<ThreadItem>): List<TranscriptRow> {
         val item = items[index]
         if (item is CommandExecutionItem && item.isExploringCall()) {
             var end = index + 1
-            while (end < items.size && (items[end] as? CommandExecutionItem)?.isExploringCall() == true) {
+            while (
+                end < items.size && (items[end] as? CommandExecutionItem)?.isExploringCall() == true
+            ) {
                 end++
             }
             rows += TranscriptRow("explored:${item.id}", (index until end).toList(), exposed = true)
@@ -841,12 +1004,13 @@ private fun ExploredGroupRow(
     val labels = commands.mapNotNull { command ->
         command.commandActions.firstOrNull()?.let { label -> commandActionLabel(label) }
     }
-    val summary = labels.take(3).joinToString(" · ") +
-        if (labels.size > 3) " +${labels.size - 3}" else ""
+    val summary =
+        labels.take(3).joinToString(" · ") + if (labels.size > 3) " +${labels.size - 3}" else ""
     CollapsibleSection(
-        title = stringResource(
-            if (active) R.string.exec_cell_exploring else R.string.exec_cell_explored,
-        ),
+        title =
+            stringResource(
+                if (active) R.string.exec_cell_exploring else R.string.exec_cell_explored
+            ),
         expanded = expanded,
         onToggle = { expanded = !expanded },
         subtitle = summary.ifEmpty { null },
@@ -922,7 +1086,8 @@ internal fun Transcript(
             Column(modifier = Modifier.fillMaxWidth()) {
                 if (row.exposed) {
                     ExploredGroupRow(
-                        commands = row.indices.mapNotNull { items.getOrNull(it) as? CommandExecutionItem },
+                        commands =
+                            row.indices.mapNotNull { items.getOrNull(it) as? CommandExecutionItem }
                     )
                 } else {
                     ThreadItemCell(
@@ -963,14 +1128,32 @@ internal fun Transcript(
 @Composable
 private fun LoadEarlierRow(loading: Boolean, onLoad: () -> Unit) {
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        CodexButton(
-            text = stringResource(
-                if (loading) R.string.transcript_load_earlier_loading else R.string.transcript_load_earlier,
-            ),
+        Button(
             onClick = onLoad,
             enabled = !loading,
-            size = com.cy.codex.CodexButtonSize.Compact,
-        )
+            colors = ButtonDefaults.buttonColorsPrimary(),
+            cornerRadius = UiConsts.ButtonHeightCompact / 2,
+            minHeight = UiConsts.ButtonHeightCompact,
+            insideMargin =
+                PaddingValues(
+                    horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                    vertical = 0.dp,
+                ),
+        ) {
+            Text(
+                text =
+                    stringResource(
+                        if (loading) R.string.transcript_load_earlier_loading
+                        else R.string.transcript_load_earlier
+                    ),
+                fontSize = UiType.Action,
+                lineHeight = UiType.ActionLine,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -986,11 +1169,11 @@ private fun LoadEarlierRow(loading: Boolean, onLoad: () -> Unit) {
  * the two the same way would stop following the moment it started to keep up.
  *
  * It is therefore driven by both the layout and the source of the movement. Every remeasure brings
- * the newest row back, but only while the pager is pinned; the pager is pinned as long as the reader
- * has not scrolled away, and a scroll *they* drove — a drag, a fling, a keyboard or an accessibility
- * scroll — unpins it until the bottom is theirs again. Reading back through a running turn is
- * therefore a page that stays put: the newest content keeps arriving below the fold, and the
- * transcript returns to it only when the reader does.
+ * the newest row back, but only while the pager is pinned; the pager is pinned as long as the
+ * reader has not scrolled away, and a scroll *they* drove — a drag, a fling, a keyboard or an
+ * accessibility scroll — unpins it until the bottom is theirs again. Reading back through a running
+ * turn is therefore a page that stays put: the newest content keeps arriving below the fold, and
+ * the transcript returns to it only when the reader does.
  */
 @Composable
 private fun AutoPager(listState: LazyListState) {
@@ -1004,31 +1187,35 @@ private fun AutoPager(listState: LazyListState) {
     var parking by remember { mutableStateOf(false) }
 
     LaunchedEffect(listState) {
-        snapshotFlow { listState.atNewestRow() }.collect { atNewest ->
-            if (atNewest) {
-                pinned = true
-            } else if (!parking && (dragging || listState.isScrollInProgress)) {
-                // The viewport left the bottom under a scroll the reader drove. Whatever drove it —
-                // a drag, a fling, a trackpad or an accessibility action — the page it landed on is
-                // the page they asked for, and it stays there.
-                pinned = false
+        snapshotFlow { listState.atNewestRow() }
+            .collect { atNewest ->
+                if (atNewest) {
+                    pinned = true
+                } else if (!parking && (dragging || listState.isScrollInProgress)) {
+                    // The viewport left the bottom under a scroll the reader drove. Whatever drove
+                    // it —
+                    // a drag, a fling, a trackpad or an accessibility action — the page it landed
+                    // on is
+                    // the page they asked for, and it stays there.
+                    pinned = false
+                }
             }
-        }
     }
 
     LaunchedEffect(listState) {
         // Keyed on the layout rather than on the item count, because the event being followed is a
         // remeasure: that is what a delta landing in the newest row produces.
-        snapshotFlow { listState.layoutInfo }.collect {
-            if (pinned && !dragging) {
-                parking = true
-                try {
-                    listState.parkOnNewestRow()
-                } finally {
-                    parking = false
+        snapshotFlow { listState.layoutInfo }
+            .collect {
+                if (pinned && !dragging) {
+                    parking = true
+                    try {
+                        listState.parkOnNewestRow()
+                    } finally {
+                        parking = false
+                    }
                 }
             }
-        }
     }
 }
 
@@ -1068,8 +1255,8 @@ private suspend fun LazyListState.parkOnNewestRow() {
     // viewport, and the line being written is the last one. The trailing content padding is the gap
     // under the list, so the row ends exactly where the content ends.
     val end = layoutInfo.visibleItemsInfo.lastOrNull() ?: return
-    val distance = end.offset + end.size -
-        (layoutInfo.viewportEndOffset - layoutInfo.afterContentPadding)
+    val distance =
+        end.offset + end.size - (layoutInfo.viewportEndOffset - layoutInfo.afterContentPadding)
     if (distance < 1) return
     if (paging) animateScrollBy(distance.toFloat()) else scrollBy(distance.toFloat())
 }
@@ -1085,11 +1272,11 @@ private fun LoadingRow(
 ) {
     val colors = MiuixTheme.colorScheme
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(corner))
-            .background(raisedSurface())
-            .padding(contentPadding),
+        modifier =
+            Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(corner))
+                .background(raisedSurface())
+                .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -1132,10 +1319,10 @@ private fun EmptyTranscript(
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
-                modifier = Modifier
-                    .size(iconBoxSize)
-                    .clip(SquircleShape(iconBoxCorner))
-                    .background(raisedSurface()),
+                modifier =
+                    Modifier.size(iconBoxSize)
+                        .squircleClip(iconBoxCorner)
+                        .background(raisedSurface()),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -1186,18 +1373,11 @@ internal fun StatusChip(
     textLineHeight: TextUnit = UiType.Message,
 ) {
     Row(
-        modifier = modifier
-            .clip(CircleShape)
-            .background(statusPillSurface(tone))
-            .padding(contentPadding),
+        modifier =
+            modifier.clip(CircleShape).background(statusPillSurface(tone)).padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(dotSize)
-                .clip(CircleShape)
-                .background(statusDotColor(tone)),
-        )
+        Box(modifier = Modifier.size(dotSize).clip(CircleShape).background(statusDotColor(tone)))
         Spacer(Modifier.width(dotGap))
         Text(
             text = label,
@@ -1240,24 +1420,25 @@ private fun ComposerDock(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // The safety-stop findings currently open in their sheet, if any.
-    var misalignmentReview by remember { mutableStateOf<com.cy.codex.protocol.protocol.v2.MisalignmentErrorDetails?>(null) }
+    var misalignmentReview by remember {
+        mutableStateOf<com.cy.codex.protocol.protocol.v2.MisalignmentErrorDetails?>(null)
+    }
     // The draft as it was when the editor launched, so an editor that saves nothing cannot wipe
     // what was typed. The result code is deliberately ignored: several editors return CANCELED
     // while still having written the file.
     var editorOriginal by remember { mutableStateOf<String?>(null) }
-    val externalEditor = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult(),
-    ) {
-        val original = editorOriginal
-        editorOriginal = null
-        val edited = runCatching { File(context.cacheDir, ComposerDraftFile).readText() }.getOrNull()
-        if (edited != null && edited != original) onPromptChange(edited)
-    }
+    val externalEditor =
+        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            val original = editorOriginal
+            editorOriginal = null
+            val edited = runCatching {
+                File(context.cacheDir, ComposerDraftFile).readText()
+            }.getOrNull()
+            if (edited != null && edited != original) onPromptChange(edited)
+        }
 
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(bottom = UiConsts.ScreenMargin),
+        modifier = modifier.fillMaxWidth().padding(bottom = UiConsts.ScreenMargin),
         verticalArrangement = Arrangement.spacedBy(composerGap),
     ) {
         ApprovalNoticeBar(
@@ -1269,21 +1450,25 @@ private fun ComposerDock(
             onApproveDenial = { denial ->
                 app.onAppEvent(AppEvent.ApproveGuardianDeniedAction(denial.threadId, denial.itemId))
             },
-            onDismissDenial = { denial -> app.onAppEvent(AppEvent.DismissAutoReviewDenial(denial.itemId)) },
+            onDismissDenial = { denial ->
+                app.onAppEvent(AppEvent.DismissAutoReviewDenial(denial.itemId))
+            },
             modifier = Modifier.padding(horizontal = UiConsts.ScreenMargin),
         )
         AnimatedVisibility(
             visible = session.queued.isNotEmpty(),
-            enter = fadeIn(tween(queuedEnterDurationMs, easing = Motion.EnterEasing)) +
-                expandVertically(
-                    expandFrom = Alignment.Bottom,
-                    animationSpec = tween(queuedEnterDurationMs, easing = Motion.EnterEasing),
-                ),
-            exit = fadeOut(tween(queuedExitDurationMs, easing = Motion.ExitEasing)) +
-                shrinkVertically(
-                    shrinkTowards = Alignment.Bottom,
-                    animationSpec = tween(queuedExitDurationMs, easing = Motion.ExitEasing),
-                ),
+            enter =
+                fadeIn(tween(queuedEnterDurationMs, easing = Motion.EnterEasing)) +
+                    expandVertically(
+                        expandFrom = Alignment.Bottom,
+                        animationSpec = tween(queuedEnterDurationMs, easing = Motion.EnterEasing),
+                    ),
+            exit =
+                fadeOut(tween(queuedExitDurationMs, easing = Motion.ExitEasing)) +
+                    shrinkVertically(
+                        shrinkTowards = Alignment.Bottom,
+                        animationSpec = tween(queuedExitDurationMs, easing = Motion.ExitEasing),
+                    ),
         ) {
             AttachmentTray(
                 attachments = session.attachments,
@@ -1293,7 +1478,7 @@ private fun ComposerDock(
                             threadId = session.threadId,
                             type = AttachmentType.fromWire(attachment.attachmentType),
                             identityKey = attachment.identityKey,
-                        ),
+                        )
                     )
                 },
                 modifier = Modifier.padding(horizontal = UiConsts.ScreenMargin),
@@ -1301,7 +1486,9 @@ private fun ComposerDock(
             QueuedMessages(
                 messages = session.queued,
                 onStart = { entry -> app.onAppEvent(AppEvent.StartQueuedMessage(entry.id)) },
-                onMove = { entry, delta -> app.onAppEvent(AppEvent.MoveQueuedMessage(entry.id, delta)) },
+                onMove = { entry, delta ->
+                    app.onAppEvent(AppEvent.MoveQueuedMessage(entry.id, delta))
+                },
                 onRemove = { entry -> app.onAppEvent(AppEvent.DeleteQueuedMessage(entry.id)) },
                 // The non-text inputs are carried across untouched: the sheet edits the body,
                 // and a queued image is not something a text field can have an opinion about.
@@ -1311,7 +1498,7 @@ private fun ComposerDock(
                         AppEvent.UpdateQueuedMessage(
                             queuedId = entry.id,
                             inputs = listOf(UserInput.Text(body)) + kept,
-                        ),
+                        )
                     )
                 },
                 onClear = { app.onAppEvent(AppEvent.ClearQueue) },
@@ -1383,10 +1570,16 @@ private fun ComposerDock(
                 val last = session.items.lastOrNull { it is AgentMessageItem } as? AgentMessageItem
                 if (last == null || last.text.isBlank()) {
                     scope.launch {
-                        app.snackbar.showSnackbar(context.getString(R.string.composer_copy_last_empty))
+                        app.snackbar.showSnackbar(
+                            context.getString(R.string.composer_copy_last_empty)
+                        )
                     }
                 } else {
-                    copyToClipboard(context, last.text, context.getString(R.string.copy_sheet_whole_response))
+                    copyToClipboard(
+                        context,
+                        last.text,
+                        context.getString(R.string.copy_sheet_whole_response),
+                    )
                 }
             },
             onOpenExternalEditor = {
@@ -1394,49 +1587,59 @@ private fun ComposerDock(
                 runCatching {
                     file.parentFile?.mkdirs()
                     file.writeText(prompt)
-                    val uri = FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        file,
-                    )
-                    val intent = Intent(Intent.ACTION_EDIT)
-                        .setDataAndType(uri, "text/plain")
-                        .addFlags(
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                                Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                    val uri =
+                        FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            file,
                         )
+                    val intent =
+                        Intent(Intent.ACTION_EDIT)
+                            .setDataAndType(uri, "text/plain")
+                            .addFlags(
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                            )
                     editorOriginal = prompt
                     externalEditor.launch(intent)
-                }.onFailure {
-                    scope.launch {
-                        app.snackbar.showSnackbar(
-                            context.getString(R.string.composer_external_editor_failed),
-                        )
-                    }
                 }
+                    .onFailure {
+                        scope.launch {
+                            app.snackbar.showSnackbar(
+                                context.getString(R.string.composer_external_editor_failed)
+                            )
+                        }
+                    }
             },
             running = session.running,
-            enabled = app.startupReady && !session.loading && !app.creatingThread &&
-                !session.config.blocksDirectInput && session.misalignment == null,
-            hint = when {
-                session.config.blocksDirectInput ->
-                    stringResource(R.string.chat_composer_hint_parent_owned)
-                // The same shell-mode signal upstream shows in its footer.
-                prompt.startsWith("!") -> stringResource(R.string.chat_composer_hint_shell)
-                session.open -> stringResource(R.string.chat_composer_hint_open)
-                else -> stringResource(R.string.chat_composer_hint_empty)
-            },
+            enabled =
+                app.startupReady &&
+                    !session.loading &&
+                    !app.creatingThread &&
+                    !session.config.blocksDirectInput &&
+                    session.misalignment == null,
+            hint =
+                when {
+                    session.config.blocksDirectInput ->
+                        stringResource(R.string.chat_composer_hint_parent_owned)
+                    // The same shell-mode signal upstream shows in its footer.
+                    prompt.startsWith("!") -> stringResource(R.string.chat_composer_hint_shell)
+                    session.open -> stringResource(R.string.chat_composer_hint_open)
+                    else -> stringResource(R.string.chat_composer_hint_empty)
+                },
             queuedCount = session.queued.size,
-            slashSuggestions = if (prompt.startsWith("/")) {
-                SidebarModel.slashSuggestions(
-                    query = prompt,
-                    planAvailable = app.catalog.collaborationModes.any {
-                        it.mode == com.cy.codex.protocol.protocol.v2.CollaborationMode.Plan
-                    },
-                )
-            } else {
-                emptyList()
-            },
+            slashSuggestions =
+                if (prompt.startsWith("/")) {
+                    SidebarModel.slashSuggestions(
+                        query = prompt,
+                        planAvailable =
+                            app.catalog.collaborationModes.any {
+                                it.mode == com.cy.codex.protocol.protocol.v2.CollaborationMode.Plan
+                            },
+                    )
+                } else {
+                    emptyList()
+                },
             onSuggestionPicked = { command ->
                 // A command that takes no argument is dispatched on the spot rather than typed
                 // out and submitted: `/clear` with a trailing space is a draft nobody wants,
@@ -1457,12 +1660,12 @@ private fun ComposerDock(
             skillCandidates = app.catalog.skills.filter { it.enabled }.map { it.name },
             onSkillPicked = {},
             backdrop = backdrop,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = (promptBarStartInset + UiConsts.ScreenMargin).coerceAtLeast(0.dp),
-                    end = UiConsts.ScreenMargin,
-                ),
+            modifier =
+                Modifier.fillMaxWidth()
+                    .padding(
+                        start = (promptBarStartInset + UiConsts.ScreenMargin).coerceAtLeast(0.dp),
+                        end = UiConsts.ScreenMargin,
+                    ),
         )
     }
 }
@@ -1470,8 +1673,8 @@ private fun ComposerDock(
 /**
  * The agent overview sheet, with its reads scoped away from [ChatScreen].
  *
- * The token total moves while a turn streams; the roster read is already the memoized fold, so
- * this indirection keeps the usage updates from invalidating the chat screen around the sheet.
+ * The token total moves while a turn streams; the roster read is already the memoized fold, so this
+ * indirection keeps the usage updates from invalidating the chat screen around the sheet.
  * Per-thread usage and subagent liveness are folded in here for the same reason: the sheet is
  * rebuilt from them, not the screen behind it.
  */
@@ -1487,10 +1690,13 @@ private fun AgentsOverviewPane(
 ) {
     val usage = app.catalog.threadUsage
     val listedThreads = app.catalog.agentThreads + app.threads.threads
-    val entries = remember(roster, usage, listedThreads) {
-        val byId = listedThreads.associateBy { it.id }
-        roster.map { agent -> agent.withThreadMetadata(byId[agent.threadId], usage[agent.threadId]) }
-    }
+    val entries =
+        remember(roster, usage, listedThreads) {
+            val byId = listedThreads.associateBy { it.id }
+            roster.map { agent ->
+                agent.withThreadMetadata(byId[agent.threadId], usage[agent.threadId])
+            }
+        }
     AgentsOverview(
         show = show,
         roster = entries,
@@ -1511,11 +1717,12 @@ private fun SideConversationBanner(
 ) {
     val colors = MiuixTheme.colorScheme
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(UiConsts.CornerChip))
-            .background(colors.primary.copy(alpha = 0.10f))
-            .padding(horizontal = UiConsts.Space12, vertical = UiConsts.Space6),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(UiConsts.CornerChip))
+                .background(colors.primary.copy(alpha = 0.10f))
+                .padding(horizontal = UiConsts.Space12, vertical = UiConsts.Space6),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -1529,10 +1736,10 @@ private fun SideConversationBanner(
         )
         Text(
             text = stringResource(R.string.side_conversation_back),
-            modifier = Modifier
-                .clip(RoundedCornerShape(UiConsts.CornerChip))
-                .clickable(onClick = onBack)
-                .padding(horizontal = UiConsts.Space8, vertical = UiConsts.Space4),
+            modifier =
+                Modifier.clip(RoundedCornerShape(UiConsts.CornerChip))
+                    .clickable(onClick = onBack)
+                    .padding(horizontal = UiConsts.Space8, vertical = UiConsts.Space4),
             fontSize = UiType.Footnote,
             lineHeight = UiType.FootnoteLine,
             color = colors.primary,
@@ -1544,8 +1751,8 @@ private fun SideConversationBanner(
 /**
  * The local images the draft is holding, as removable `[Image #N]` chips.
  *
- * The placeholder also sits in the draft text, so this row is a second, visible handle on the
- * same attachment: tapping the close icon deletes both.
+ * The placeholder also sits in the draft text, so this row is a second, visible handle on the same
+ * attachment: tapping the close icon deletes both.
  */
 @Composable
 private fun ComposerImageTray(
@@ -1556,18 +1763,21 @@ private fun ComposerImageTray(
     if (images.isEmpty()) return
     val colors = MiuixTheme.colorScheme
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
+        modifier = modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(UiConsts.Space6),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         images.forEach { image ->
             Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(UiConsts.CornerChip))
-                    .background(colors.primary.copy(alpha = 0.12f))
-                    .padding(start = UiConsts.Space10, end = UiConsts.Space4, top = UiConsts.Space3, bottom = UiConsts.Space3),
+                modifier =
+                    Modifier.clip(RoundedCornerShape(UiConsts.CornerChip))
+                        .background(colors.primary.copy(alpha = 0.12f))
+                        .padding(
+                            start = UiConsts.Space10,
+                            end = UiConsts.Space4,
+                            top = UiConsts.Space3,
+                            bottom = UiConsts.Space3,
+                        ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -1610,23 +1820,29 @@ private fun AttachmentTray(
 ) {
     if (attachments.isEmpty()) return
     val colors = MiuixTheme.colorScheme
-    val shape = remember { SquircleShape(UiConsts.PanelCorner) }
+    val shape = remember { RoundedCornerShape(UiConsts.PanelCorner) }
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .floatingSurface(shape = shape, tint = glassTint(0.94f), elevation = UiConsts.PanelElevation)
-            .clip(shape)
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = UiConsts.Space10, vertical = UiConsts.Space7),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(glassTint(0.94f), shape)
+                .clip(shape)
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = UiConsts.Space10, vertical = UiConsts.Space7),
         horizontalArrangement = Arrangement.spacedBy(UiConsts.Space6),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         attachments.forEach { attachment ->
             Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(UiConsts.CornerChip))
-                    .background(colors.primary.copy(alpha = 0.12f))
-                    .padding(start = UiConsts.Space8, end = UiConsts.Space4, top = UiConsts.Space3, bottom = UiConsts.Space3),
+                modifier =
+                    Modifier.clip(RoundedCornerShape(UiConsts.CornerChip))
+                        .background(colors.primary.copy(alpha = 0.12f))
+                        .padding(
+                            start = UiConsts.Space8,
+                            end = UiConsts.Space4,
+                            top = UiConsts.Space3,
+                            bottom = UiConsts.Space3,
+                        ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(

@@ -27,45 +27,41 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.cy.codex.R
+import com.cy.codex.UiConsts
+import com.cy.codex.UiType
+import com.cy.codex.codeSurface
+import com.cy.codex.label
 import com.cy.codex.protocol.ApprovalRequest
 import com.cy.codex.protocol.ElicitationAction
 import com.cy.codex.protocol.protocol.v2.McpElicitationField
 import com.cy.codex.protocol.protocol.v2.McpElicitationFieldKind
 import com.cy.codex.protocol.protocol.v2.McpElicitationRequest
-import com.cy.codex.label
-import com.cy.codex.UiConsts
-import com.cy.codex.UiType
-import com.cy.codex.codeSurface
-import com.cy.codex.pressableRow
 import com.cy.codex.raisedSurface
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.MindMap
 import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
- * `mcpServer/elicitation/request` in its form mode: an MCP server asks the user to fill in a schema.
+ * `mcpServer/elicitation/request` in its form mode: an MCP server asks the user to fill in a
+ * schema.
  *
  * Mirrors `codex-rs/tui/src/bottom_pane/mcp_server_elicitation.rs`: the flattened
  * [McpElicitationField] list is rendered as a real form, required fields gate the submit button,
  * and the submitted map is the *whole* form rather than only the fields the user touched.
  *
  * Every field is a label (with the required marker beside it), an optional description, and the
- * control. The switch and the enum chips both sit on the same [raisedSurface] the option rows of
- * the other dialog use, so the two forms read as one component.
+ * control. Boolean fields use miuix switch preferences so the label and switch share one action.
  */
 
-/** Enum options are chips: fully rounded, and the only control here that is not a full-width row. */
+/**
+ * Enum options are chips: fully rounded, and the only control here that is not a full-width row.
+ */
 private val ChipShape = RoundedCornerShape(percent = UiConsts.PillCorner)
-
-/** The switch row a boolean field renders as. */
-private val BooleanRowShape = RoundedCornerShape(UiConsts.CornerControl)
 
 /** One field's own rhythm. */
 private val RequiredBadgeShape = RoundedCornerShape(UiConsts.CornerChip)
@@ -85,19 +81,21 @@ internal fun McpElicitationForm(
     // and accept. Rendering the URL variant as an empty form lost the URL entirely, which is why it
     // gets its own body.
     when (val payload = request.params) {
-        is McpElicitationRequest.Url -> McpElicitationUrl(
-            payload = payload,
-            onAccept = { onSubmit(emptyMap()) },
-            onDecline = onDecline,
-            busy = busy,
-        )
+        is McpElicitationRequest.Url ->
+            McpElicitationUrl(
+                payload = payload,
+                onAccept = { onSubmit(emptyMap()) },
+                onDecline = onDecline,
+                busy = busy,
+            )
 
-        is McpElicitationRequest.Form -> McpElicitationFields(
-            payload = payload,
-            onSubmit = onSubmit,
-            onDecline = onDecline,
-            busy = busy,
-        )
+        is McpElicitationRequest.Form ->
+            McpElicitationFields(
+                payload = payload,
+                onSubmit = onSubmit,
+                onDecline = onDecline,
+                busy = busy,
+            )
     }
 }
 
@@ -111,11 +109,12 @@ private fun McpElicitationFields(
     val params = payload.requestedSchema
     val fields = params.fields
     // fieldName -> current raw value; seeded from the schema's `value`.
-    val values = remember(fields) {
-        mutableStateMapOf<String, String>().apply {
-            fields.forEach { put(it.name, it.value) }
+    val values =
+        remember(fields) {
+            mutableStateMapOf<String, String>().apply {
+                fields.forEach { put(it.name, it.value) }
+            }
         }
-    }
     var submitted by remember(fields) { mutableStateOf(false) }
 
     val missing = fields.count { it.required && values[it.name].orEmpty().isBlank() }
@@ -194,9 +193,11 @@ private fun McpElicitationUrl(
         ApprovalScrollBody {
             if (screen == AppLinkScreen.Confirmation && prompt != null) {
                 Text(
-                    text = stringResource(
-                        if (auth) R.string.app_link_finish_auth_title else R.string.app_link_finish_browser_title,
-                    ),
+                    text =
+                        stringResource(
+                            if (auth) R.string.app_link_finish_auth_title
+                            else R.string.app_link_finish_browser_title
+                        ),
                     modifier = Modifier.fillMaxWidth(),
                     fontSize = UiType.DialogTitle,
                     lineHeight = UiType.DialogTitleLine,
@@ -205,9 +206,11 @@ private fun McpElicitationUrl(
                 )
                 Spacer(Modifier.height(UiConsts.DialogFieldGap))
                 Text(
-                    text = stringResource(
-                        if (auth) R.string.app_link_finish_auth_body else R.string.app_link_finish_browser_body,
-                    ),
+                    text =
+                        stringResource(
+                            if (auth) R.string.app_link_finish_auth_body
+                            else R.string.app_link_finish_browser_body
+                        ),
                     modifier = Modifier.fillMaxWidth(),
                     fontSize = UiType.Body,
                     lineHeight = UiType.BodyLine,
@@ -217,11 +220,13 @@ private fun McpElicitationUrl(
                 UrlSurface(link)
             } else {
                 Text(
-                    text = when {
-                        prompt == null -> stringResource(R.string.mcp_server_elicitation_url_message)
-                        auth -> prompt.connectorName ?: prompt.connectorId.orEmpty()
-                        else -> stringResource(R.string.app_link_external_title)
-                    },
+                    text =
+                        when {
+                            prompt == null ->
+                                stringResource(R.string.mcp_server_elicitation_url_message)
+                            auth -> prompt.connectorName ?: prompt.connectorId.orEmpty()
+                            else -> stringResource(R.string.app_link_external_title)
+                        },
                     modifier = Modifier.fillMaxWidth(),
                     fontSize = UiType.DialogTitle,
                     lineHeight = UiType.DialogTitleLine,
@@ -231,7 +236,11 @@ private fun McpElicitationUrl(
                 if (prompt != null && !auth) {
                     Spacer(Modifier.height(UiConsts.Space4))
                     Text(
-                        text = stringResource(R.string.app_link_external_description, prompt.serverName),
+                        text =
+                            stringResource(
+                                R.string.app_link_external_description,
+                                prompt.serverName,
+                            ),
                         modifier = Modifier.fillMaxWidth(),
                         fontSize = UiType.Meta,
                         lineHeight = UiType.MetaLine,
@@ -250,9 +259,11 @@ private fun McpElicitationUrl(
                 }
                 Spacer(Modifier.height(UiConsts.DialogFieldGap))
                 Text(
-                    text = stringResource(
-                        if (auth) R.string.app_link_auth_instructions else R.string.app_link_external_instructions,
-                    ),
+                    text =
+                        stringResource(
+                            if (auth) R.string.app_link_auth_instructions
+                            else R.string.app_link_external_instructions
+                        ),
                     modifier = Modifier.fillMaxWidth(),
                     fontSize = UiType.Body,
                     lineHeight = UiType.BodyLine,
@@ -264,13 +275,15 @@ private fun McpElicitationUrl(
         }
         Spacer(Modifier.height(UiConsts.DialogFooterGap))
         FormButtons(
-            confirmLabel = when {
-                prompt == null -> stringResource(R.string.mcp_server_elicitation_url_open)
-                screen == AppLinkScreen.Link && auth -> stringResource(R.string.app_link_open_sign_in)
-                screen == AppLinkScreen.Link -> stringResource(R.string.app_link_open_link)
-                auth -> stringResource(R.string.app_link_signed_in)
-                else -> stringResource(R.string.app_link_finished)
-            },
+            confirmLabel =
+                when {
+                    prompt == null -> stringResource(R.string.mcp_server_elicitation_url_open)
+                    screen == AppLinkScreen.Link && auth ->
+                        stringResource(R.string.app_link_open_sign_in)
+                    screen == AppLinkScreen.Link -> stringResource(R.string.app_link_open_link)
+                    auth -> stringResource(R.string.app_link_signed_in)
+                    else -> stringResource(R.string.app_link_finished)
+                },
             // A URL that failed validation has no open button: declining is the only way out, the
             // same outcome the TUI reaches by rejecting the conversion.
             enabled = prompt != null,
@@ -298,10 +311,10 @@ private fun McpElicitationUrl(
 private fun UrlSurface(url: String) {
     Text(
         text = url,
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(codeSurface(), UrlShape)
-            .padding(horizontal = UiConsts.Space12, vertical = UiConsts.Space10),
+        modifier =
+            Modifier.fillMaxWidth()
+                .background(codeSurface(), UrlShape)
+                .padding(horizontal = UiConsts.Space12, vertical = UiConsts.Space10),
         fontSize = UiType.Code,
         lineHeight = UiType.CodeLine,
         fontFamily = FontFamily.Monospace,
@@ -330,9 +343,9 @@ private fun ElicitationFieldRow(
                 Spacer(Modifier.width(UiConsts.Space8))
                 Text(
                     text = stringResource(R.string.mcp_server_elicitation_required),
-                    modifier = Modifier
-                        .background(colors.error.copy(alpha = 0.12f), RequiredBadgeShape)
-                        .padding(horizontal = UiConsts.Space6, vertical = UiConsts.Space2),
+                    modifier =
+                        Modifier.background(colors.error.copy(alpha = 0.12f), RequiredBadgeShape)
+                            .padding(horizontal = UiConsts.Space6, vertical = UiConsts.Space2),
                     fontSize = UiType.Badge,
                     lineHeight = UiType.BadgeLine,
                     fontWeight = FontWeight.Medium,
@@ -352,71 +365,55 @@ private fun ElicitationFieldRow(
         }
         Spacer(Modifier.height(FieldControlGap))
         when (field.kind) {
-            McpElicitationFieldKind.Text -> TextField(
-                value = value,
-                onValueChange = onValueChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = field.title.ifBlank { field.name },
-                singleLine = true,
-            )
+            McpElicitationFieldKind.Text ->
+                TextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = field.title.ifBlank { field.name },
+                    singleLine = true,
+                )
 
-            McpElicitationFieldKind.Multiline -> TextField(
-                value = value,
-                onValueChange = onValueChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = field.title.ifBlank { field.name },
-                singleLine = false,
-                minLines = 3,
-                maxLines = 6,
-            )
+            McpElicitationFieldKind.Multiline ->
+                TextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = field.title.ifBlank { field.name },
+                    singleLine = false,
+                    minLines = 3,
+                    maxLines = 6,
+                )
 
-            McpElicitationFieldKind.Number -> TextField(
-                value = value,
-                onValueChange = onValueChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = field.title.ifBlank { field.name },
-                singleLine = true,
-                textStyle = MiuixTheme.textStyles.main.copy(fontFamily = FontFamily.Monospace),
-            )
+            McpElicitationFieldKind.Number ->
+                TextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = field.title.ifBlank { field.name },
+                    singleLine = true,
+                    textStyle = MiuixTheme.textStyles.main.copy(fontFamily = FontFamily.Monospace),
+                )
 
-            McpElicitationFieldKind.Boolean -> {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .pressableRow(
-                            shape = BooleanRowShape,
-                            container = raisedSurface(),
-                            onClick = { onValueChange(if (isTrue(value)) "false" else "true") },
-                        )
-                        .padding(
-                            horizontal = UiConsts.Space16,
-                            vertical = UiConsts.Space8,
-                        ),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = if (isTrue(value)) {
+            McpElicitationFieldKind.Boolean ->
+                SwitchPreference(
+                    title =
+                        if (isTrue(value)) {
                             stringResource(R.string.mcp_server_elicitation_boolean_on)
                         } else {
                             stringResource(R.string.mcp_server_elicitation_boolean_off)
                         },
-                        modifier = Modifier.weight(1f),
-                        fontSize = UiType.Body,
-                        lineHeight = UiType.BodyLine,
-                        color = colors.onSurface,
-                    )
-                    Switch(
-                        checked = isTrue(value),
-                        onCheckedChange = { onValueChange(if (it) "true" else "false") },
-                    )
-                }
-            }
+                    checked = isTrue(value),
+                    onCheckedChange = { onValueChange(if (it) "true" else "false") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
 
-            McpElicitationFieldKind.Enum -> EnumChips(
-                options = field.options,
-                selected = value,
-                onSelect = onValueChange,
-            )
+            McpElicitationFieldKind.Enum ->
+                EnumChips(
+                    options = field.options,
+                    selected = value,
+                    onSelect = onValueChange,
+                )
         }
     }
 }
@@ -447,30 +444,29 @@ private fun EnumChips(
         options.forEach { option ->
             val chosen = option == selected
             Row(
-                modifier = Modifier
-                    .background(
-                        if (chosen) colors.primary.copy(alpha = 0.14f) else raisedSurface(),
-                        ChipShape,
-                    )
-                    .border(
-                        width = UiConsts.OutlineThickness,
-                        color = if (chosen) colors.primary else colors.outline.copy(alpha = 0.3f),
-                        shape = ChipShape,
-                    )
-                    .clickable { onSelect(option) }
-                    .padding(
-                        horizontal = UiConsts.Space16,
-                        vertical = UiConsts.Space8,
-                    ),
+                modifier =
+                    Modifier.background(
+                            if (chosen) colors.primary.copy(alpha = 0.14f) else raisedSurface(),
+                            ChipShape,
+                        )
+                        .border(
+                            width = UiConsts.OutlineThickness,
+                            color =
+                                if (chosen) colors.primary else colors.outline.copy(alpha = 0.3f),
+                            shape = ChipShape,
+                        )
+                        .clickable { onSelect(option) }
+                        .padding(
+                            horizontal = UiConsts.Space16,
+                            vertical = UiConsts.Space8,
+                        ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (chosen) {
                     Icon(
                         imageVector = MiuixIcons.Ok,
                         contentDescription = null,
-                        modifier = Modifier
-                            .padding(end = UiConsts.Space5)
-                            .size(UiConsts.IconCheck),
+                        modifier = Modifier.padding(end = UiConsts.Space5).size(UiConsts.IconCheck),
                         tint = colors.primary,
                     )
                 }

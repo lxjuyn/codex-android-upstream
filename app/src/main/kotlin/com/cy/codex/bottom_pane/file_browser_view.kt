@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,23 +28,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import com.cy.codex.ActionRow
-import com.cy.codex.ButtonRole
-import com.cy.codex.CodexButton
-import com.cy.codex.CodexButtonSize
-import com.cy.codex.CodexDivider
-import com.cy.codex.EmptyState
-import com.cy.codex.ModalSheet
 import com.cy.codex.R
-import com.cy.codex.SectionCard
-import com.cy.codex.SurfaceBackButton
-import com.cy.codex.SurfaceHeader
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
-import com.cy.codex.ValueRow
 import com.cy.codex.app.FormField
 import com.cy.codex.app.FormSheet
 import com.cy.codex.codeSurface
@@ -51,18 +47,33 @@ import com.cy.codex.fileName
 import com.cy.codex.parentPath
 import com.cy.codex.protocol.AppServerClient
 import com.cy.codex.protocol.protocol.v2.FileMetadata
+import com.cy.codex.raisedSurface
+import com.cy.codex.sheetColor
+import com.cy.codex.sheetSideMargin
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonColors
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.AddFolder
+import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
 import top.yukonga.miuix.kmp.icon.extended.ConvertFile
 import top.yukonga.miuix.kmp.icon.extended.FolderFill
 import top.yukonga.miuix.kmp.icon.extended.Info
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Tune
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.squircle.squircleBackground
+import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * The `fs/…` family as a page: one directory at a time, the files in it, and the writes the
@@ -124,7 +135,8 @@ fun FileBrowserScreen(
         // The preview belongs to the listing that produced it, and a re-read may have removed the
         // file: keeping a stale path on screen would show contents of something that is gone.
         previewPath = null
-        client.readDirectory(current)
+        client
+            .readDirectory(current)
             .onSuccess { entries = it }
             .onFailure {
                 entries = emptyList()
@@ -141,7 +153,8 @@ fun FileBrowserScreen(
             client.getMetadata(target).onSuccess { metadata = it }
         }
         if (target == null) return@LaunchedEffect
-        client.readFile(target)
+        client
+            .readFile(target)
             .onSuccess { preview = fileBrowserPreview(it) }
             .onFailure {
                 preview = FilePreview(bytes = 0L, text = null, failure = it.message ?: readFailed)
@@ -150,9 +163,12 @@ fun FileBrowserScreen(
 
     // Folders first, then files, each by name: the order the TUI's file list uses, and the only
     // order in which a folder can be read by eye.
-    val rows = remember(entries) {
-        entries.sortedWith(compareBy<FileMetadata>({ !it.isDirectory }, { it.name.lowercase() }))
-    }
+    val rows =
+        remember(entries) {
+            entries.sortedWith(
+                compareBy<FileMetadata>({ !it.isDirectory }, { it.name.lowercase() })
+            )
+        }
 
     // Every write goes through here so that a refusal is reported in one place and the listing is
     // re-read in one place: a write the page does not re-read is a listing that lies.
@@ -174,11 +190,12 @@ fun FileBrowserScreen(
     fun toggleWatch(target: String) {
         val registered = target in watched
         scope.launch {
-            val result = if (registered) {
-                client.unwatchPath(target)
-            } else {
-                client.watchPath(target, target)
-            }
+            val result =
+                if (registered) {
+                    client.unwatchPath(target)
+                } else {
+                    client.watchPath(target, target)
+                }
             result
                 .onSuccess { watched = if (registered) watched - target else watched + target }
                 .onFailure { writeFailure = it.message ?: writeFailed }
@@ -196,16 +213,25 @@ fun FileBrowserScreen(
     }
     BackHandler(enabled = current != path) { current = fileBrowserParent(current) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(colors.background),
-    ) {
-        SurfaceHeader(
+    Column(modifier = modifier.fillMaxSize().background(colors.background)) {
+        BasicComponent(
             title = fileBrowserName(current),
-            subtitle = parentPath(current).ifEmpty { null },
-            leading = { SurfaceBackButton(stringResource(R.string.file_browser_back), back) },
-            trailing = {
+            summary = parentPath(current).ifEmpty { null },
+            startAction = {
+                IconButton(
+                    onClick = back,
+                    minWidth = UiConsts.IconButtonSize,
+                    minHeight = UiConsts.IconButtonSize,
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.ChevronBackward,
+                        contentDescription = stringResource(R.string.file_browser_back),
+                        modifier = Modifier.size(UiConsts.IconHeader),
+                        tint = MiuixTheme.colorScheme.primary,
+                    )
+                }
+            },
+            endActions = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
                         onClick = { revision++ },
@@ -223,29 +249,63 @@ fun FileBrowserScreen(
                     // it is what the page was opened for, and must not scroll away with the list.
                     if (picking) {
                         Spacer(Modifier.width(UiConsts.Space6))
-                        CodexButton(
-                            text = stringResource(R.string.file_browser_use_directory),
+                        Button(
                             onClick = { onPick(current) },
-                            size = CodexButtonSize.Compact,
-                        )
+                            colors = ButtonDefaults.buttonColorsPrimary(),
+                            cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                            minWidth = 0.dp,
+                            minHeight = UiConsts.ButtonHeightCompact,
+                            insideMargin =
+                                PaddingValues(
+                                    horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                                    vertical = 0.dp,
+                                ),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.file_browser_use_directory),
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
             },
+            insideMargin = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = UiConsts.ScreenMargin)
-                .padding(bottom = UiConsts.PageBottomInset),
+            modifier =
+                Modifier.weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = UiConsts.ScreenMargin)
+                    .padding(bottom = UiConsts.PageBottomInset),
             verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
         ) {
             if (writeFailure != null) {
-                SectionCard(
-                    title = stringResource(R.string.file_browser_action_failed_title),
-                    icon = MiuixIcons.Info,
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadius = UiConsts.SectionCorner,
+                    insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+                    colors =
+                        CardDefaults.defaultColors(
+                            color = raisedSurface(),
+                            contentColor = MiuixTheme.colorScheme.onSurface,
+                        ),
                 ) {
+                    BasicComponent(
+                        title = stringResource(R.string.file_browser_action_failed_title),
+                        startAction = {
+                            Icon(
+                                imageVector = MiuixIcons.Info,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MiuixTheme.colorScheme.primary,
+                            )
+                        },
+                        insideMargin = PaddingValues(0.dp),
+                    )
+                    Spacer(Modifier.height(8.dp))
                     FileBrowserNote(writeFailure.orEmpty(), error = true)
                 }
             }
@@ -287,143 +347,244 @@ fun FileBrowserScreen(
     when (val open = sheet) {
         null -> Unit
 
-        is FileSheet.NewFolder -> FormSheet(
-            title = stringResource(R.string.file_browser_new_folder),
-            subtitle = open.directory,
-            fields = listOf(
-                FormField(
-                    key = NameField,
-                    label = stringResource(R.string.file_browser_name),
-                    placeholder = stringResource(R.string.file_browser_name_placeholder),
-                ),
-            ),
-            confirmLabel = stringResource(R.string.file_browser_create),
-            onDismiss = { sheet = null },
-            onSubmit = { values ->
-                val name = values[NameField].orEmpty().trim()
-                sheet = null
-                val destination = fileBrowserJoin(open.directory, name)
-                mutate({ client.createDirectory(destination, recursive = true) })
-            },
-        )
-
-        is FileSheet.NewFile -> FormSheet(
-            title = stringResource(R.string.file_browser_new_file),
-            subtitle = open.directory,
-            fields = listOf(
-                FormField(
-                    key = NameField,
-                    label = stringResource(R.string.file_browser_name),
-                    placeholder = stringResource(R.string.file_browser_name_placeholder),
-                ),
-                FormField(
-                    key = ContentField,
-                    label = stringResource(R.string.file_browser_content),
-                    required = false,
-                    help = stringResource(R.string.file_browser_content_help),
-                ),
-            ),
-            confirmLabel = stringResource(R.string.file_browser_create),
-            onDismiss = { sheet = null },
-            onSubmit = { values ->
-                val name = values[NameField].orEmpty().trim()
-                val bytes = values[ContentField].orEmpty().toByteArray(Charsets.UTF_8)
-                sheet = null
-                mutate({ client.writeFile(fileBrowserJoin(open.directory, name), bytes) })
-            },
-        )
-
-        is FileSheet.Rename -> FormSheet(
-            title = stringResource(R.string.file_browser_rename_title, fileBrowserName(open.path)),
-            fields = listOf(
-                FormField(
-                    key = NameField,
-                    label = stringResource(R.string.file_browser_name),
-                    initial = fileBrowserName(open.path),
-                    help = stringResource(R.string.file_browser_rename_help),
-                ),
-            ),
-            confirmLabel = stringResource(R.string.file_browser_rename),
-            onDismiss = { sheet = null },
-            onSubmit = { values ->
-                val name = values[NameField].orEmpty().trim()
-                val destination = fileBrowserJoin(fileBrowserParent(open.path), name)
-                sheet = null
-                mutate({ client.copyPath(open.path, destination, recursive = open.isDirectory) })
-            },
-        )
-
-        is FileSheet.Copy -> FormSheet(
-            title = stringResource(R.string.file_browser_copy_title, fileBrowserName(open.path)),
-            fields = listOf(
-                FormField(
-                    key = DestinationField,
-                    label = stringResource(R.string.file_browser_copy_destination),
-                    initial = open.path + stringResource(R.string.file_browser_copy_default_suffix),
-                    help = stringResource(R.string.file_browser_copy_help),
-                ),
-            ),
-            confirmLabel = stringResource(R.string.file_browser_copy),
-            onDismiss = { sheet = null },
-            onSubmit = { values ->
-                val destination = values[DestinationField].orEmpty().trim()
-                sheet = null
-                mutate({ client.copyPath(open.path, destination, recursive = open.isDirectory) })
-            },
-        )
-
-        is FileSheet.Delete -> ModalSheet(
-            show = true,
-            onDismiss = { sheet = null },
-            onDismissFinished = { sheet = null },
-            title = stringResource(R.string.file_browser_delete_title, fileBrowserName(open.path)),
-            subtitle = stringResource(R.string.file_browser_delete_detail),
-        ) {
-            Text(
-                text = open.path,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(UiConsts.RowCorner))
-                    .background(codeSurface())
-                    .padding(horizontal = UiConsts.Space8, vertical = UiConsts.Space7),
-                fontSize = UiType.Code,
-                lineHeight = UiType.CodeLine,
-                fontFamily = FontFamily.Monospace,
-                color = colors.onSurfaceVariantSummary,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(UiConsts.Space8),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CodexButton(
-                    text = stringResource(R.string.file_browser_cancel),
-                    onClick = { sheet = null },
-                    modifier = Modifier.weight(1f),
-                    role = ButtonRole.Secondary,
-                )
-                CodexButton(
-                    text = stringResource(R.string.file_browser_delete),
-                    onClick = {
-                        // Read out now, so the write hits the path the user confirmed even if the
-                        // page has moved on by the time the coroutine runs.
-                        val target = open.path
-                        val recursive = open.isDirectory
-                        sheet = null
-                        mutate(
-                            action = { client.removePath(target, recursive = recursive) },
-                            // Deleting the folder on screen would leave the page reading a path
-                            // that is gone; the parent is the nearest thing still there.
-                            onSuccess = {
-                                if (target == current) current = fileBrowserParent(target)
-                            },
+        is FileSheet.NewFolder ->
+            FormSheet(
+                title = stringResource(R.string.file_browser_new_folder),
+                subtitle = open.directory,
+                fields =
+                    listOf(
+                        FormField(
+                            key = NameField,
+                            label = stringResource(R.string.file_browser_name),
+                            placeholder = stringResource(R.string.file_browser_name_placeholder),
                         )
-                    },
-                    modifier = Modifier.weight(1f),
-                    role = ButtonRole.Destructive,
-                )
+                    ),
+                confirmLabel = stringResource(R.string.file_browser_create),
+                onDismiss = { sheet = null },
+                onSubmit = { values ->
+                    val name = values[NameField].orEmpty().trim()
+                    sheet = null
+                    val destination = fileBrowserJoin(open.directory, name)
+                    mutate({ client.createDirectory(destination, recursive = true) })
+                },
+            )
+
+        is FileSheet.NewFile ->
+            FormSheet(
+                title = stringResource(R.string.file_browser_new_file),
+                subtitle = open.directory,
+                fields =
+                    listOf(
+                        FormField(
+                            key = NameField,
+                            label = stringResource(R.string.file_browser_name),
+                            placeholder = stringResource(R.string.file_browser_name_placeholder),
+                        ),
+                        FormField(
+                            key = ContentField,
+                            label = stringResource(R.string.file_browser_content),
+                            required = false,
+                            help = stringResource(R.string.file_browser_content_help),
+                        ),
+                    ),
+                confirmLabel = stringResource(R.string.file_browser_create),
+                onDismiss = { sheet = null },
+                onSubmit = { values ->
+                    val name = values[NameField].orEmpty().trim()
+                    val bytes = values[ContentField].orEmpty().toByteArray(Charsets.UTF_8)
+                    sheet = null
+                    mutate({ client.writeFile(fileBrowserJoin(open.directory, name), bytes) })
+                },
+            )
+
+        is FileSheet.Rename ->
+            FormSheet(
+                title =
+                    stringResource(R.string.file_browser_rename_title, fileBrowserName(open.path)),
+                fields =
+                    listOf(
+                        FormField(
+                            key = NameField,
+                            label = stringResource(R.string.file_browser_name),
+                            initial = fileBrowserName(open.path),
+                            help = stringResource(R.string.file_browser_rename_help),
+                        )
+                    ),
+                confirmLabel = stringResource(R.string.file_browser_rename),
+                onDismiss = { sheet = null },
+                onSubmit = { values ->
+                    val name = values[NameField].orEmpty().trim()
+                    val destination = fileBrowserJoin(fileBrowserParent(open.path), name)
+                    sheet = null
+                    mutate({
+                        client.copyPath(open.path, destination, recursive = open.isDirectory)
+                    })
+                },
+            )
+
+        is FileSheet.Copy ->
+            FormSheet(
+                title =
+                    stringResource(R.string.file_browser_copy_title, fileBrowserName(open.path)),
+                fields =
+                    listOf(
+                        FormField(
+                            key = DestinationField,
+                            label = stringResource(R.string.file_browser_copy_destination),
+                            initial =
+                                open.path +
+                                    stringResource(R.string.file_browser_copy_default_suffix),
+                            help = stringResource(R.string.file_browser_copy_help),
+                        )
+                    ),
+                confirmLabel = stringResource(R.string.file_browser_copy),
+                onDismiss = { sheet = null },
+                onSubmit = { values ->
+                    val destination = values[DestinationField].orEmpty().trim()
+                    sheet = null
+                    mutate({
+                        client.copyPath(open.path, destination, recursive = open.isDirectory)
+                    })
+                },
+            )
+
+        is FileSheet.Delete ->
+            WindowBottomSheet(
+                show = true,
+                onDismissRequest = { sheet = null },
+                onDismissFinished = { sheet = null },
+                title =
+                    stringResource(R.string.file_browser_delete_title, fileBrowserName(open.path)),
+                backgroundColor = sheetColor(),
+                cornerRadius = UiConsts.SheetCorner,
+                sheetMaxWidth = UiConsts.SheetMaxWidth,
+                outsideMargin = DpSize(sheetSideMargin(), 0.dp),
+                insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
+                dragHandleColor = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.4f),
+            ) {
+                Column(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .heightIn(
+                                max =
+                                    LocalWindowInfo.current.containerDpSize.height *
+                                        UiConsts.SheetHeightFraction
+                            )
+                ) {
+                    Text(
+                        text = stringResource(R.string.file_browser_delete_detail),
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Column(
+                        modifier =
+                            Modifier.fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .padding(bottom = UiConsts.SheetPadding),
+                        verticalArrangement = Arrangement.spacedBy(UiConsts.Space6),
+                    ) {
+                        Text(
+                            text = open.path,
+                            modifier =
+                                Modifier.fillMaxWidth()
+                                    .clip(RoundedCornerShape(UiConsts.RowCorner))
+                                    .background(codeSurface())
+                                    .padding(
+                                        horizontal = UiConsts.Space8,
+                                        vertical = UiConsts.Space7,
+                                    ),
+                            fontSize = UiType.Code,
+                            lineHeight = UiType.CodeLine,
+                            fontFamily = FontFamily.Monospace,
+                            color = colors.onSurfaceVariantSummary,
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(UiConsts.Space8),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Button(
+                                onClick = { sheet = null },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(),
+                                cornerRadius = UiConsts.ButtonHeight / 2,
+                                minWidth = 0.dp,
+                                minHeight = UiConsts.ButtonHeight,
+                                insideMargin =
+                                    PaddingValues(
+                                        horizontal = UiConsts.ButtonPaddingHorizontal,
+                                        vertical = 0.dp,
+                                    ),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.file_browser_cancel),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            Button(
+                                onClick = {
+                                    // Read out now, so the write hits the path the user confirmed
+                                    // even if the
+                                    // page has moved on by the time the coroutine runs.
+                                    val target = open.path
+                                    val recursive = open.isDirectory
+                                    sheet = null
+                                    mutate(
+                                        action = {
+                                            client.removePath(target, recursive = recursive)
+                                        },
+                                        // Deleting the folder on screen would leave the page
+                                        // reading a path
+                                        // that is gone; the parent is the nearest thing still
+                                        // there.
+                                        onSuccess = {
+                                            if (target == current)
+                                                current = fileBrowserParent(target)
+                                        },
+                                    )
+                                },
+                                modifier =
+                                    Modifier.weight(1f)
+                                        .squircleBorder(
+                                            UiConsts.OutlineThickness,
+                                            MiuixTheme.colorScheme.error.copy(alpha = 0.5f),
+                                            UiConsts.ButtonHeight / 2,
+                                        ),
+                                colors =
+                                    ButtonColors(
+                                        color = Color.Transparent,
+                                        disabledColor =
+                                            MiuixTheme.colorScheme.disabledOnSurface.copy(
+                                                alpha = 0.1f
+                                            ),
+                                        contentColor = MiuixTheme.colorScheme.error,
+                                        disabledContentColor =
+                                            MiuixTheme.colorScheme.disabledOnSurface,
+                                    ),
+                                cornerRadius = UiConsts.ButtonHeight / 2,
+                                minWidth = 0.dp,
+                                minHeight = UiConsts.ButtonHeight,
+                                insideMargin =
+                                    PaddingValues(
+                                        horizontal = UiConsts.ButtonPaddingHorizontal,
+                                        vertical = 0.dp,
+                                    ),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.file_browser_delete),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
             }
-        }
     }
 }
 
@@ -442,40 +603,150 @@ private fun FileListingCard(
     failure: String?,
     onOpen: (FileMetadata) -> Unit,
 ) {
-    SectionCard(
-        title = stringResource(R.string.file_browser_contents),
-        icon = MiuixIcons.FolderFill,
-        trailing = if (failure == null) rows.size.toString() else null,
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
-        when {
-            failure != null -> EmptyState(
-                icon = MiuixIcons.Info,
-                title = stringResource(R.string.file_browser_read_failed),
-                detail = failure,
-            )
-
-            rows.isEmpty() && reading -> FileBrowserNote(
-                stringResource(R.string.file_browser_reading),
-            )
-
-            rows.isEmpty() -> EmptyState(
-                icon = MiuixIcons.FolderFill,
-                title = stringResource(R.string.file_browser_empty),
-                detail = stringResource(R.string.file_browser_empty_detail),
-            )
-
-            else -> rows.forEach { entry ->
-                ActionRow(
-                    title = entry.name,
-                    subtitle = if (entry.isDirectory) {
-                        stringResource(R.string.file_browser_folder)
-                    } else {
-                        fileBrowserSize(entry.size)
-                    },
-                    icon = if (entry.isDirectory) MiuixIcons.FolderFill else MiuixIcons.ConvertFile,
-                    onClick = { onOpen(entry) },
+        BasicComponent(
+            title = stringResource(R.string.file_browser_contents),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.FolderFill,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
                 )
-            }
+            },
+            endActions = {
+                (if (failure == null) rows.size.toString() else null)?.let {
+                    Text(
+                        text = it,
+                        fontWeight = FontWeight.Medium,
+                        color = MiuixTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                    )
+                }
+            },
+            insideMargin = PaddingValues(0.dp),
+        )
+        Spacer(Modifier.height(8.dp))
+        when {
+            failure != null ->
+                Column(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .padding(vertical = UiConsts.Space24, horizontal = UiConsts.Space16),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        modifier =
+                            Modifier.size(UiConsts.IconBoxLarge)
+                                .squircleBackground(
+                                    color = raisedSurface(),
+                                    cornerRadius = UiConsts.CornerCard,
+                                ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = MiuixIcons.Info,
+                            contentDescription = null,
+                            modifier = Modifier.size(UiConsts.IconHeader),
+                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                    }
+                    Spacer(Modifier.height(UiConsts.Space12))
+                    Text(
+                        text = stringResource(R.string.file_browser_read_failed),
+                        fontSize = UiType.RowTitle,
+                        lineHeight = UiType.RowTitleLine,
+                        fontWeight = FontWeight.Medium,
+                        color = MiuixTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(UiConsts.Space4))
+                    Text(
+                        text = failure,
+                        fontSize = UiType.Meta,
+                        lineHeight = UiType.MetaLine,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+
+            rows.isEmpty() && reading ->
+                FileBrowserNote(stringResource(R.string.file_browser_reading))
+
+            rows.isEmpty() ->
+                Column(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .padding(vertical = UiConsts.Space24, horizontal = UiConsts.Space16),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        modifier =
+                            Modifier.size(UiConsts.IconBoxLarge)
+                                .squircleBackground(
+                                    color = raisedSurface(),
+                                    cornerRadius = UiConsts.CornerCard,
+                                ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = MiuixIcons.FolderFill,
+                            contentDescription = null,
+                            modifier = Modifier.size(UiConsts.IconHeader),
+                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                    }
+                    Spacer(Modifier.height(UiConsts.Space12))
+                    Text(
+                        text = stringResource(R.string.file_browser_empty),
+                        fontSize = UiType.RowTitle,
+                        lineHeight = UiType.RowTitleLine,
+                        fontWeight = FontWeight.Medium,
+                        color = MiuixTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(UiConsts.Space4))
+                    Text(
+                        text = stringResource(R.string.file_browser_empty_detail),
+                        fontSize = UiType.Meta,
+                        lineHeight = UiType.MetaLine,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+
+            else ->
+                rows.forEach { entry ->
+                    ArrowPreference(
+                        title = entry.name,
+                        summary =
+                            if (entry.isDirectory) {
+                                stringResource(R.string.file_browser_folder)
+                            } else {
+                                fileBrowserSize(entry.size)
+                            },
+                        startAction = {
+                            Icon(
+                                imageVector =
+                                    if (entry.isDirectory) MiuixIcons.FolderFill
+                                    else MiuixIcons.ConvertFile,
+                                contentDescription = null,
+                                modifier = Modifier.size(UiConsts.IconPreference),
+                                tint = MiuixTheme.colorScheme.primary,
+                            )
+                        },
+                        onClick = { onOpen(entry) },
+                    )
+                }
         }
     }
 }
@@ -502,60 +773,136 @@ private fun FilePreviewCard(
     val colors = MiuixTheme.colorScheme
     val body = preview
     val text = body?.text
-    SectionCard(
-        title = fileBrowserName(path),
-        icon = MiuixIcons.ConvertFile,
-        trailing = body?.let { fileBrowserSize(it.bytes) },
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
+        BasicComponent(
+            title = fileBrowserName(path),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.ConvertFile,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            endActions = {
+                (body?.let { fileBrowserSize(it.bytes) })?.let {
+                    Text(
+                        text = it,
+                        fontWeight = FontWeight.Medium,
+                        color = MiuixTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                    )
+                }
+            },
+            insideMargin = PaddingValues(0.dp),
+        )
+        Spacer(Modifier.height(8.dp))
         // The server's answer about the path itself, which is the only description available for a
         // file this client is not allowed to read.
         if (metadata != null) {
-            ValueRow(
-                label = stringResource(R.string.file_browser_meta_kind),
-                value = stringResource(
-                    if (metadata.isDirectory) {
-                        R.string.file_browser_meta_directory
-                    } else {
-                        R.string.file_browser_meta_file
-                    },
-                ),
+            BasicComponent(
+                title = stringResource(R.string.file_browser_meta_kind),
+                endActions = {
+                    Text(
+                        text =
+                            (stringResource(
+                                    if (metadata.isDirectory) {
+                                        R.string.file_browser_meta_directory
+                                    } else {
+                                        R.string.file_browser_meta_file
+                                    }
+                                ))
+                                .ifEmpty { "—" },
+                        modifier = Modifier.weight(1f, fill = false),
+                        fontSize = UiType.Detail,
+                        lineHeight = UiType.DetailLine,
+                        fontFamily = null,
+                        color = MiuixTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                    )
+                },
+                insideMargin =
+                    PaddingValues(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
             )
-            CodexDivider()
-            ValueRow(
-                label = stringResource(R.string.file_browser_meta_size),
-                value = fileBrowserSize(metadata.size),
+            HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+            BasicComponent(
+                title = stringResource(R.string.file_browser_meta_size),
+                endActions = {
+                    Text(
+                        text = (fileBrowserSize(metadata.size)).ifEmpty { "—" },
+                        modifier = Modifier.weight(1f, fill = false),
+                        fontSize = UiType.Detail,
+                        lineHeight = UiType.DetailLine,
+                        fontFamily = null,
+                        color = MiuixTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                    )
+                },
+                insideMargin =
+                    PaddingValues(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
             )
             if (metadata.modifiedAt > 0L) {
-                CodexDivider()
-                ValueRow(
-                    label = stringResource(R.string.file_browser_meta_modified),
-                    value = android.text.format.DateUtils.getRelativeTimeSpanString(
-                        metadata.modifiedAt,
-                    ).toString(),
+                HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
+                BasicComponent(
+                    title = stringResource(R.string.file_browser_meta_modified),
+                    endActions = {
+                        Text(
+                            text =
+                                (android.text.format.DateUtils.getRelativeTimeSpanString(
+                                            metadata.modifiedAt
+                                        )
+                                        .toString())
+                                    .ifEmpty { "—" },
+                            modifier = Modifier.weight(1f, fill = false),
+                            fontSize = UiType.Detail,
+                            lineHeight = UiType.DetailLine,
+                            fontFamily = null,
+                            color = MiuixTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.End,
+                            maxLines = 1,
+                        )
+                    },
+                    insideMargin =
+                        PaddingValues(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
                 )
             }
-            CodexDivider()
+            HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
         }
         when {
             body == null -> FileBrowserNote(stringResource(R.string.file_browser_preview_reading))
 
             body.failure != null -> FileBrowserNote(body.failure.orEmpty(), error = true)
 
-            text == null -> FileBrowserNote(
-                stringResource(R.string.file_browser_preview_binary, fileBrowserSize(body.bytes)),
-            )
+            text == null ->
+                FileBrowserNote(
+                    stringResource(
+                        R.string.file_browser_preview_binary,
+                        fileBrowserSize(body.bytes),
+                    )
+                )
 
             text.isEmpty() -> FileBrowserNote(stringResource(R.string.file_browser_preview_empty))
 
             else -> {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = PreviewMaxHeight)
-                        .clip(RoundedCornerShape(UiConsts.RowCorner))
-                        .background(codeSurface())
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = UiConsts.Space8, vertical = UiConsts.Space7),
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .heightIn(max = PreviewMaxHeight)
+                            .clip(RoundedCornerShape(UiConsts.RowCorner))
+                            .background(codeSurface())
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = UiConsts.Space8, vertical = UiConsts.Space7)
                 ) {
                     Text(
                         text = text,
@@ -568,7 +915,7 @@ private fun FilePreviewCard(
                 if (body.clipped) {
                     Spacer(Modifier.height(UiConsts.Space6))
                     FileBrowserNote(
-                        stringResource(R.string.file_browser_preview_clipped, PreviewCharLimit),
+                        stringResource(R.string.file_browser_preview_clipped, PreviewCharLimit)
                     )
                 }
             }
@@ -605,23 +952,56 @@ private fun FolderActionsCard(
     onCopy: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    SectionCard(
-        title = stringResource(R.string.file_browser_folder_actions),
-        icon = MiuixIcons.Tune,
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = UiConsts.SectionCorner,
+        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
+        colors =
+            CardDefaults.defaultColors(
+                color = raisedSurface(),
+                contentColor = MiuixTheme.colorScheme.onSurface,
+            ),
     ) {
-        ActionRow(
+        BasicComponent(
+            title = stringResource(R.string.file_browser_folder_actions),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.Tune,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
+            insideMargin = PaddingValues(0.dp),
+        )
+        Spacer(Modifier.height(8.dp))
+        ArrowPreference(
             title = stringResource(R.string.file_browser_new_folder),
-            subtitle = stringResource(R.string.file_browser_new_folder_detail),
-            icon = MiuixIcons.AddFolder,
+            summary = stringResource(R.string.file_browser_new_folder_detail),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.AddFolder,
+                    contentDescription = null,
+                    modifier = Modifier.size(UiConsts.IconPreference),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
             onClick = onNewFolder,
         )
-        ActionRow(
+        ArrowPreference(
             title = stringResource(R.string.file_browser_new_file),
-            subtitle = stringResource(R.string.file_browser_new_file_detail),
-            icon = MiuixIcons.ConvertFile,
+            summary = stringResource(R.string.file_browser_new_file_detail),
+            startAction = {
+                Icon(
+                    imageVector = MiuixIcons.ConvertFile,
+                    contentDescription = null,
+                    modifier = Modifier.size(UiConsts.IconPreference),
+                    tint = MiuixTheme.colorScheme.primary,
+                )
+            },
             onClick = onNewFile,
         )
-        CodexDivider()
+        HorizontalDivider(modifier = Modifier.padding(vertical = UiConsts.Space1))
         EntryActions(
             watched = watched,
             onToggleWatch = onToggleWatch,
@@ -649,46 +1029,112 @@ private fun EntryActions(
     onDelete: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
+        modifier =
+            Modifier.fillMaxWidth()
+                .padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space8),
         verticalArrangement = Arrangement.spacedBy(UiConsts.Space6),
     ) {
-        CodexButton(
-            text = stringResource(
-                if (watched) R.string.file_browser_watch_stop else R.string.file_browser_watch,
-            ),
+        Button(
             onClick = onToggleWatch,
             modifier = Modifier.fillMaxWidth(),
-            role = ButtonRole.Secondary,
-            size = CodexButtonSize.Compact,
-        )
+            colors = ButtonDefaults.buttonColors(),
+            cornerRadius = UiConsts.ButtonHeightCompact / 2,
+            minWidth = 0.dp,
+            minHeight = UiConsts.ButtonHeightCompact,
+            insideMargin =
+                PaddingValues(
+                    horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                    vertical = 0.dp,
+                ),
+        ) {
+            Text(
+                text =
+                    stringResource(
+                        if (watched) R.string.file_browser_watch_stop
+                        else R.string.file_browser_watch
+                    ),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(UiConsts.Space6),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CodexButton(
-                text = stringResource(R.string.file_browser_rename),
+            Button(
                 onClick = onRename,
                 modifier = Modifier.weight(1f),
-                role = ButtonRole.Secondary,
-                size = CodexButtonSize.Compact,
-            )
-            CodexButton(
-                text = stringResource(R.string.file_browser_copy),
+                colors = ButtonDefaults.buttonColors(),
+                cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                minWidth = 0.dp,
+                minHeight = UiConsts.ButtonHeightCompact,
+                insideMargin =
+                    PaddingValues(
+                        horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                        vertical = 0.dp,
+                    ),
+            ) {
+                Text(
+                    text = stringResource(R.string.file_browser_rename),
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Button(
                 onClick = onCopy,
                 modifier = Modifier.weight(1f),
-                role = ButtonRole.Secondary,
-                size = CodexButtonSize.Compact,
-            )
-            CodexButton(
-                text = stringResource(R.string.file_browser_delete),
+                colors = ButtonDefaults.buttonColors(),
+                cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                minWidth = 0.dp,
+                minHeight = UiConsts.ButtonHeightCompact,
+                insideMargin =
+                    PaddingValues(
+                        horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                        vertical = 0.dp,
+                    ),
+            ) {
+                Text(
+                    text = stringResource(R.string.file_browser_copy),
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Button(
                 onClick = onDelete,
-                modifier = Modifier.weight(1f),
-                role = ButtonRole.Destructive,
-                size = CodexButtonSize.Compact,
-            )
+                modifier =
+                    Modifier.weight(1f)
+                        .squircleBorder(
+                            UiConsts.OutlineThickness,
+                            MiuixTheme.colorScheme.error.copy(alpha = 0.5f),
+                            UiConsts.ButtonHeightCompact / 2,
+                        ),
+                colors =
+                    ButtonColors(
+                        color = Color.Transparent,
+                        disabledColor = MiuixTheme.colorScheme.disabledOnSurface.copy(alpha = 0.1f),
+                        contentColor = MiuixTheme.colorScheme.error,
+                        disabledContentColor = MiuixTheme.colorScheme.disabledOnSurface,
+                    ),
+                cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                minWidth = 0.dp,
+                minHeight = UiConsts.ButtonHeightCompact,
+                insideMargin =
+                    PaddingValues(
+                        horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                        vertical = 0.dp,
+                    ),
+            ) {
+                Text(
+                    text = stringResource(R.string.file_browser_delete),
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -708,11 +1154,12 @@ private fun FileBrowserNote(text: String, error: Boolean = false) {
 
 /** A byte count in the unit a person reads, one decimal above a kilobyte. */
 @Composable
-private fun fileBrowserSize(bytes: Long): String = when {
-    bytes >= 1_048_576 -> stringResource(R.string.file_browser_size_mb, bytes / 1_048_576f)
-    bytes >= 1_024 -> stringResource(R.string.file_browser_size_kb, bytes / 1_024f)
-    else -> stringResource(R.string.file_browser_size_bytes, bytes)
-}
+private fun fileBrowserSize(bytes: Long): String =
+    when {
+        bytes >= 1_048_576 -> stringResource(R.string.file_browser_size_mb, bytes / 1_048_576f)
+        bytes >= 1_024 -> stringResource(R.string.file_browser_size_kb, bytes / 1_024f)
+        else -> stringResource(R.string.file_browser_size_bytes, bytes)
+    }
 
 /**
  * One file, decoded far enough to show.
