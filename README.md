@@ -96,7 +96,7 @@ Compose UI / CodexApp
   沙箱，因此嵌入运行时使用 `danger-full-access`；这不代表拥有 root 或其他 App 的私有数据权限。
 - 协议方法、通知与类型以 `codex/codex-rs/app-server-protocol` 为准；上游客户端请求都已绑定
   （测试用的 `mock/experimentalMethod` 除外），`AppServerClientBindingTest` 离线校验没有
-  方法落到 `unsupported()` 默认值；明确不做的部分见 [docs/TODO.md](docs/TODO.md)。
+  方法落到 `unsupported()` 默认值；尚未覆盖的能力与全部待办见 [docs/TODO.md](docs/TODO.md)。
 
 ## 私有数据
 
@@ -145,7 +145,7 @@ adb shell am instrument -w \
 
 ## 文档
 
-- [docs/TODO.md](docs/TODO.md)：当前待办、已知缺口与未验证项
+- [docs/TODO.md](docs/TODO.md)：当前待办与已知功能缺口
 - [docs/toolchain.md](docs/toolchain.md)：工具链构建、工具清单与取舍
 - [native/README.md](native/README.md)：JNI/helper 构建、补丁与运行时契约
 - [AGENTS.md](AGENTS.md)：在本仓库工作时的规范

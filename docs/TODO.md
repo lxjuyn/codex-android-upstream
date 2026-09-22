@@ -1,118 +1,194 @@
 # TODO
 
-当前待办、已知缺口与未验证项。已完成的部分不在本文件里，见 [README.md](../README.md)、
-[docs/toolchain.md](toolchain.md) 与 [native/README.md](../native/README.md)。
+与上游 TUI 逐模块对比后的缺口（基线：当前 `codex/` submodule；范围 `tui/src/bottom_pane/`、
+`tui/src/chatwidget/` + `history_cell/` + `streaming/`、app 级模块与 slash 命令），
+以及对比中发现的协议解析/绑定缺陷。已完成能力见 [README.md](../README.md) 与
+[docs/toolchain.md](toolchain.md)；终端专有、平台与工具链约束项见第 6 节。
 
-约定：只记「没做的、做错的、没验证的」；条目里的路径相对仓库根，行号为撰写时位置；
-引用上游一律用 `codex/codex-rs/...` 路径。完成一条就删一条。
+约定：路径相对仓库根；引用上游一律用 `codex/codex-rs/...`；改协议按 `AGENTS.md` 同步
+wire 类型、`json_rpc_app_server_client.kt` 绑定与 JVM 测试三处；每条完成后删除。
 
-## 0. 现状基线
+## 0. 协议解析与绑定缺陷（改动小、用户直接可见，优先）
 
-工具链、JNI in-process app-server、Kotlin 协议编解码与 Compose UI 骨架都已接线，
-`UpstreamSchemaTest` 离线比对 Kotlin 协议类型与上游 schema（字段名、必填方向、枚举 wire 值、
-方法集合），`scripts/device-smoke-test.sh` 在真机上验证工具链安装、JNI 启动、
-账户/配置/模型/会话读取、`command/exec`、apply_patch、shell 消息流与重启恢复（不发模型请求）。
-流式 delta 统一按 `Motion.StreamCommitIntervalMs` 提交，`Lagged` 会触发重同步，无响应的
-worker 由 `JsonRpcAppServerClient` 的看门狗摘掉；`:toolchain:packJniLibs` 对进 jniLibs 的每个 ELF
-做 16 KB 页对齐门禁（`:native:buildJni` 同样校验自己的两个 `.so`）。
-`AgentMessageItem.questions` 按 TUI 的内联问题编辑器处理（选项、自由文本、`> 问题` 框定、
-32 条/512 字节选项上限），答案本身是普通用户消息，不需要独立的 `request_user_input`
-结果 cell，见 `history_cell/async_questions.kt`。
-下面的顺序是「先上真机验证，最后是功能与可选的架构扩展」。
+- [ ] **hook 名解析错字段**：wire 是 `fragments[].hookRunId`（上游
+      `app-server-protocol/src/protocol/v2/item.rs`），Kotlin 读的是不存在的 `hookName`
+      （`protocol/wire_codec.kt:203`），`HookPromptFragment.hookName` 永远为空，
+      `history_cell/notices.kt` 与 `app/transcript_export.kt` 显示「Hook · 」。
+- [ ] **web search 结果丢失**：`WebSearchItem.results` 不解析（`protocol/wire_codec.kt:192`），
+      `history_cell/search.kt` 永远渲染「0 results / No results」。
+- [ ] **exec 卡片 commandActions 丢失**：`commandActions` 不解析（`protocol/wire_codec.kt:179`），
+      卡片 chips 与「Explored」折叠（`history_cell/exec.kt`、`chatwidget/rendering.kt` 的
+      `foldTranscriptRows`）是死代码，`isExploringCall()` 永远 false。
+- [ ] **image generation 明细丢失**：读了不存在的 `prompt` 字段，`revisedPrompt/result/
+      savedPath/failure/transparentBackground` 全丢（`protocol/wire_codec.kt:199`，
+      `history_cell/search.kt`）；对照上游 `tui/src/history_cell/patches.rs`。
+- [ ] **MCP 调用丢字段**：`appContext/mcpAppUi/pluginId/readOnlyHint/mcpAppResourceUri`
+      未解析（`protocol/wire_codec.kt:183`），上游 `history_cell/mcp.rs` 用它们渲染
+      app/插件/只读标记。
+- [ ] **agent message 丢 memoryCitation/delivery**（`protocol/wire_codec.kt:171`）。
+- [ ] **审批 `_meta` 与持久化选择未解析**：`json_rpc_app_server_client.kt` 的审批解析不读
+      meta，`bottom_pane/approval_overlay.kt` 只发默认响应。缺 MCP tool suggestion 的
+      Install/Enable、Allow once/session/always 选项与 approval display params；
+      上游 `tui/src/bottom_pane/approval_overlay.rs`、`mcp_server_elicitation.rs`。
+- [ ] **elicitation 只支持 url/form**：`bottom_pane/mcp_server_elicitation.kt` 把
+      `openai/userVerification` 变体当普通空表单，无法完成验证签名；上游
+      `tui/src/bottom_pane/user_verification.rs`。
+- [ ] **权限 profile 选择器缺失**：`permissionProfile/list` 已绑定但零调用
+      （`protocol/app_server_client.kt`），设置里只有三种 `AskForApproval`；
+      上游 `tui/src/chatwidget/permissions_menu.rs`。
+- [ ] **workspace headline/banner 不显示**：`account/workspaceMessages/read` 已绑定但零调用；
+      上游 `tui/src/workspace_messages.rs`。
+- [ ] **Luna Reserve 未接线**：`account/rateLimits/read` 不带 `supportsLunaReserve`，
+      fallback/return 模型与提示都没有；上游 `tui/src/luna_reserve_model.rs`、
+      `backend_banners.rs`。
+- [ ] **`ModelPreset.hidden` 已解析未使用**（`protocol/protocol/v2/thread_data.kt`），
+      模型选择器应过滤/折叠隐藏项。
 
-## 1. 真机与真实账户验证（P0，需要账户 + 网络）
+## 1. 交互能力
 
-离线 smoke 刻意不发模型请求，以下必须用真实账户跑一遍：
+- [ ] **回退重编辑（backtrack）**：上游 Esc-Esc 打开 transcript、选中用户消息后回退并把它
+      重新填进输入框（`tui/src/app_backtrack.rs`）。Kotlin 只有只读 Ctrl+T
+      （`app/history_ui.kt`）与 `/revert <itemId>`；用户消息 cell 没有可点击的回退入口。
+- [ ] **steer（运行中插话）**：上游运行中提交是 pending steer 并有预览/编辑
+      （`tui/src/bottom_pane/pending_input_preview.rs`）；Kotlin 运行中一律走
+      `thread/queue`（`chatwidget.kt` 的 `submitInput`），`steerTurn` 协议已绑定但无调用点。
+- [ ] **中断时恢复输入**：上游把 pending steer / 队列草稿并回 composer
+      （`tui/src/chatwidget/input_restore.rs`）；Kotlin 中断后只重读服务端队列，草稿不回流。
+- [ ] **审批决定回执**：上游在 transcript 里记「You approved … / denied / timed out」
+      （`tui/src/history_cell/approvals.rs`）；Kotlin 只关弹窗并改状态，没有回执 cell。
+- [ ] **Plan 实施提示**：上游问「Implement this plan? / 清空上下文实施」
+      （`tui/src/chatwidget/plan_implementation.rs`）；Kotlin 有 plan 模式与时间线，无此一步。
+- [ ] **安全缓冲重试**：上游给「换更快的模型重试 / 继续等待 / 了解更多」
+      （`tui/src/chatwidget/safety_buffering.rs`）；Kotlin 只报一条诊断。
+- [ ] **实时语音（realtime）**：目前是壳，无 WebRTC/录音/字幕，`Realtime*` 通知全部丢弃
+      （`chatwidget/realtime.kt`）；上游 `tui/src/chatwidget/realtime.rs`、
+      `realtime_split_flap.rs`、`realtime_settings.rs`。含麦克风/扬声器电平条、静音提示、
+      连接阶段、voice 选择与设置页。
+- [ ] **goal 持久状态指示**：上游 footer 常驻 Active/Paused/Blocked/UsageLimited/
+      BudgetLimited/Complete 与用量，恢复会话时提示「Resume paused goal?」
+      （`tui/src/chatwidget/goal_status.rs`、`goal_menu.rs`）；Kotlin 只在 GoalSheet 打开时可见。
+- [ ] **通知类型与优先级**：上游有 PlanModePrompt、user-input 请求等类型并按优先级聚合
+      （`tui/src/chatwidget/notifications.rs`）；Kotlin 只有 TurnComplete + ApprovalRequested。
 
-- [ ] 登录后的完整 turn：模型请求、流式 delta、工具调用、审批应答、apply_patch、
-      `/compact`、会话恢复。
-- [ ] `HookStarted/HookCompleted`、`FileChange` 审批、`currentTime/read` 等只有真实服务端
-      才会发的路径。
-- [ ] 审批 UX 新路径：输入中延后（`ChatWidget.ApprovalTypingIdleDelayMs`）、跨线程审批提示与
-      切换、自动审查聚合与「允许一次」覆盖——目前只有 JVM 测试，真机与真实服务端未验证。
-- [ ] 内联异步问题（`AgentMessageItem.questions`）的选项/自由文本应答与 `> 问题` 框定只在
-      JVM 测试里验证过；真实服务端的 `request_user_input_async` 是否走同一形状未验证。
-- [ ] 新增的自动 recap（后台 30 分钟触发）、Ctrl+T 只读 transcript、首屏分页
-      （`thread/resume.initialTurnsPage` + `thread/turns/list`）与 `wait_threads` 动态工具目前
-      只有 JVM 测试，真机行为未验证。
-- [ ] 登录状态：设备码登录 / API key / 取消 / 过期 / 登出，凭据是否只落在 `files/home/.codex/`。
-- [ ] 长会话的流式性能与内存。Kotlin 侧已改增量路径（markdown 只重解析 tail block、
-      diff 只解析追加段），但这批改动只在 JVM 测试里验证过，仍需真机 trace 确认。
-- [ ] 进程被系统回收后的恢复、`transportLagged` 重同步，以及 worker 卡死时看门狗是否
-      如期进入重连横幅——三者目前都只有 JVM 测试。
+## 2. Transcript 渲染
 
-## 2. UI 功能缺口
+- [ ] **Computer/CUA 活动聚合**：相邻 `cua_repl`/node-repl 调用合并为
+      「Using/Used computer · N actions」（上游 `tui/src/history_cell/computer_activity.rs`）；
+      Kotlin 一次调用一张通用 MCP 卡片，无 `cua` 处理。
+- [ ] **Mermaid 图**：完成的 mermaid fence 渲染成图，失败回退代码块
+      （上游 `tui/src/markdown_render/mermaid.rs`）；Kotlin 当普通代码块。
+- [ ] **inline visualization**：`::codex-inline-vis{…}` 指令（上游
+      `tui/src/inline_visualization.rs`）；Kotlin 只处理 `:codex-file-citation{…}`。
+- [ ] **数学排版**：上游对受支持的 TeX 子集做有界排版（`tui/src/markdown_render/math/`）；
+      Kotlin 显示为 mono 斜体源码。
+- [ ] **hook cell**：上游持久显示 Hook completed/failed/Blocked/stopped 及每条
+      `HookOutputEntry`，且不依赖 turn 状态行（`tui/src/history_cell/hook_cell.rs`）；
+      Kotlin 只有运行中的 hook 名和每条失败一条警告，`entries` 文本丢弃。
+- [ ] **compaction 进度**：上游有实时标题与「Context compacted · 3s」
+      （`tui/src/chatwidget/compaction.rs`）；Kotlin 只有静态通知。
+- [ ] **unified exec 等待/交互 cell**：上游区分「Waited for background terminal」与
+      「Interacted with background terminal」（`tui/src/history_cell/exec.rs`）；Kotlin 把
+      stdin 混进命令输出，等待不可见。
+- [ ] **嵌套 review turn**：上游在 transcript/backtrack 里隐藏 review 内部 turn
+      （`tui/src/app_backtrack.rs`）；Kotlin 每个 finished turn 都插分隔。
+- [ ] **启动警告 cell**：上游在 transcript 顶部提示「N startup issues」
+      （`tui/src/history_cell/startup_warnings.rs`）；Kotlin 只在 `/mcp` 页可见。
+- [ ] **turn 分隔符的 runtime metrics**（工具/推理调用数、TTFT/TBT，
+      `tui/src/history_cell/separators.rs`）：wire 没有该数据，需要本地统计。
 
-- [ ] **账户分析仪表盘**：完整 analytics 没有做，且在本仓库当前无法做：上游 `tui/src/analytics/`
-      直连 ChatGPT 私有 HTTP 接口（`codex_backend_client::AnalyticsSession`，路由见
-      `backend-client/src/client/analytics.rs:41-75`），而 app-server 协议没有 analytics 方法，
-      本客户端只走 app-server。已有的部分是 `account/usage/read` 的每日用量与 summary
-      （lifetime/peak、连续天数、最长 turn），见 `status/account.kt`；要补齐按模型/功能/任务/
-      插件/技能与日期范围的报表，需要上游先新增 app-server 方法，再按协议三处同步绑定。
+## 3. 会话与工作区
 
-## 3. 未验证 / 未知
+- [ ] **resume picker**：补排序键（Created/Updated/Recency/Section）与 All/Cwd/来源过滤；
+      展开预览改为完整 transcript（上游 `tui/src/resume_picker/`）；删除加二次确认；
+      打开归档会话时给「解档并恢复」（上游 `tui/src/unarchive_prompt.rs`）。
+- [ ] **worktree**：补 owner/thread 绑定、remove/copy、以及新会话/fork 的「在哪运行」选择
+      （上游 `tui/src/worktree_browser.rs`、`chatwidget/worktree_picker.rs`）；Kotlin
+      `app/worktrees.kt` 只有 `git worktree list/add`。
+- [ ] **`/cd` 语义**：上游在当前会话内换目录（`tui/src/app/working_directory.rs`）；
+      Kotlin 会新开空会话（`app.kt`），`/pwd` 也会打开目录选择器。
+- [ ] **resume/fork 的 cwd 提示**：上游问「用会话 cwd 还是当前 cwd」并记住选择
+      （`tui/src/cwd_prompt.rs`、`session_resume.rs`）；Kotlin 固定用服务端记录值。
+- [ ] **additional dirs**：上游可增删可写根（`tui/src/additional_dirs.rs`）；
+      Kotlin 设置页只读展示。
 
-- [ ] core 在 `danger-full-access` 下是否真的会走 fs helper / arg0 路径；无沙箱退化
-      （`exec-server` 的 `process_sandbox` / `fs_sandbox`）未实测；真机 instrumentation
-      不含 fs helper 与 tty。
-- [ ] `network-proxy` 的 Android 分支指向 Termux 证书路径（`native_certs.rs`），
-      在普通 App 上是 no-op；运行期是否被触达未验证（App 侧靠注入
-      `SSL_CERT_FILE` / `CURL_CA_BUNDLE` 兜底）。
-- [ ] 真机上 diff "显示更多" 分页的滚动位置与长文件 jank 未验证；无截图测试做像素对比。
+## 4. 设置、引导与更新
 
-## 4. 不做
+- [ ] **statusline 配置**：`/statusline` 选择/排序/实时预览页脚条目
+      （上游 `tui/src/bottom_pane/status_line_setup.rs`、`status_surface_preview.rs`）；
+      Kotlin 只有固定状态卡。
+- [ ] **startup hooks 信任审查**：启动时对新增/变更的 hooks 做阻塞式信任确认
+      （上游 `tui/src/startup_hooks_review.rs`）；Kotlin 只在用户打开 `/hooks` 时逐条信任，
+      没有「全部信任」。
+- [ ] **主题**：语法高亮主题列表、实时预览与自定义主题（上游 `tui/src/theme_picker.rs`）；
+      Kotlin 只能选 System/Light/Dark。
+- [ ] **experimental 开关**：失败后保留意图可重试、按 stage 门控、发现失败提示
+      （上游 `tui/src/bottom_pane/experimental_features_view.rs`）；Kotlin 写入是
+      fire-and-forget。
+- [ ] **skills 展示与搜索**：用 `interface.displayName/shortDescription` 并支持模糊过滤
+      （上游 `tui/src/skills_helpers.rs`）；Kotlin 用 raw name，无搜索框。
+- [ ] **`@` 提及**：补 skills 与已授权 connector（`app://`）、搜索模式切换、footer 提示与
+      高亮（上游 `tui/src/task_mentions.rs`、`bottom_pane/mentions_v2/`）；Kotlin 只有
+      plugins/tasks/files/directories。
+- [ ] **模型/effort 默认值**：会话打开时也能「设为默认」，Plan 模式单独覆盖
+      （上游 `tui/src/chatwidget/model_popups.rs`）；补 auto-model 分组与 Ultra 并发警告。
+- [ ] **review 分支/commit 选择器**：上游列出真实分支与 commit（`chatwidget/review_popups.rs`）；
+      Kotlin 要求手输。
+- [ ] **feedback**：区分内外部受众的披露、上传后给 issue 链接、附件选择
+      （上游 `tui/src/bottom_pane/feedback_view.rs`）；Kotlin 只有分类/理由/日志同意。
+- [ ] **backend/workspace banner 通用化**：上游 `actionable_banner.rs` 支持标题/描述/CTA/关闭
+      （account mismatch、用量恢复、workspace owner 提示等）；Kotlin 的
+      `app/session_status.kt` 明确不解析 banner，只有硬编码横幅与连接中断横幅。
+- [ ] **onboarding/启动**：首运行欢迎页、trust 提示的「Open restricted/Open existing task」
+      变体、model migration 一次性提示（上游 `tui/src/onboarding/welcome.rs`、
+      `trust_directory.rs`、`model_migration.rs`、`startup_orchestration.rs`）；Kotlin
+      启动编排只有 bootstrap/restore。
 
-- 终端专有机制：vim 模态与键位重绑、crossterm 原始键事件、bracketed paste / Kitty 协议、
-  终端光标与 scrollback 重排、ANSI/OSC 标记、终端标题与调色板、BEL/OSC 9、OSC-52、
-  sixel 内联图片、pager overlay、PTY 终端网格渲染、daemon 菜单、IDE context IPC、
-  `$EDITOR` → PTY。
-- PTY / 交互式命令：`process/spawn|write|resize|kill` 不实现，
-  `json_rpc_app_server_client.kt` 的 `require(!tty)` 保留；命令执行只走 `command/exec`
-  的非交互流。
-- 设备端编译工具链：clang/rustc/cmake/ninja/perl；JDK 与 Android 构建工具（aapt2/d8/
-  apksigner/Gradle，glibc 程序，bionic 上跑不起来）。见 [toolchain.md](toolchain.md)。
-- node/npm（由 bun 取代）；wget（由 curl 取代）、vi/less/top/watch（无 PTY）、
-  nc/ping/traceroute（用 curl 或 bash `/dev/tcp`，或需要额外权限）。
+## 5. 暂缓与待定
 
-## 5. 暂缓
+- [ ] **账户分析仪表盘**：上游 `tui/src/analytics/` 直连 ChatGPT 私有 HTTP 接口
+      （`backend-client` 的 analytics 路由），app-server 无对应方法；补齐按模型/功能/
+      日期范围的报表需要上游先加协议。已有 `account/usage/read` 的每日用量与 summary。
+- [ ] **APK 更新提示**：上游 `tui/src/updates.rs` 面向自更新安装；Android 走应用分发，
+      是否在应用内做检查/提示待定。
+- [ ] **本地模型 provider（Ollama/LM Studio）**：上游 `tui/src/oss_selection.rs`；手机上
+      是否有可用的本地服务端场景待定。
 
-- **体积与启动耗时裁剪**：`libcodex_android_jni.so` 168 MiB + `libcodex_helper.so` 18 MiB
-  （已 strip），jniLibs 合计约 361 MB；`native/Cargo.toml` 没有 `[features]`，
-  `--no-default-features` 不生效。等体积成为实际问题再处理，届时先记启动耗时基线。
+## 6. 终端专有、平台与工具链
 
-## 附录 A：上游参考位置
+以下机制在终端形态下才有直接对应物，或受 Android 平台约束尚未提供；均作为待办跟踪，
+多数需要先确定 Android 上的等价交互或前置能力。
 
-| 主题 | 位置（`codex/codex-rs/`） |
-| --- | --- |
-| 客户端门面 / 后端枚举 | `app-server-client/src/lib.rs`（`AppServerClient`、`InProcessAppServerClient`）、`tui/src/lib.rs`（`AppServerTarget`） |
-| in-process 事件与背压 | `app-server/src/in_process.rs` |
-| 后端选择 / 探测 / 回退 | `tui/src/lib.rs`（`can_reuse_implicit_local_daemon` 等） |
-| ws 鉴权参数 | `app-server-transport/src/transport/auth.rs` |
-| 协议 schema（字段级对照的输入） | `app-server-protocol/schema/json/`、`schema/precomputed/` |
-| markdown 渲染 | `tui/src/markdown_render.rs` + `markdown_render/` |
-| 语法高亮 | `tui/src/render/highlight.rs` |
-| diff 渲染 | `tui/src/diff_render.rs` + `diff_model.rs` |
-| slash 命令全集 | `tui/src/slash_command.rs` |
-| 状态卡 / 费率 | `tui/src/status/` |
-| hooks 通知负载 | `app-server-protocol/src/protocol/v2/hook.rs` |
-
-上游事实：`ServerNotification` 共 84 条，其中 `rawResponse*` 两条上游 TUI 自己也忽略；
-`app-server-protocol` 的 `schema/` 是 `UpstreamSchemaTest` 的输入；它离线比对 Kotlin 类型与上游 schema。
-
-## 附录 B：有意分歧（不是缺口）
-
-- **后端只做 Embedded(in-process) 一种。** 上游 `tui/src/lib.rs` 的 `AppServerTarget` 有
-  `Embedded` / `LocalDaemon` / `Remote` 三种并带探测与回退；Android 固定同进程
-  `InProcessClientHandle`（`runtime/CodexApplication.kt` 直接构造 `NativeRpcTransport`），
-  没有 websocket 依赖、无 UDS/loopback endpoint、无 ws 鉴权、无 remote-workspace 语义，
-  也没有按后端的配置隔离（`SharedPreferences` 全局一份即可）。
-- collab / sub-agent 卡片进 transcript（本客户端用独立 Agents 页 + 页头导航，不把卡片插进
-  transcript）。
-- dynamic / function-call 工具卡片（上游在 transcript 里忽略通用 `FunctionCallOutput`）。
-- 只读的细粒度审批开关、线程附件托盘、`project/*` 与 `threadSection/*` 界面：
-  上游 TUI 无对应物（有的是协议定义）。
-- OAuth 浏览器登录的回调由 app-server 的 localhost 回调服务器完成（`login/src/server.rs`），
-  浏览器与内嵌服务同机，Android 端因此不注册自定义 scheme、不需要 `onNewIntent`。
-- 凭据不额外套 Keystore/EncryptedSharedPreferences：`auth.json` 由内嵌的 Rust 服务直接读写
-  （`login/src/auth/storage.rs`，unix 下 0600），加密文件它读不了；落盘位置在应用私有目录
-  `files/home/.codex/`，依赖 Android 沙箱而非密钥库。
+- [ ] **vim 模态与键位重绑**：上游 `tui/src/bottom_pane/vim_*.rs`、`keymap/`；在 Compose
+      输入层实现，硬件键盘场景可用。
+- [ ] **终端按键语义**：crossterm 原始键事件、Kitty 键盘协议、bracketed paste；Compose
+      没有对应事件层，需先定义映射。
+- [ ] **光标与 scrollback 重排**：Compose 列表没有终端 scrollback，需确定等价交互
+      （保持阅读位置、跳转等）。
+- [ ] **ANSI/OSC 与终端元信息**：ANSI/OSC 标记、终端标题与调色板、BEL/OSC 9、OSC-52；
+      需要通知、剪贴板与标题的等价物。
+- [ ] **sixel 内联图片**：改为 Compose 图片渲染路径。
+- [ ] **pager overlay**：在 Ctrl+T 只读历史页（`app/history_ui.kt`）基础上扩展为通用
+      全屏分页视图。
+- [ ] **PTY 终端网格渲染与 daemon 菜单**：依赖下一条的 PTY 支持。
+- [ ] **IDE context IPC**：上游 `tui/src/ide_context.rs`；需要 IDE 侧协议配合。
+- [ ] **`$EDITOR` → PTY**：可用系统编辑器 Intent 近似，语义不同。
+- [ ] **`/raw`、`/title`、pets**：上游 `tui/src/chatwidget/pets.rs` 等；需定 Android
+      表现形式。
+- [ ] **PTY / 交互式命令**：`process/spawn|write|resize|kill`；当前
+      `json_rpc_app_server_client.kt` 保留 `require(!tty)`，命令只走 `command/exec`
+      的非交互流。
+- [ ] **LocalDaemon / Remote 后端**：探测与回退、ws 鉴权、remote-workspace 语义、
+      按后端隔离的配置（上游 `tui/src/lib.rs` 的 `AppServerTarget`）；当前固定同进程
+      Embedded。
+- [ ] **CLI 专有机制**：named session lookup（`named_session_lookup.rs`）、跨会话排队
+      （`session_queue_commands.rs`）、`CODEX_TUI_RECORD_SESSION` 式 JSONL 录制
+      （`session_log.rs`）、`/app`（上游仅 macOS/Windows，需 Android 等价物）、`/ide`、
+      `/daemon`、`/keymap`、`/vim`、`/elevate-sandbox`。
+- [ ] **设备端编译工具链**：clang/rustc/cmake/ninja/perl 与 JDK、Android 构建工具
+      （aapt2/d8/apksigner/Gradle）受 bionic/glibc 限制，需先评估可行路径；
+      见 [toolchain.md](toolchain.md)。
+- [ ] **缺失工具**：node/npm（现由 bun 取代）、wget（现由 curl 取代）、
+      vi/less/top/watch、nc/ping/traceroute（依赖 PTY 或额外权限）。
+- [ ] **登录与凭据**：系统浏览器回跳的自定义 scheme（现由 app-server localhost 回调
+      替代）、`auth.json` 的 Keystore 保护（内嵌 Rust 直接读写该文件，需要上游支持
+      外部密钥回调）。

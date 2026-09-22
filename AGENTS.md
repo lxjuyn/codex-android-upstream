@@ -49,4 +49,4 @@
 | native / Rust | `./gradlew :native:buildJni`，宿主内核验证 `./gradlew :native:hostSmokeTest` |
 | 真机集成 | `bash scripts/device-smoke-test.sh -PskipNativeBuild` |
 
-模型生成与登录需要真实账户和网络，离线测试不能替代（见 `docs/TODO.md`）。
+模型生成与登录需要真实账户和网络，离线测试不能替代。
