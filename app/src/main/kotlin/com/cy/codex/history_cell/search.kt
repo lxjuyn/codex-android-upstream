@@ -59,7 +59,10 @@ fun WebSearchCell(
     ToolCard(
         icon = MiuixIcons.Basic.Search,
         title = webSearchTitle(item),
-        subtitle = stringResource(R.string.search_cell_result_count, item.results.size),
+        // A server that does not ship result payloads at all is not a search that found nothing,
+        // so the count only appears when there is something to count.
+        subtitle = item.results.takeIf { it.isNotEmpty() }
+            ?.let { stringResource(R.string.search_cell_result_count, it.size) },
         modifier = modifier,
     ) {
         if (item.results.isEmpty()) {
@@ -134,15 +137,55 @@ fun ImageViewCell(item: ImageViewItem, modifier: Modifier = Modifier) {
 
 @Composable
 fun ImageGenerationCell(item: ImageGenerationItem, modifier: Modifier = Modifier) {
-    val tone = dynamicTone(item.status)
+    val tone = imageGenerationTone(item.status)
     CompactLine(
         icon = MiuixIcons.Photos,
-        text = stringResource(R.string.search_cell_image_generation),
-        detail = item.prompt.ifBlank { null },
+        text =
+            stringResource(
+                if (item.failed) {
+                    R.string.search_cell_image_generation_failed
+                } else {
+                    R.string.search_cell_image_generation
+                }
+            ),
+        detail = item.revisedPrompt?.takeIf { it.isNotBlank() },
         modifier = modifier,
         tone = tone,
-        trailing = { StatusChip(label = dynamicLabel(item.status), tone = tone) },
+        trailing = { StatusChip(label = imageGenerationLabel(item.status), tone = tone) },
     )
+    if (item.savedPath != null) {
+        CompactLine(
+            icon = MiuixIcons.Photos,
+            text = stringResource(R.string.search_cell_image_saved_to),
+            detail = item.savedPath,
+            modifier = modifier,
+        )
+    }
+}
+
+/**
+ * Tone for the server's own image-generation status string.
+ *
+ * The vocabulary belongs to the server (`ext/items/src/image_generation.rs` only guarantees
+ * `completed` and `failed`), so an unknown value reads as still running rather than as a failure.
+ */
+internal fun imageGenerationTone(status: String): ThreadStatusTone = when (status) {
+    ImageGenerationItem.CompletedStatus -> ThreadStatusTone.Done
+    ImageGenerationItem.FailedStatus -> ThreadStatusTone.Failed
+    else -> ThreadStatusTone.Running
+}
+
+/** The chip label for [imageGenerationTone]; the three known statuses reuse the dynamic labels. */
+@Composable
+@ReadOnlyComposable
+internal fun imageGenerationLabel(status: String): String = when (status) {
+    ImageGenerationItem.CompletedStatus ->
+        stringResource(R.string.mcp_cell_dynamic_status_completed)
+
+    ImageGenerationItem.FailedStatus ->
+        stringResource(R.string.mcp_cell_dynamic_status_failed)
+
+    else -> stringResource(R.string.mcp_cell_dynamic_status_calling)
 }
 
 @Composable

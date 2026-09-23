@@ -10,6 +10,7 @@ import com.cy.codex.protocol.protocol.item.ExitedReviewModeItem
 import com.cy.codex.protocol.protocol.item.FileChangeItem
 import com.cy.codex.protocol.protocol.item.FunctionCallOutputItem
 import com.cy.codex.protocol.protocol.item.HookPromptItem
+import com.cy.codex.protocol.protocol.item.ImageGenerationFailure
 import com.cy.codex.protocol.protocol.item.ImageGenerationItem
 import com.cy.codex.protocol.protocol.item.ImageViewItem
 import com.cy.codex.protocol.protocol.item.McpToolCallItem
@@ -71,7 +72,8 @@ private fun transcriptLines(item: ThreadItem): List<String> = when (item) {
     is ReasoningItem -> item.summary + item.content
     is FunctionCallOutputItem -> item.output.lines()
     is HookPromptItem -> item.fragments.flatMap { fragment ->
-        listOf("hook ${fragment.hookName}:") + fragment.text.lines()
+        val header = fragment.hookRunId.takeIf { it.isNotBlank() }?.let { "hook $it:" } ?: "hook:"
+        listOf(header) + fragment.text.lines()
     }
 
     is CommandExecutionItem ->
@@ -114,7 +116,16 @@ private fun transcriptLines(item: ThreadItem): List<String> = when (item) {
     is WebSearchItem -> listOf("web search: ${item.query}")
     is ImageViewItem -> listOf("image: ${item.path}")
     is SleepItem -> listOf("sleep: ${item.durationMs}ms")
-    is ImageGenerationItem -> listOf("image generation: ${item.prompt}")
+    is ImageGenerationItem -> buildList {
+        add("image generation: ${item.detail}")
+        item.failure?.let { failure ->
+            when (failure) {
+                is ImageGenerationFailure.UsageLimitExceeded ->
+                    add("  failure: usage limit ${failure.limitId}")
+            }
+        }
+        item.savedPath?.let { add("  saved to: $it") }
+    }
     is EnteredReviewModeItem -> listOf("entered review mode: ${item.review}")
     is ExitedReviewModeItem -> listOf("exited review mode: ${item.review}")
     is ContextCompactionItem -> listOf("context compacted")

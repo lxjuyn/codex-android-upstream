@@ -169,7 +169,23 @@ sealed interface UserInput {
         val textElements: List<TextElement> = emptyList(),
     ) : UserInput
 
-    data class Image(val url: String, val detail: String? = null) : UserInput
+    /**
+     * An image the server already holds, referenced either by an inline URL or by an uploaded
+     * file id.
+     *
+     * The two are a flattened union upstream (`ImageReference` in
+     * `app-server-protocol/src/protocol/v2/turn.rs`), so exactly one of [Image.url] and
+     * [Image.fileId] is present in any real payload; a file-backed image has no URL to fall back on,
+     * which is why both are nullable instead of defaulting the missing one to "".
+     */
+    data class Image(
+        val url: String? = null,
+        val fileId: String? = null,
+        val detail: String? = null,
+    ) : UserInput {
+        /** The best identity to show or export, preferring the URL. */
+        val reference: String get() = url ?: fileId.orEmpty()
+    }
 
     data class LocalImage(val path: String, val detail: String? = null) : UserInput
 

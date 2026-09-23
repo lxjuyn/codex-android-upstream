@@ -97,7 +97,7 @@ class ResumePickerTest {
                 id = "u",
                 content = listOf(
                     UserInput.Text("first part"),
-                    UserInput.Image("https://example.com/a.png"),
+                    UserInput.Image(url = "https://example.com/a.png"),
                     UserInput.Text("second part"),
                 ),
             ),

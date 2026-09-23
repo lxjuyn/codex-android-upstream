@@ -584,7 +584,7 @@ private fun toolMarker(item: ThreadItem, turnId: String?): JsonObject? {
     return when (item) {
         is CommandExecutionItem -> marker(item.id, "commandExecution", "commandExecution", item.status.wire)
         is FileChangeItem -> marker(item.id, "fileChange", "fileChange", item.status.wire)
-        is ImageGenerationItem -> marker(item.id, "imageGeneration", "imageGeneration", item.status.wire)
+        is ImageGenerationItem -> marker(item.id, "imageGeneration", "imageGeneration", item.status)
         is McpToolCallItem -> marker(item.id, "mcpToolCall", item.tool, item.status.wire)
         is DynamicToolCallItem -> marker(item.id, "dynamicToolCall", item.tool, item.status.wire)
         is CollabAgentToolCallItem -> marker(item.id, "collabAgentToolCall", item.tool.wire, item.status.wire)

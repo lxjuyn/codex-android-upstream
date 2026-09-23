@@ -50,7 +50,9 @@ internal object WireCodec {
             // The wire field stays snake_case: the v2 enum's variant fields were not renamed.
             "text_elements" to value.textElements.map(::textElement),
         )
-        is UserInput.Image -> obj("type" to "image", "url" to value.url, "detail" to value.detail)
+        // The image arm is a flattened `{url} | {fileId}` union, so only the present reference is
+        // sent; `obj` drops null fields for exactly this reason.
+        is UserInput.Image -> obj("type" to "image", "url" to value.url, "fileId" to value.fileId, "detail" to value.detail)
         is UserInput.LocalImage -> obj("type" to "localImage", "path" to value.path, "detail" to value.detail)
         is UserInput.Audio -> obj("type" to "audio", "url" to value.url)
         is UserInput.LocalAudio -> obj("type" to "localAudio", "path" to value.path)
@@ -76,7 +78,9 @@ internal object WireCodec {
         val o = value.objectValue()
         return when (o.required("type")) {
             "text" -> UserInput.Text(o.required("text"), o.array("text_elements").map(::textElement))
-            "image" -> UserInput.Image(o.required("url"), o.text("detail"))
+            // `url` and `fileId` are a union, so neither may be required: an uploaded image has
+            // no url and requiring one would abort the whole message.
+            "image" -> UserInput.Image(o.text("url"), o.text("fileId"), o.text("detail"))
             "localImage" -> UserInput.LocalImage(o.required("path"), o.text("detail"))
             "audio" -> UserInput.Audio(o.required("url"))
             "localAudio" -> UserInput.LocalAudio(o.required("path"))
@@ -173,15 +177,22 @@ internal object WireCodec {
                 o.text("text").orEmpty(),
                 MessagePhase.entries.find { it.wire == o.text("phase") || (it == MessagePhase.FinalAnswer && o.text("phase") == "final_answer") },
                 asyncQuestions(o),
+                memoryCitation(o),
+                AgentMessageDelivery.fromWire(o.text("delivery")),
             )
             "plan" -> PlanItem(id, o.text("text").orEmpty())
             "reasoning" -> ReasoningItem(id, o.strings("summary"), o.strings("content"))
             "commandExecution" -> CommandExecutionItem(id, o.required("command"), o.required("cwd"), o.text("processId"),
                 CommandExecutionSource.entries.find { it.wire == o.text("source") } ?: CommandExecutionSource.Agent,
-                CommandExecutionStatus.fromWire(status.orEmpty()), aggregatedOutput = o.text("aggregatedOutput"), exitCode = o.int("exitCode"), durationMs = o.long("durationMs"))
+                CommandExecutionStatus.fromWire(status.orEmpty()),
+                o.array("commandActions").mapNotNull(::commandAction),
+                pluginId = o.text("pluginId"), scriptPath = o.text("scriptPath"),
+                aggregatedOutput = o.text("aggregatedOutput"), exitCode = o.int("exitCode"), durationMs = o.long("durationMs"))
             "fileChange" -> FileChangeItem(id, changes(o), PatchApplyStatus.fromWire(status.orEmpty()))
             "mcpToolCall" -> McpToolCallItem(id, o.required("server"), o.required("tool"), McpToolCallStatus.entries.find { it.wire == status } ?: McpToolCallStatus.InProgress,
-                o["arguments"]?.let(Json::write) ?: "{}", o["result"]?.takeUnless { it == JsonNull }?.let(Json::write), o.objectOrNull("error")?.text("message"), o.long("durationMs"))
+                o["arguments"]?.let(Json::write) ?: "{}", appContext = mcpAppContext(o), mcpAppUi = mcpAppUi(o),
+                pluginId = o.text("pluginId"), readOnlyHint = o.bool("readOnlyHint"), mcpAppResourceUri = o.text("mcpAppResourceUri"),
+                result = o["result"]?.takeUnless { it == JsonNull }?.let(Json::write), error = o.objectOrNull("error")?.text("message"), durationMs = o.long("durationMs"))
             "dynamicToolCall" -> DynamicToolCallItem(id, o.text("namespace"), o.required("tool"), o["arguments"]?.let(Json::write) ?: "{}",
                 DynamicToolCallStatus.entries.find { it.wire == status } ?: DynamicToolCallStatus.InProgress, o.array("contentItems").mapNotNull(::dynamicToolContent), o.bool("success"), o.long("durationMs"))
             "collabAgentToolCall" -> CollabAgentToolCallItem(id, CollabAgentTool.entries.find { it.wire == o.text("tool") } ?: CollabAgentTool.SendInput,
@@ -192,15 +203,17 @@ internal object WireCodec {
             "webSearch" -> WebSearchItem(
                 id,
                 o.text("query") ?: o.objectOrNull("action")?.text("query").orEmpty(),
+                results = o.array("results").mapNotNull(::webSearchResult),
                 action = o.objectOrNull("action")?.let(::webSearchAction),
             )
             "imageView" -> ImageViewItem(id, o.required("path"))
             "sleep" -> SleepItem(id, o.long("durationMs") ?: 0)
-            "imageGeneration" -> ImageGenerationItem(id, o.text("prompt").orEmpty(), DynamicToolCallStatus.entries.find { it.wire == status } ?: DynamicToolCallStatus.InProgress)
+            "imageGeneration" -> ImageGenerationItem(id, status.orEmpty(), o.text("revisedPrompt"),
+                o.text("result").orEmpty(), o.bool("transparentBackground"), imageGenerationFailure(o), o.text("savedPath"))
             "enteredReviewMode" -> EnteredReviewModeItem(id, o.required("review"))
             "exitedReviewMode" -> ExitedReviewModeItem(id, o.required("review"))
             "contextCompaction" -> ContextCompactionItem(id)
-            "hookPrompt" -> HookPromptItem(id, o.array("fragments").map { it.objectValue().let { f -> HookPromptFragment(f.required("text"), f.text("hookName").orEmpty()) } })
+            "hookPrompt" -> HookPromptItem(id, o.array("fragments").map { it.objectValue().let { f -> HookPromptFragment(f.required("text"), f.text("hookRunId").orEmpty()) } })
             "functionCallOutput" -> FunctionCallOutputItem(id, o.required("name"), o.text("namespace"), o["output"]?.wireText().orEmpty())
             else -> FunctionCallOutputItem(id, type, output = Json.write(o))
         }
@@ -357,6 +370,93 @@ internal object WireCodec {
         )
 
         else -> WebSearchAction.Other
+    }
+
+    /**
+     * One element of `webSearch.results`.
+     *
+     * The wire type is opaque JSON (`ext/items/src/web_search.rs`), so anything without a title or
+     * a url is dropped instead of rendered as a blank row — a result the transcript cannot name is
+     * not worth a line.
+     */
+    private fun webSearchResult(value: JsonElement): WebSearchResult? {
+        val o = value as? JsonObject ?: return null
+        val url = o.text("url").orEmpty()
+        val title = o.text("title").orEmpty()
+        if (url.isBlank() && title.isBlank()) return null
+        return WebSearchResult(title = title, url = url, snippet = o.text("snippet"), type = o.text("type"))
+    }
+
+    /**
+     * One `ImageGenerationFailure`; unknown tags are dropped rather than shown as a generic failure.
+     *
+     * The union has a single variant today, so an unrecognised tag means the server knows a failure
+     * mode this build cannot describe.
+     */
+    private fun imageGenerationFailure(o: JsonObject): ImageGenerationFailure? {
+        val failure = o.objectOrNull("failure") ?: return null
+        return when (failure.text("type")) {
+            "usageLimitExceeded" ->
+                ImageGenerationFailure.UsageLimitExceeded(failure.required("limitId"), failure.long("resetsAt"))
+
+            else -> null
+        }
+    }
+
+    /**
+     * Memory the agent message cited.
+     *
+     * `entries` is the only place the citation's file paths live; upstream keeps `threadIds` on the
+     * wire too (`MemoryCitation` in `codex-rs/protocol/src/memory_citation.rs`).
+     */
+    private fun memoryCitation(o: JsonObject): MemoryCitation? {
+        val citation = o.objectOrNull("memoryCitation") ?: return null
+        val entries = citation.array("entries").mapNotNull { value ->
+            val entry = value as? JsonObject ?: return@mapNotNull null
+            val path = entry.text("path").orEmpty()
+            if (path.isBlank()) null else MemoryCitationEntry(
+                path = path,
+                lineStart = entry.int("lineStart"),
+                lineEnd = entry.int("lineEnd"),
+                note = entry.text("note"),
+            )
+        }
+        return MemoryCitation(entries, citation.strings("threadIds"))
+    }
+
+    /** `mcpToolCall.appContext`; `connectorId` is the field that decides the object exists. */
+    private fun mcpAppContext(o: JsonObject): McpToolCallAppContext? {
+        val context = o.objectOrNull("appContext") ?: return null
+        val connectorId = context.text("connectorId") ?: return null
+        return McpToolCallAppContext(
+            connectorId = connectorId,
+            linkId = context.text("linkId"),
+            resourceUri = context.text("resourceUri"),
+            appName = context.text("appName"),
+            actionName = context.text("actionName"),
+        )
+    }
+
+    /** `mcpToolCall.mcpAppUi`: presentation captured from the invoked descriptor. */
+    private fun mcpAppUi(o: JsonObject): McpAppUi? {
+        val ui = o.objectOrNull("mcpAppUi") ?: return null
+        return McpAppUi(ui.text("resourceUri"), ui.text("preferredModelDisplayMode"))
+    }
+
+    /**
+     * One `CommandAction` element, shared by `commandExecution.commandActions` and the approval
+     * requests that describe the same parsed command; an unknown future tag is dropped, not faked.
+     */
+    fun commandAction(value: JsonElement): CommandAction? {
+        val o = value as? JsonObject ?: return null
+        val command = o.text("command") ?: return null
+        return when (o.text("type")) {
+            "read" -> CommandAction.Read(command, o.required("name"), o.required("path"))
+            "listFiles" -> CommandAction.ListFiles(command, o.text("path"))
+            "search" -> CommandAction.Search(command, o.text("query"), o.text("path"))
+            "unknown" -> CommandAction.Unknown(command)
+            else -> null
+        }
     }
 
     fun hookMetadata(o: JsonObject) = HookMetadata(

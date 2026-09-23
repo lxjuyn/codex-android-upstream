@@ -572,7 +572,20 @@ class JsonRpcAppServerClient(
     }
     override suspend fun cancelLogin(loginId: String) = call("account/login/cancel", obj("loginId" to loginId))
     override suspend fun logout() = call("account/logout", null)
-    override suspend fun readRateLimits() = result { WireCodec.accountRateLimits(rpc("account/rateLimits/read")) }
+    override suspend fun readRateLimits() = result {
+        // `supportsLunaReserve` is a capability claim, not a hint: it tells the backend this client
+        // can be recorded in the fallback experiment. An older server rejects the unknown params
+        // outright, so the read retries with none rather than failing the usage screen
+        // (`app/background_requests.rs` in the TUI does the same).
+        val read = runCatching {
+            rpc("account/rateLimits/read", obj("supportsLunaReserve" to true))
+        }.recoverCatching { error ->
+            val code = (error as? AppServerRpcException)?.code
+            if (code != -32600 && code != -32602) throw error
+            rpc("account/rateLimits/read", null)
+        }
+        WireCodec.accountRateLimits(read.getOrThrow())
+    }
     override suspend fun readUsage() = result {
         val o = rpc("account/usage/read")
         val summary = o.objectOrNull("summary")
@@ -1155,17 +1168,8 @@ class JsonRpcAppServerClient(
         if (event != null) eventQueue.send(event)
     }
 
-    /** One element of a request's `commandActions`; an unknown future tag is dropped, not faked. */
-    private fun commandAction(value: JsonElement): CommandAction? {
-        val o = value.objectValue()
-        return when (o.text("type")) {
-            "read" -> CommandAction.Read(o.required("command"), o.required("name"), o.required("path"))
-            "listFiles" -> CommandAction.ListFiles(o.required("command"), o.text("path"))
-            "search" -> CommandAction.Search(o.required("command"), o.text("query"), o.text("path"))
-            "unknown" -> CommandAction.Unknown(o.required("command"))
-            else -> null
-        }
-    }
+    /** One element of a request's `commandActions`; shared with the `commandExecution` item. */
+    private fun commandAction(value: JsonElement): CommandAction? = WireCodec.commandAction(value)
 
     private fun networkPolicyAmendment(value: JsonElement): NetworkPolicyAmendment? {
         val o = value.objectValue()

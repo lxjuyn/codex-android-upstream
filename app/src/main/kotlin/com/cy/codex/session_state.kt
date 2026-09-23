@@ -531,7 +531,7 @@ class SessionState {
                     if (item.status == CollabAgentToolCallStatus.InProgress) item.copy(status = CollabAgentToolCallStatus.Failed) else null
 
                 is ImageGenerationItem ->
-                    if (item.status == DynamicToolCallStatus.InProgress) item.copy(status = DynamicToolCallStatus.Failed) else null
+                    if (item.status == ImageGenerationItem.InProgressStatus) item.copy(status = ImageGenerationItem.FailedStatus) else null
 
                 else -> null
             }

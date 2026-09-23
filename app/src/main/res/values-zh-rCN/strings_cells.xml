@@ -65,7 +65,6 @@
     <string name="notices_cell_entered_review_mode">已进入审查模式</string>
     <string name="notices_cell_exited_review_mode">已退出审查模式</string>
     <string name="notices_cell_hook">Hook</string>
-    <string name="notices_cell_hook_named">Hook · %1$s</string>
 
     <!-- PatchesCell.kt -->
     <string name="patches_cell_title">文件改动</string>
@@ -107,6 +106,8 @@
     <string name="search_cell_no_results">没有返回结果</string>
     <string name="search_cell_view_image">查看图片</string>
     <string name="search_cell_image_generation">生成图片</string>
+    <string name="search_cell_image_generation_failed">图片生成失败</string>
+    <string name="search_cell_image_saved_to">已保存到</string>
     <string name="search_cell_sleep">等待</string>
 
     <!-- MessagesCell.kt -->

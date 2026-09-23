@@ -148,7 +148,7 @@ internal fun activeToolDetail(items: List<ThreadItem>): String? {
             is McpToolCallItem -> candidate.status == McpToolCallStatus.InProgress
             is DynamicToolCallItem -> candidate.status == DynamicToolCallStatus.InProgress
             is CollabAgentToolCallItem -> candidate.status == CollabAgentToolCallStatus.InProgress
-            is ImageGenerationItem -> candidate.status == DynamicToolCallStatus.InProgress
+            is ImageGenerationItem -> candidate.status == ImageGenerationItem.InProgressStatus
             else -> false
         }
     } ?: return null
@@ -158,7 +158,7 @@ internal fun activeToolDetail(items: List<ThreadItem>): String? {
         is McpToolCallItem -> "${item.server}.${item.tool}"
         is DynamicToolCallItem -> item.namespace?.let { "$it.${item.tool}" } ?: item.tool
         is CollabAgentToolCallItem -> item.tool.wire
-        is ImageGenerationItem -> item.prompt.lineSequence().firstOrNull { it.isNotBlank() }
+        is ImageGenerationItem -> item.revisedPrompt?.lineSequence()?.firstOrNull { it.isNotBlank() }
         else -> null
     }
 }

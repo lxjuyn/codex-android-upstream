@@ -186,8 +186,6 @@ fun HookPromptCell(
     headerFontSize: TextUnit = UiType.RowDetail,
     headerLineHeight: TextUnit = UiType.Message,
     fragmentSpacing: Dp = 2.dp,
-    fragmentNameFontSize: TextUnit = UiType.Footnote,
-    fragmentNameLineHeight: TextUnit = UiType.CardTitle,
     fragmentFontSize: TextUnit = UiType.Body,
     fragmentLineHeight: TextUnit = UiType.BodyLine,
 ) {
@@ -219,13 +217,9 @@ fun HookPromptCell(
         }
         item.fragments.forEach { fragment ->
             Column(verticalArrangement = Arrangement.spacedBy(fragmentSpacing)) {
-                Text(
-                    text = stringResource(R.string.notices_cell_hook_named, fragment.hookName),
-                    fontSize = fragmentNameFontSize,
-                    lineHeight = fragmentNameLineHeight,
-                    color = colors.onSurfaceVariantSummary,
-                    maxLines = 1,
-                )
+                // The wire only carries the hook's opaque run id — `hookRunId` — and no name, and
+                // the header above already says the block came from a hook, so there is nothing
+                // worth a second line here.
                 Text(
                     text = fragment.text,
                     fontSize = fragmentFontSize,

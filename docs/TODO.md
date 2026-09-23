@@ -10,39 +10,46 @@ wire 类型、`json_rpc_app_server_client.kt` 绑定与 JVM 测试三处；每�
 
 ## 0. 协议解析与绑定缺陷（改动小、用户直接可见，优先）
 
-- [ ] **hook 名解析错字段**：wire 是 `fragments[].hookRunId`（上游
-      `app-server-protocol/src/protocol/v2/item.rs`），Kotlin 读的是不存在的 `hookName`
-      （`protocol/wire_codec.kt:203`），`HookPromptFragment.hookName` 永远为空，
-      `history_cell/notices.kt` 与 `app/transcript_export.kt` 显示「Hook · 」。
-- [ ] **web search 结果丢失**：`WebSearchItem.results` 不解析（`protocol/wire_codec.kt:192`），
-      `history_cell/search.kt` 永远渲染「0 results / No results」。
-- [ ] **exec 卡片 commandActions 丢失**：`commandActions` 不解析（`protocol/wire_codec.kt:179`），
-      卡片 chips 与「Explored」折叠（`history_cell/exec.kt`、`chatwidget/rendering.kt` 的
-      `foldTranscriptRows`）是死代码，`isExploringCall()` 永远 false。
-- [ ] **image generation 明细丢失**：读了不存在的 `prompt` 字段，`revisedPrompt/result/
-      savedPath/failure/transparentBackground` 全丢（`protocol/wire_codec.kt:199`，
-      `history_cell/search.kt`）；对照上游 `tui/src/history_cell/patches.rs`。
-- [ ] **MCP 调用丢字段**：`appContext/mcpAppUi/pluginId/readOnlyHint/mcpAppResourceUri`
-      未解析（`protocol/wire_codec.kt:183`），上游 `history_cell/mcp.rs` 用它们渲染
-      app/插件/只读标记。
-- [ ] **agent message 丢 memoryCitation/delivery**（`protocol/wire_codec.kt:171`）。
-- [ ] **审批 `_meta` 与持久化选择未解析**：`json_rpc_app_server_client.kt` 的审批解析不读
-      meta，`bottom_pane/approval_overlay.kt` 只发默认响应。缺 MCP tool suggestion 的
-      Install/Enable、Allow once/session/always 选项与 approval display params；
-      上游 `tui/src/bottom_pane/approval_overlay.rs`、`mcp_server_elicitation.rs`。
+`wire_codec.kt` 的 `item()` 变体与字段解析已逐条对齐上游（19 个变体、字段名与 camelCase
+拼写、`UserInput.Image` 的 `{url} | {fileId}` 联合）；`app/src/test/.../wire_codec_tests.kt`
+覆盖这些解析点。以下为仍未接线的部分。
+
+- [ ] **审批 display params 与持久化选择未解析**：`_meta` 本身已读取并回显（elicitation 路径，
+      `json_rpc_app_server_client.kt`、`bottom_pane/mcp_server_elicitation.kt`），缺的是 `_meta`
+      之上的四种消费：`codex_approval_kind=mcp_tool_call` 派生的空表单 ApprovalAction
+      （Allow / Allow for this session / Always allow，由 `persist` 决定出现哪些）、
+      `tool_suggestion` + `tool_type`/`suggest_type`/`install_url` 的 Install/Enable 卡片、
+      `tool_params_display` 明细，以及 Exec/ApplyPatch/Permissions/DynamicTool 四族不带 meta
+      的审批；`bottom_pane/approval_overlay.kt` 目前只发默认响应。上游
+      `tui/src/bottom_pane/approval_overlay.rs`、`mcp_server_elicitation.rs`。
 - [ ] **elicitation 只支持 url/form**：`bottom_pane/mcp_server_elicitation.kt` 把
       `openai/userVerification` 变体当普通空表单，无法完成验证签名；上游
-      `tui/src/bottom_pane/user_verification.rs`。
+      `tui/src/bottom_pane/user_verification.rs`、`app/user_verification_requests.rs`
+      （需 native 侧 P-256/SHA-256 凭据签名）。
 - [ ] **权限 profile 选择器缺失**：`permissionProfile/list` 已绑定但零调用
-      （`protocol/app_server_client.kt`），设置里只有三种 `AskForApproval`；
-      上游 `tui/src/chatwidget/permissions_menu.rs`。
+      （`protocol/app_server_client.kt`），设置里只有三种 `AskForApproval`。绑定本身也要修：
+      `PermissionProfileEntry` 把 `id` 当 `name`（wire 没有 `name`）、未解析 `allowed`，
+      而 `ThreadSessionState.activePermissionProfile` 从未被 `WireCodec.session()` 赋值，
+      `status/card.kt` 的展示分支是死代码。上游 `tui/src/chatwidget/permissions_menu.rs`、
+      `permission_discovery.rs`。
 - [ ] **workspace headline/banner 不显示**：`account/workspaceMessages/read` 已绑定但零调用；
-      上游 `tui/src/workspace_messages.rs`。
-- [ ] **Luna Reserve 未接线**：`account/rateLimits/read` 不带 `supportsLunaReserve`，
-      fallback/return 模型与提示都没有；上游 `tui/src/luna_reserve_model.rs`、
-      `backend_banners.rs`。
-- [ ] **`ModelPreset.hidden` 已解析未使用**（`protocol/protocol/v2/thread_data.kt`），
-      模型选择器应过滤/折叠隐藏项。
+      上游 `tui/src/workspace_messages.rs`（取第一条 `Headline`，`featureEnabled=false` 时降级）。
+- [ ] **Luna Reserve 的模型侧未接线**：`account/rateLimits/read` 已带 `supportsLunaReserve`
+      并对老服务端的 -32600/-32602 回退到无参重试；仍缺 fallback/return 模型与提示，以及响应里
+      `ordinaryUsageAllowed`（已解析无消费）与 `rateLimitUpsell`（连类型都没有）。上游
+      `tui/src/chatwidget/luna_reserve_model.rs`、`luna_reserve_return.rs`、`backend_banners.rs`。
+- [ ] **MCP 调用新字段未渲染**：`appContext/mcpAppUi/pluginId/readOnlyHint/mcpAppResourceUri`
+      已解析进 `McpToolCallItem`（含 `appResourceUri` 派生），`history_cell/mcp.kt` 尚未据此
+      渲染 app/插件/只读标记；上游 `tui/src/history_cell/mcp.rs` 也没有对应渲染，属超越上游的增强。
+- [ ] **web search 结果渲染属增强**：`results` 已解析进 `WebSearchItem`（元素按 `title`/`url`/
+      `snippet`/`type` 投影），上游 TUI 只把 results 用于遥测、不渲染，因此这是 Android 侧增强；
+      若上游将来返回既无 title 又无 url 的结果类型（如纯图片结果），当前会在解析处丢弃。
+- [ ] **hook cell 仍不显示 hook 名**：wire 只给 opaque `hookRunId`，`notices.kt` 现只在有 id 时
+      显示该 id。要显示真正的 hook 名需要与 `hooks/list` 的 `HookMetadata` 建立映射（wire 两侧
+      没有共享键）；上游 `tui/src/history_cell/hook_cell.rs` 用 `HookRunSummary` 的
+      `status_message`/`entries`，还缺 `HookOutputEntry` 的逐条渲染。
+备注：`MemoryCitationEntry` 的全部字段与 `HookPromptFragment.hookRunId` 在上游为必填，Kotlin
+侧给了默认值——沿用本仓既有的宽松解析风格，不是 wire 错误，无需改动。
 
 ## 1. 交互能力
 

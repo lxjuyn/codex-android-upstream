@@ -67,7 +67,6 @@
     <string name="notices_cell_entered_review_mode">Entered review mode</string>
     <string name="notices_cell_exited_review_mode">Exited review mode</string>
     <string name="notices_cell_hook">Hook</string>
-    <string name="notices_cell_hook_named">Hook · %1$s</string>
 
     <!-- PatchesCell.kt -->
     <string name="patches_cell_title">File changes</string>
@@ -109,6 +108,8 @@
     <string name="search_cell_no_results">No results</string>
     <string name="search_cell_view_image">Viewed Image</string>
     <string name="search_cell_image_generation">Generated Image</string>
+    <string name="search_cell_image_generation_failed">Image generation failed</string>
+    <string name="search_cell_image_saved_to">Saved to</string>
     <string name="search_cell_sleep">Waiting</string>
 
     <!-- MessagesCell.kt -->
