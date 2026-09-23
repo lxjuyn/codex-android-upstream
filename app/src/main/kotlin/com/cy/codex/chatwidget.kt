@@ -1416,17 +1416,35 @@ class ChatWidget(
                 ),
             )
 
-            // A hook that failed is worth a notice; one that succeeded is not, or a session with
-            // hooks on would fill the transcript with a line per tool call.
+            // Upstream persists a completed hook only when it failed or produced user-facing output
+            // (`hook_cell.rs`); a quiet success would otherwise be a line per tool call.
             is AppServerEvent.HookCompleted -> {
                 state.applyHookCompleted()
-                if (event.delta.run.failed) {
+                val run = event.delta.run
+                val name = run.eventName.ifEmpty { run.id }
+                val output =
+                    run.entries
+                        .map { entry -> entry.text }
+                        .filter { it.isNotBlank() }
+                        .joinToString("\n")
+                        .takeIf { it.isNotBlank() }
+                if (run.failed) {
                     state.addDiagnostic(
                         SessionDiagnostic(
                             severity = DiagnosticSeverity.Warning,
-                            message = event.delta.run.statusMessage,
+                            message = run.statusMessage,
+                            detail = output,
                             code = DiagnosticCode.HookFailed,
-                            args = listOf(event.delta.run.eventName.ifEmpty { event.delta.run.id }),
+                            args = listOf(name),
+                        ),
+                    )
+                } else if (output != null) {
+                    state.addDiagnostic(
+                        SessionDiagnostic(
+                            severity = DiagnosticSeverity.Info,
+                            detail = output,
+                            code = DiagnosticCode.HookOutput,
+                            args = listOf(name),
                         ),
                     )
                 }

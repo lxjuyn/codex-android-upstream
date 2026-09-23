@@ -619,6 +619,9 @@ enum class DiagnosticCode {
     /** A hook failed; the notice names it. */
     HookFailed,
 
+    /** A hook completed with output the user should see; the notice names it. */
+    HookOutput,
+
     /** An MCP server's OAuth flow failed; the notice names the server. */
     McpLoginFailed,
 
