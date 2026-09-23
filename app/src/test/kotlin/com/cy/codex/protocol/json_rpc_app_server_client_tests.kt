@@ -1102,6 +1102,54 @@ class JsonRpcAppServerClientTest {
     }
 
     @Test
+    fun `the rate-limit upsell banner decodes its snake_case contract`() = runTest {
+        val transport = HarnessTransport()
+        val client = JsonRpcAppServerClient(transport, backgroundScope)
+        client.initialize(ClientInfo("android", version = "1")).getOrThrow()
+        val limits = async { client.readRateLimits().getOrThrow() }
+        transport.response(
+            transport.request(),
+            obj(
+                "rateLimits" to obj("primary" to obj("usedPercent" to 100, "windowDurationMins" to 300, "resetsAt" to 99)),
+                "ordinaryUsageAllowed" to false,
+                "rateLimitUpsell" to obj(
+                    "banner_type" to "luna_reserve",
+                    "title" to "Switching to Reserve",
+                    "description" to "Ordinary usage is spent",
+                    "ctas" to listOf(obj("action" to "open_url", "label" to "Learn more")),
+                    "blocked_model_slug" to "gpt-5.6-codex",
+                    "fallback_model_slugs" to listOf("gpt-5.6-luna"),
+                ),
+            ),
+        )
+        val decoded = limits.await()
+        assertEquals(false, decoded.ordinaryUsageAllowed)
+        val banner = decoded.rateLimitUpsell!!
+        assertEquals("luna_reserve", banner.bannerType)
+        assertEquals("Switching to Reserve", banner.title)
+        assertEquals("Learn more", banner.ctas.single().label)
+        assertEquals("gpt-5.6-codex", banner.blockedModelSlug)
+        assertEquals(listOf("gpt-5.6-luna"), banner.fallbackModelSlugs)
+        client.close()
+    }
+
+    @Test
+    fun `a rate-limit read without an upsell carries no banner`() = runTest {
+        val transport = HarnessTransport()
+        val client = JsonRpcAppServerClient(transport, backgroundScope)
+        client.initialize(ClientInfo("android", version = "1")).getOrThrow()
+        val limits = async { client.readRateLimits().getOrThrow() }
+        transport.response(
+            transport.request(),
+            obj("rateLimits" to obj("primary" to obj("usedPercent" to 1, "windowDurationMins" to 300, "resetsAt" to 99))),
+        )
+        val decoded = limits.await()
+        assertNull(decoded.rateLimitUpsell)
+        assertNull(decoded.ordinaryUsageAllowed)
+        client.close()
+    }
+
+    @Test
     fun `mcp status list decodes auth status and tool counts`() = runTest {
         val transport = HarnessTransport()
         val client = JsonRpcAppServerClient(transport, backgroundScope)

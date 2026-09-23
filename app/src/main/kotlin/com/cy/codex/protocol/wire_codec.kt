@@ -322,6 +322,20 @@ internal object WireCodec {
             )
         },
         ordinaryUsageAllowed = o.bool("ordinaryUsageAllowed"),
+        // Untyped on the wire and snake_case inside; see RateLimitUpsellBanner.
+        rateLimitUpsell = o.objectOrNull("rateLimitUpsell")?.let { banner ->
+            RateLimitUpsellBanner(
+                bannerType = banner.text("banner_type").orEmpty(),
+                title = banner.text("title").orEmpty(),
+                description = banner.text("description").orEmpty(),
+                ctas = banner.array("ctas").mapNotNull { it as? JsonObject }.map { cta ->
+                    RateLimitUpsellCta(cta.text("action").orEmpty(), cta.text("label").orEmpty())
+                },
+                modelSlug = banner.text("model_slug"),
+                blockedModelSlug = banner.text("blocked_model_slug"),
+                fallbackModelSlugs = banner.strings("fallback_model_slugs"),
+            )
+        },
     )
 
     fun attachment(o: JsonObject) = ThreadAttachment(
