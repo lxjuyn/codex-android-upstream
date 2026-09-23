@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -55,6 +56,11 @@ import com.cy.codex.protocol.protocol.v2.ReasoningEffort
 import com.cy.codex.protocol.protocol.v2.ThreadSessionState
 import com.cy.codex.theme.Appearance
 import kotlinx.serialization.json.JsonPrimitive
+import top.yukonga.miuix.kmp.nav.core.NavDisplay
+import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
+import top.yukonga.miuix.kmp.nav.core.NavKey
+import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
+import top.yukonga.miuix.kmp.nav.transition.NavTransitions
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -119,74 +125,45 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val config = session.config
-    var section by remember { mutableStateOf<SettingsSection?>(null) }
-    val currentSection = section
     val preset =
         catalog.modelPreset(config.model)
             ?: catalog.models.firstOrNull { it.isDefault && !it.hidden }
-    val focusManager = LocalFocusManager.current
+    val backStack = remember { mutableStateListOf<NavKey>(SettingsRoute.Home) }
 
-    Column(
+    NavDisplay(
+        backStack = backStack,
         modifier =
             modifier
-                .fillMaxSize()
-                .background(MiuixTheme.colorScheme.background)
-                .onPreviewKeyEvent { event ->
-                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    when (event.key) {
-                        Key.Escape, Key.Back -> {
-                            if (section == null) onBack() else section = null
-                            true
-                        }
-
-                        Key.Tab -> {
-                            focusManager.moveFocus(
-                                if (event.isShiftPressed) FocusDirection.Previous else FocusDirection.Next,
-                            )
-                            true
-                        }
-
-                        else -> false
-                    }
-                },
+                .fillMaxSize(),
+        onBack = {
+            if (backStack.size > 1) backStack.removeLastOrNull() else onBack()
+        },
+        // The settings sheet is a horizontal hierarchy inside a modal sheet. Keep the sheet's
+        // outer modal transition in the app shell and give these inner pages the standard miuix
+        // push/pop motion with no second scrim or corner clip.
+        transition = NavTransitions.MiuixDefault,
+        effects = NavDisplayEffects(enableCornerClip = false, dimAmount = 0f),
     ) {
-        BasicComponent(
-            title =
-                if (currentSection == null) {
-                    stringResource(R.string.settings_screen_title)
-                } else {
-                    stringResource(currentSection.titleRes)
-                },
-            summary =
-                if (currentSection == null) {
-                    stringResource(R.string.settings_home_subtitle)
-                } else {
-                    stringResource(currentSection.descriptionRes)
-                },
-                startAction = {
-                    SettingsBackButton(
-                        onBack = { if (section == null) onBack() else section = null },
-                    )
-                },
-            insideMargin = PaddingValues(14.dp, 10.dp),
-        )
-        Column(
-            modifier =
-                Modifier.weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = UiConsts.ScreenMargin)
-                    .padding(top = UiConsts.Space4, bottom = UiConsts.PageBottomInset),
-            verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
-        ) {
-            if (currentSection == null) {
+        entry<SettingsRoute.Home>(swipeDismiss = NavSwipeDirection.None) {
+            SettingsPage(
+                title = stringResource(R.string.settings_screen_title),
+                summary = stringResource(R.string.settings_home_subtitle),
+                onBack = onBack,
+            ) {
                 SettingsHome(
                     catalog = catalog,
                     session = session,
-                    onSelect = { section = it },
+                    onSelect = { backStack.add(SettingsRoute.Detail(it)) },
                 )
-            } else {
-                when (currentSection) {
+            }
+        }
+        entry<SettingsRoute.Detail>(swipeDismiss = NavSwipeDirection.None) { route ->
+            SettingsPage(
+                title = stringResource(route.section.titleRes),
+                summary = stringResource(route.section.descriptionRes),
+                onBack = { backStack.removeLastOrNull() },
+            ) {
+                when (route.section) {
                     SettingsSection.Model -> {
                         SettingsModelSection(
                             catalog,
@@ -223,9 +200,67 @@ fun SettingsScreen(
                         SettingsConfigSourcesSection(catalog, configPath)
                         SettingsAboutSection()
                     }
-
                 }
             }
+        }
+    }
+}
+
+private sealed interface SettingsRoute : NavKey {
+    data object Home : SettingsRoute
+    data class Detail(val section: SettingsSection) : SettingsRoute
+}
+
+/** One settings page's chrome and scrolling body; the navigation host animates this whole frame. */
+@Composable
+private fun SettingsPage(
+    title: String,
+    summary: String,
+    onBack: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val focusManager = LocalFocusManager.current
+    Column(
+        modifier = Modifier.fillMaxSize().background(MiuixTheme.colorScheme.background),
+    ) {
+        BasicComponent(
+            title = title,
+            summary = summary,
+            startAction = { SettingsBackButton(onBack = onBack) },
+            insideMargin = PaddingValues(14.dp, 10.dp),
+        )
+        Column(
+            modifier =
+                Modifier.weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = UiConsts.ScreenMargin)
+                    .padding(top = UiConsts.Space4, bottom = UiConsts.PageBottomInset)
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when (event.key) {
+                            Key.Escape, Key.Back -> {
+                                onBack()
+                                true
+                            }
+
+                            Key.Tab -> {
+                                focusManager.moveFocus(
+                                    if (event.isShiftPressed) {
+                                        FocusDirection.Previous
+                                    } else {
+                                        FocusDirection.Next
+                                    },
+                                )
+                                true
+                            }
+
+                            else -> false
+                        }
+                    },
+            verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
+        ) {
+            content()
         }
     }
 }
