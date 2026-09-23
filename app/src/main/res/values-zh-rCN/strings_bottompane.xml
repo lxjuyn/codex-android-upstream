@@ -14,6 +14,12 @@
     <string name="mcp_approval_allow_always">始终允许</string>
     <string name="mcp_approval_cancel">取消</string>
     <string name="mcp_approval_field_tool">工具</string>
+    <string name="mcp_tool_suggestion_install_title">安装 %1$s</string>
+    <string name="mcp_tool_suggestion_enable_title">启用 %1$s</string>
+    <string name="mcp_tool_suggestion_connector">服务端建议的连接器</string>
+    <string name="mcp_tool_suggestion_plugin">服务端建议的插件</string>
+    <string name="mcp_tool_suggestion_open">打开安装页</string>
+    <string name="mcp_tool_suggestion_done">已完成，继续</string>
 
     <!-- ApprovalOverlay.kt: dialog summaries, shown when the server sent no reason. -->
     <string name="approval_overlay_exec_summary_fallback">Codex 想在你的工作区运行一条命令</string>

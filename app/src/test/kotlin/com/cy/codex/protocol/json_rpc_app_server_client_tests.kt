@@ -490,6 +490,26 @@ class JsonRpcAppServerClientTest {
     }
 
     @Test
+    fun `a tool suggestion exposes its install target`() = runTest {
+        val transport = HarnessTransport()
+        val client = JsonRpcAppServerClient(transport, backgroundScope)
+        client.initialize(ClientInfo("android", version = "1")).getOrThrow()
+        val approval = async { client.requests.first() }
+        transport.push(
+            """{"id":"suggest","method":"mcpServer/elicitation/request","params":{"threadId":"t","serverName":"codex_apps","mode":"form","message":"Calendar needs installing","requestedSchema":{"properties":{}},"_meta":{"codex_approval_kind":"tool_suggestion","tool_type":"connector","suggest_type":"install","suggest_reason":"Calendar is not installed","tool_id":"calendar","tool_name":"Calendar","install_url":"https://chatgpt.com/apps/calendar"}}}""",
+        )
+        val received = assertIs<ApprovalRequest.Elicitation>(approval.await())
+        val meta = (received.params as com.cy.codex.protocol.protocol.v2.McpElicitationRequest.Form).approval!!
+        assertEquals(true, meta.isToolSuggestion)
+        assertEquals(false, meta.isToolCall)
+        assertEquals(true, meta.isInstall)
+        assertEquals("Calendar", meta.toolName)
+        assertEquals("Calendar is not installed", meta.suggestReason)
+        assertEquals("https://chatgpt.com/apps/calendar", meta.installUrl)
+        client.close()
+    }
+
+    @Test
     fun `project creation sends roots and idempotency and goals decode nested response`() = runTest {
         val transport = HarnessTransport()
         val client = JsonRpcAppServerClient(transport, backgroundScope)

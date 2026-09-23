@@ -235,16 +235,45 @@ data class McpApprovalMeta(
     val toolTitle: String? = null,
     val toolDescription: String? = null,
     val paramsDisplay: List<McpApprovalParamDisplay> = emptyList(),
+    // `tool_suggestion` only.
+    val toolType: String? = null,
+    val suggestType: String? = null,
+    val suggestReason: String? = null,
+    val toolId: String? = null,
+    val installUrl: String? = null,
 ) {
     /** A tool call awaiting a decision, as opposed to a suggestion card or a browser hand-off. */
     val isToolCall: Boolean get() = kind == KindMcpToolCall
     val allowsSession: Boolean get() = PersistSession in persist
     val allowsAlways: Boolean get() = PersistAlways in persist
 
+    /**
+     * A suggestion to install or enable a connector/plugin before the call can run.
+     *
+     * The TUI drops a suggestion missing any required field (`parse_tool_suggestion_request`), so
+     * an incomplete payload stays a plain elicitation rather than a half-filled card.
+     */
+    val isToolSuggestion: Boolean
+        get() =
+            kind == KindToolSuggestion &&
+                toolType in ToolTypes &&
+                suggestType in SuggestTypes &&
+                !suggestReason.isNullOrBlank() &&
+                !toolId.isNullOrBlank() &&
+                !toolName.isNullOrBlank()
+
+    val isInstall: Boolean get() = suggestType == SuggestInstall
+
     companion object {
         const val KindMcpToolCall = "mcp_tool_call"
+        const val KindToolSuggestion = "tool_suggestion"
+        const val SuggestInstall = "install"
+        const val SuggestEnable = "enable"
         const val PersistSession = "session"
         const val PersistAlways = "always"
+
+        private val ToolTypes = setOf("connector", "plugin")
+        private val SuggestTypes = setOf(SuggestInstall, SuggestEnable)
 
         /** Null when the meta carries no approval kind, which is every elicitation but an approval. */
         fun from(meta: JsonElement?): McpApprovalMeta? {
@@ -264,6 +293,11 @@ data class McpApprovalMeta(
                             displayName = entry.text("display_name"),
                         )
                     },
+                toolType = o.text("tool_type"),
+                suggestType = o.text("suggest_type"),
+                suggestReason = o.text("suggest_reason"),
+                toolId = o.text("tool_id"),
+                installUrl = o.text("install_url"),
             )
         }
     }
