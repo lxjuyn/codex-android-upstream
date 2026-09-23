@@ -883,10 +883,32 @@ class JsonRpcAppServerClientTest {
         // The legacy `guardian_subagent` alias is the same mode and must fold into AutoReview.
         val settings = async(UnconfinedTestDispatcher(testScheduler)) { client.events.first() }
         transport.push(
-            """{"method":"thread/settings/updated","params":{"threadId":"t","threadSettings":{"model":"gpt","approvalPolicy":"on-request","approvalsReviewer":"guardian_subagent"}}}""",
+            """{"method":"thread/settings/updated","params":{"threadId":"t","threadSettings":{"model":"gpt","approvalPolicy":"on-request","approvalsReviewer":"guardian_subagent","activePermissionProfile":{"id":":workspace"}}}}""",
         )
         val event = assertIs<AppServerEvent.ThreadSettingsUpdatedEvent>(settings.await())
         assertEquals(ApprovalsReviewer.AutoReview, event.delta.approvalsReviewer)
+        assertEquals(":workspace", event.delta.activePermissionProfile?.id)
+        client.close()
+    }
+
+    @Test
+    fun `permission profiles decode id, description and the allowed gate`() = runTest {
+        val transport = HarnessTransport()
+        val client = JsonRpcAppServerClient(transport, backgroundScope)
+        client.initialize(ClientInfo("android", version = "1")).getOrThrow()
+        val profiles = async { client.listPermissionProfiles().getOrThrow() }
+        transport.response(
+            transport.request(),
+            obj("data" to listOf(
+                obj("id" to ":workspace", "allowed" to true, "description" to "Default workspace"),
+                obj("id" to ":read-only", "allowed" to false),
+            )),
+        )
+        val decoded = profiles.await()
+        assertEquals(listOf(":workspace", ":read-only"), decoded.map { it.id })
+        assertEquals("Default workspace", decoded.first().description)
+        assertEquals(true, decoded.first().allowed)
+        assertEquals(false, decoded.last().allowed)
         client.close()
     }
 

@@ -1315,6 +1315,8 @@ class ChatWidget(
                         approvalsReviewer = delta.approvalsReviewer ?: state.config.approvalsReviewer,
                         collaborationMode = delta.collaborationMode ?: state.config.collaborationMode,
                         serviceTier = delta.serviceTier ?: state.config.serviceTier,
+                        activePermissionProfile =
+                            delta.activePermissionProfile ?: state.config.activePermissionProfile,
                     ),
                 )
             }

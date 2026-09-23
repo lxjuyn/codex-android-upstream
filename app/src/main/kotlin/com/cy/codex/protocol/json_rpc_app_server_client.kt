@@ -667,7 +667,7 @@ class JsonRpcAppServerClient(
         (value as? JsonPrimitive)?.takeIf { !it.isString }?.booleanOrNull?.let { name to it }
     }.toMap() }
     override suspend fun listPermissionProfiles() = result {
-        catalog("permissionProfile/list").map { o -> PermissionProfileEntry(o.required("id"), o.required("id"), o.text("description").orEmpty()) }
+        catalog("permissionProfile/list").map { o -> PermissionProfileEntry(o.required("id"), o.text("description").orEmpty(), o.bool("allowed") == true) }
     }
     override suspend fun listExperimentalFeatures() = result {
         catalog("experimentalFeature/list").map { o -> ExperimentalFeatureEntry(o.required("name"), o.text("displayName") ?: o.required("name"),
@@ -1084,7 +1084,8 @@ class JsonRpcAppServerClient(
                     settings.text("effort")?.let(ReasoningEffort::fromWire), settings.text("approvalPolicy")?.let(AskForApproval::fromWire),
                     settings.text("approvalsReviewer")?.let(ApprovalsReviewer::fromWire),
                     settings.objectOrNull("collaborationMode")?.text("mode")?.let(CollaborationMode::fromWire),
-                    settings.text("serviceTier")))
+                    settings.text("serviceTier"),
+                    settings.objectOrNull("activePermissionProfile")?.text("id")?.let { PermissionProfileEntry(it) }))
             }
             "thread/tokenUsage/updated" -> {
                 val usage = p.objectOrNull("tokenUsage")!!
