@@ -360,12 +360,18 @@ enum class InputModality(val wire: String) {
     Audio("audio"),
 }
 
-/** `permissionProfile/list` entry. */
+/**
+ * A permission profile, from `permissionProfile/list` or the active profile in `thread/settings/updated`.
+ *
+ * The wire never carries a display name — a profile *is* its id (`:workspace`, `:read-only`, or a
+ * user `[permissions.<id>]` key) — so the id is what clients show, exactly as the TUI's permissions
+ * menu does. [allowed] is the requirements gate: a listed profile the effective policy forbids must
+ * not be selectable. It defaults to true because the active-profile shape does not carry the flag.
+ */
 data class PermissionProfileEntry(
     val id: String,
-    val name: String,
     val description: String = "",
-    val active: Boolean = false,
+    val allowed: Boolean = true,
 )
 
 /** `experimentalFeature/list` entry. */

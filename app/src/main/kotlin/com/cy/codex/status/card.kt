@@ -1332,7 +1332,7 @@ internal fun accessSummary(session: ThreadSessionState): String {
         if (session.sandboxPolicy.networkAccess) {
             add(stringResource(R.string.status_card_access_network))
         }
-        session.activePermissionProfile?.let { add(it.name) }
+        session.activePermissionProfile?.let { add(it.id) }
     }
     return parts.joinToString(" · ")
 }
