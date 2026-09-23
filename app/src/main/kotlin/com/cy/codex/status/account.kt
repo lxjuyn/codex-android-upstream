@@ -45,12 +45,14 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import com.cy.codex.AppEvent
 import com.cy.codex.CatalogState
 import com.cy.codex.R
+import com.cy.codex.AdaptiveSurface
+import com.cy.codex.SurfacePurpose
+import com.cy.codex.sheetHeightFraction
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
 import com.cy.codex.codeSurface
@@ -64,8 +66,6 @@ import com.cy.codex.protocol.protocol.v2.LoginAccountResponse
 import com.cy.codex.protocol.protocol.v2.RateLimitResetCredit
 import com.cy.codex.protocol.protocol.v2.RateLimitWindow
 import com.cy.codex.raisedSurface
-import com.cy.codex.sheetColor
-import com.cy.codex.sheetSideMargin
 import com.cy.codex.usageColor
 import java.time.Instant
 import java.time.ZoneId
@@ -89,7 +89,6 @@ import top.yukonga.miuix.kmp.icon.extended.Community
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Store
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * Account page: login state, rate-limit windows and the daily token chart.
@@ -592,16 +591,12 @@ private fun ResetCreditSheet(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    WindowBottomSheet(
+    AdaptiveSurface(
+        purpose = SurfacePurpose.Confirmation,
         show = true,
         onDismissRequest = onDismiss,
         onDismissFinished = onDismiss,
         title = stringResource(R.string.account_screen_reset_credit_confirm_title),
-        backgroundColor = sheetColor(),
-        cornerRadius = UiConsts.SheetCorner,
-        sheetMaxWidth = UiConsts.SheetMaxWidth,
-        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
-        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
     ) {
         Column(
             modifier =
@@ -609,7 +604,7 @@ private fun ResetCreditSheet(
                     .heightIn(
                         max =
                             LocalWindowInfo.current.containerDpSize.height *
-                                UiConsts.SheetHeightFraction
+                                sheetHeightFraction()
                     )
         ) {
             Text(

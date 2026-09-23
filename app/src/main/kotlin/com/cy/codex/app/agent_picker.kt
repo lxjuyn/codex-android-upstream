@@ -29,6 +29,9 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.cy.codex.R
 import com.cy.codex.SessionState
+import com.cy.codex.AdaptiveSurface
+import com.cy.codex.SurfacePurpose
+import com.cy.codex.sheetHeightFraction
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
 import com.cy.codex.protocol.protocol.item.CollabAgentToolCallItem
@@ -38,8 +41,6 @@ import com.cy.codex.protocol.protocol.v2.AgentRunStatus
 import com.cy.codex.protocol.protocol.v2.ReasoningEffort
 import com.cy.codex.protocol.protocol.v2.SubAgentActivityKind
 import com.cy.codex.protocol.protocol.v2.ThreadStatus
-import com.cy.codex.sheetColor
-import com.cy.codex.sheetSideMargin
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
@@ -49,7 +50,6 @@ import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.icon.basic.SearchCleanup
 import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * The agent roster and the agent picker.
@@ -226,7 +226,8 @@ fun AgentPickerSheet(
             val needle = query.trim()
             if (needle.isEmpty()) roster else roster.filter { it.matches(needle) }
         }
-    WindowBottomSheet(
+    AdaptiveSurface(
+        purpose = SurfacePurpose.Picker,
         show = show,
         // Closing the picker is a decision, not an exit: the chosen thread is opening behind it, so
         // waiting for the sheet's own exit would hold the transcript back for a third of a second.
@@ -236,11 +237,6 @@ fun AgentPickerSheet(
         },
         onDismissFinished = onDismissFinished,
         title = stringResource(R.string.agent_picker_title),
-        backgroundColor = sheetColor(),
-        cornerRadius = UiConsts.SheetCorner,
-        sheetMaxWidth = UiConsts.SheetMaxWidth,
-        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
-        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
     ) {
         val close = LocalDismissState.current
         Column(
@@ -249,7 +245,7 @@ fun AgentPickerSheet(
                     .heightIn(
                         max =
                             LocalWindowInfo.current.containerDpSize.height *
-                                UiConsts.SheetHeightFraction
+                                sheetHeightFraction()
                     )
         ) {
             Text(

@@ -30,13 +30,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.cy.codex.R
+import com.cy.codex.AdaptiveSurface
+import com.cy.codex.SurfacePurpose
+import com.cy.codex.sheetHeightFraction
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
 import com.cy.codex.label
 import com.cy.codex.protocol.protocol.v2.GoalStatus
 import com.cy.codex.protocol.protocol.v2.ThreadGoalUpdated
-import com.cy.codex.sheetColor
-import com.cy.codex.sheetSideMargin
 import com.cy.codex.status.formatTokens
 import com.cy.codex.successColor
 import com.cy.codex.warningColor
@@ -45,7 +46,6 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * Goal mode sheet.
@@ -65,15 +65,11 @@ fun GoalSheet(
     val colors = MiuixTheme.colorScheme
     var objective by
         remember(goal?.threadId, goal?.objective) { mutableStateOf(goal?.objective.orEmpty()) }
-    WindowBottomSheet(
+    AdaptiveSurface(
+        purpose = SurfacePurpose.Form,
         show = true,
         onDismissRequest = onDismiss,
         title = stringResource(R.string.goal_sheet_title),
-        backgroundColor = sheetColor(),
-        cornerRadius = UiConsts.SheetCorner,
-        sheetMaxWidth = UiConsts.SheetMaxWidth,
-        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
-        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
     ) {
         Column(
             modifier =
@@ -81,7 +77,7 @@ fun GoalSheet(
                     .heightIn(
                         max =
                             LocalWindowInfo.current.containerDpSize.height *
-                                UiConsts.SheetHeightFraction
+                                sheetHeightFraction()
                     )
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = UiConsts.SheetPadding),

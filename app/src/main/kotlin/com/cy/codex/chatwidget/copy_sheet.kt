@@ -16,21 +16,20 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.cy.codex.R
+import com.cy.codex.AdaptiveSurface
+import com.cy.codex.SurfacePurpose
+import com.cy.codex.sheetHeightFraction
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
 import com.cy.codex.copyToClipboard
 import com.cy.codex.extractCodeBlocks
 import com.cy.codex.protocol.protocol.item.AgentMessageItem
-import com.cy.codex.sheetColor
-import com.cy.codex.sheetSideMargin
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * The `/copy` picker.
@@ -51,15 +50,11 @@ fun CopySheet(
         remember(response?.id, response?.text) {
             extractCodeBlocks(response?.text.orEmpty())
         }
-    WindowBottomSheet(
+    AdaptiveSurface(
+        purpose = SurfacePurpose.Picker,
         show = true,
         onDismissRequest = onDismiss,
         title = stringResource(R.string.copy_sheet_title),
-        backgroundColor = sheetColor(),
-        cornerRadius = UiConsts.SheetCorner,
-        sheetMaxWidth = UiConsts.SheetMaxWidth,
-        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
-        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
     ) {
         Column(
             modifier =
@@ -67,7 +62,7 @@ fun CopySheet(
                     .heightIn(
                         max =
                             LocalWindowInfo.current.containerDpSize.height *
-                                UiConsts.SheetHeightFraction
+                                sheetHeightFraction()
                     )
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = UiConsts.SheetPadding),
@@ -81,7 +76,7 @@ fun CopySheet(
                     lineHeight = com.cy.codex.UiType.SheetBodyLine,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
-                return@WindowBottomSheet
+                return@AdaptiveSurface
             }
             if (response != null && response.text.isNotBlank()) {
                 val label = stringResource(R.string.copy_sheet_whole_response)

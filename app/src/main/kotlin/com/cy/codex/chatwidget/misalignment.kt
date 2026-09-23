@@ -19,19 +19,18 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.cy.codex.R
+import com.cy.codex.AdaptiveSurface
+import com.cy.codex.SurfacePurpose
+import com.cy.codex.sheetHeightFraction
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
 import com.cy.codex.protocol.protocol.v2.MisalignmentErrorDetails
 import com.cy.codex.raisedSurface
-import com.cy.codex.sheetColor
-import com.cy.codex.sheetSideMargin
 import com.cy.codex.warningColor
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /** The longest steer `continuation_message` accepts upstream. */
 internal const val MaxMisalignmentSteerChars = 1024
@@ -117,15 +116,11 @@ internal fun MisalignmentReviewSheet(
     val colors = MiuixTheme.colorScheme
     val steer =
         details.steer?.message?.takeIf { it.isNotBlank() && it.length <= MaxMisalignmentSteerChars }
-    WindowBottomSheet(
+    AdaptiveSurface(
+        purpose = SurfacePurpose.Details,
         show = true,
         onDismissRequest = onDismiss,
         title = stringResource(R.string.misalignment_review_title),
-        backgroundColor = sheetColor(),
-        cornerRadius = UiConsts.SheetCorner,
-        sheetMaxWidth = UiConsts.SheetMaxWidth,
-        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
-        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
     ) {
         Column(
             modifier =
@@ -133,7 +128,7 @@ internal fun MisalignmentReviewSheet(
                     .heightIn(
                         max =
                             LocalWindowInfo.current.containerDpSize.height *
-                                UiConsts.SheetHeightFraction
+                                sheetHeightFraction()
                     )
         ) {
             Column(

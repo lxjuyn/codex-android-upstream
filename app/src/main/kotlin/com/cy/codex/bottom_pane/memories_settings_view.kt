@@ -28,17 +28,17 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.cy.codex.AppEvent
 import com.cy.codex.CatalogState
 import com.cy.codex.R
+import com.cy.codex.AdaptiveSurface
+import com.cy.codex.SurfacePurpose
+import com.cy.codex.sheetHeightFraction
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
 import com.cy.codex.protocol.protocol.v2.MemoryStatusResponse
 import com.cy.codex.raisedSurface
-import com.cy.codex.sheetColor
-import com.cy.codex.sheetSideMargin
 import com.cy.codex.successColor
 import com.cy.codex.warningColor
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -59,7 +59,6 @@ import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * The memory store: whether it is ready, how much has been consolidated, and the one action that
@@ -436,17 +435,12 @@ private fun MemoriesNote(text: String) {
 @Composable
 private fun ResetMemorySheet(onDismiss: () -> Unit, onConfirm: () -> Unit) {
     val colors = MiuixTheme.colorScheme
-    WindowBottomSheet(
+    AdaptiveSurface(
+        purpose = SurfacePurpose.Confirmation,
         show = true,
         onDismissRequest = onDismiss,
         onDismissFinished = onDismiss,
         title = stringResource(R.string.memories_screen_reset_title),
-        backgroundColor = sheetColor(),
-        cornerRadius = UiConsts.SheetCorner,
-        sheetMaxWidth = UiConsts.SheetMaxWidth,
-        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
-        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
-        dragHandleColor = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.4f),
     ) {
         Column(
             modifier =
@@ -454,7 +448,7 @@ private fun ResetMemorySheet(onDismiss: () -> Unit, onConfirm: () -> Unit) {
                     .heightIn(
                         max =
                             LocalWindowInfo.current.containerDpSize.height *
-                                UiConsts.SheetHeightFraction
+                                sheetHeightFraction()
                     )
         ) {
             Text(

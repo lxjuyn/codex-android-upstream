@@ -23,10 +23,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.cy.codex.R
 import com.cy.codex.ThreadStatusTone
+import com.cy.codex.AdaptiveSurface
+import com.cy.codex.SurfacePurpose
+import com.cy.codex.sheetHeightFraction
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
 import com.cy.codex.label
@@ -34,15 +36,12 @@ import com.cy.codex.protocol.protocol.v2.AgentRunStatus
 import com.cy.codex.protocol.protocol.v2.SubAgentActivityKind
 import com.cy.codex.protocol.protocol.v2.Thread
 import com.cy.codex.protocol.protocol.v2.ThreadTokenUsage
-import com.cy.codex.sheetColor
-import com.cy.codex.sheetSideMargin
 import com.cy.codex.status.formatTokens
 import com.cy.codex.statusDotColor
 import com.cy.codex.tone
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * Full-screen agent dashboard, plus the roster presentation helpers the picker shares with it.
@@ -67,7 +66,9 @@ fun AgentsOverview(
 ) {
     val colors = MiuixTheme.colorScheme
     val busiest = remember(roster) { roster.maxOfOrNull { it.tokens }?.coerceAtLeast(1) ?: 1 }
-    WindowBottomSheet(
+    AdaptiveSurface(
+        purpose = SurfacePurpose.Details,
+        tall = true,
         show = show,
         onDismissRequest = {
             onDismiss()
@@ -75,11 +76,6 @@ fun AgentsOverview(
         },
         onDismissFinished = onDismissFinished,
         title = stringResource(R.string.agents_overview_title),
-        backgroundColor = sheetColor(),
-        cornerRadius = UiConsts.SheetCorner,
-        sheetMaxWidth = UiConsts.SheetMaxWidth,
-        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
-        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
     ) {
         val close = LocalDismissState.current
         Column(
@@ -88,7 +84,7 @@ fun AgentsOverview(
                     .heightIn(
                         max =
                             LocalWindowInfo.current.containerDpSize.height *
-                                UiConsts.SheetHeightFractionTall
+                                sheetHeightFraction()
                     )
         ) {
             Text(

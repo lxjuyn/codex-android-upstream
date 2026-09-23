@@ -37,21 +37,21 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cy.codex.AppEvent
 import com.cy.codex.CatalogState
 import com.cy.codex.PluginInstallAuthFlow
 import com.cy.codex.R
+import com.cy.codex.AdaptiveSurface
+import com.cy.codex.SurfacePurpose
+import com.cy.codex.sheetHeightFraction
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
 import com.cy.codex.label
 import com.cy.codex.protocol.AppServerClient
 import com.cy.codex.protocol.protocol.v2.PluginDetail
 import com.cy.codex.protocol.protocol.v2.PluginEntry
-import com.cy.codex.sheetColor
-import com.cy.codex.sheetSideMargin
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
@@ -74,7 +74,6 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * `/plugins` output as a page.
@@ -335,7 +334,8 @@ private fun PluginInstallAuthSheet(
     var stillMissing by remember(flow) { mutableStateOf<String?>(null) }
     val app = flow.apps.getOrNull(index)
 
-    WindowBottomSheet(
+    AdaptiveSurface(
+        purpose = SurfacePurpose.Form,
         show = true,
         onDismissRequest = onDismiss,
         title =
@@ -344,11 +344,6 @@ private fun PluginInstallAuthSheet(
             } else {
                 stringResource(R.string.plugins_auth_done)
             },
-        backgroundColor = sheetColor(),
-        cornerRadius = UiConsts.SheetCorner,
-        sheetMaxWidth = UiConsts.SheetMaxWidth,
-        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
-        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
     ) {
         Column(
             modifier =
@@ -356,7 +351,7 @@ private fun PluginInstallAuthSheet(
                     .heightIn(
                         max =
                             LocalWindowInfo.current.containerDpSize.height *
-                                UiConsts.SheetHeightFraction
+                                sheetHeightFraction()
                     )
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = UiConsts.SheetPadding),
@@ -401,7 +396,7 @@ private fun PluginInstallAuthSheet(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                return@WindowBottomSheet
+                return@AdaptiveSurface
             }
             Text(
                 text = stringResource(R.string.plugins_auth_body),
@@ -747,15 +742,11 @@ private fun PluginDetailSheet(
     var skillBody by remember(detail.id) { mutableStateOf<String?>(null) }
     var skillFailed by remember(detail.id) { mutableStateOf(false) }
 
-    WindowBottomSheet(
+    AdaptiveSurface(
+        purpose = SurfacePurpose.Details,
         show = true,
         onDismissRequest = onDismiss,
         title = detail.name,
-        backgroundColor = sheetColor(),
-        cornerRadius = UiConsts.SheetCorner,
-        sheetMaxWidth = UiConsts.SheetMaxWidth,
-        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
-        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
     ) {
         Column(
             modifier =
@@ -763,7 +754,7 @@ private fun PluginDetailSheet(
                     .heightIn(
                         max =
                             LocalWindowInfo.current.containerDpSize.height *
-                                UiConsts.SheetHeightFraction
+                                sheetHeightFraction()
                     )
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = UiConsts.SheetPadding),

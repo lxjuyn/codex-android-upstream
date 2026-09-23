@@ -35,9 +35,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.cy.codex.R
+import com.cy.codex.AdaptiveSurface
+import com.cy.codex.SurfacePurpose
+import com.cy.codex.sheetHeightFraction
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
 import com.cy.codex.app.FormField
@@ -48,8 +50,6 @@ import com.cy.codex.parentPath
 import com.cy.codex.protocol.AppServerClient
 import com.cy.codex.protocol.protocol.v2.FileMetadata
 import com.cy.codex.raisedSurface
-import com.cy.codex.sheetColor
-import com.cy.codex.sheetSideMargin
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
@@ -73,7 +73,6 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * The `fs/…` family as a page: one directory at a time, the files in it, and the writes the
@@ -449,18 +448,13 @@ fun FileBrowserScreen(
             )
 
         is FileSheet.Delete ->
-            WindowBottomSheet(
+            AdaptiveSurface(
+                purpose = SurfacePurpose.Confirmation,
                 show = true,
                 onDismissRequest = { sheet = null },
                 onDismissFinished = { sheet = null },
                 title =
                     stringResource(R.string.file_browser_delete_title, fileBrowserName(open.path)),
-                backgroundColor = sheetColor(),
-                cornerRadius = UiConsts.SheetCorner,
-                sheetMaxWidth = UiConsts.SheetMaxWidth,
-                outsideMargin = DpSize(sheetSideMargin(), 0.dp),
-                insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
-                dragHandleColor = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.4f),
             ) {
                 Column(
                     modifier =
@@ -468,7 +462,7 @@ fun FileBrowserScreen(
                             .heightIn(
                                 max =
                                     LocalWindowInfo.current.containerDpSize.height *
-                                        UiConsts.SheetHeightFraction
+                                        sheetHeightFraction()
                             )
                 ) {
                     Text(

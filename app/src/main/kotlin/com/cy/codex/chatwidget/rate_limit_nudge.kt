@@ -14,19 +14,18 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.cy.codex.R
 import com.cy.codex.RateLimitNudge
+import com.cy.codex.AdaptiveSurface
+import com.cy.codex.SurfacePurpose
+import com.cy.codex.sheetHeightFraction
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
-import com.cy.codex.sheetColor
-import com.cy.codex.sheetSideMargin
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * The "approaching rate limits" model-switch prompt.
@@ -43,15 +42,11 @@ fun RateLimitNudgeSheet(
     onNever: () -> Unit,
 ) {
     val colors = MiuixTheme.colorScheme
-    WindowBottomSheet(
+    AdaptiveSurface(
+        purpose = SurfacePurpose.Confirmation,
         show = true,
         onDismissRequest = onKeep,
         title = stringResource(R.string.rate_limit_nudge_title),
-        backgroundColor = sheetColor(),
-        cornerRadius = UiConsts.SheetCorner,
-        sheetMaxWidth = UiConsts.SheetMaxWidth,
-        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
-        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
     ) {
         Column(
             modifier =
@@ -59,7 +54,7 @@ fun RateLimitNudgeSheet(
                     .heightIn(
                         max =
                             LocalWindowInfo.current.containerDpSize.height *
-                                UiConsts.SheetHeightFraction
+                                sheetHeightFraction()
                     )
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = UiConsts.SheetPadding),

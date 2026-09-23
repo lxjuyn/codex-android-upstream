@@ -34,10 +34,12 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.cy.codex.FileDiffRow
 import com.cy.codex.R
+import com.cy.codex.AdaptiveSurface
+import com.cy.codex.SurfacePurpose
+import com.cy.codex.sheetHeightFraction
 import com.cy.codex.UiConsts
 import com.cy.codex.UiType
 import com.cy.codex.codeSurface
@@ -62,8 +64,6 @@ import com.cy.codex.protocol.protocol.v2.PermissionsApprovalDecision
 import com.cy.codex.protocol.protocol.v2.PermissionsApprovalParams
 import com.cy.codex.protocol.protocol.v2.UserVerificationProof
 import com.cy.codex.protocol.protocol.v2.UserVerificationVerifyParams
-import com.cy.codex.sheetColor
-import com.cy.codex.sheetSideMargin
 import com.cy.codex.theme.HideStatusBarInWindow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
@@ -78,7 +78,6 @@ import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.icon.extended.Play
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * Approval requests stay visible in a non-dismissible miuix sheet until a decision is submitted.
@@ -111,7 +110,8 @@ fun ApprovalDialog(
     // One decision per request. Without this the exit animation is a window in which a second tap
     // answers a request the server has already resolved.
 
-    WindowBottomSheet(
+    AdaptiveSurface(
+        purpose = SurfacePurpose.Approval,
         show = request != null,
         allowDismiss = false,
         onDismissFinished = {
@@ -119,11 +119,6 @@ fun ApprovalDialog(
             lastChanges = emptyList()
         },
         onDismissRequest = {},
-        backgroundColor = sheetColor(),
-        cornerRadius = UiConsts.SheetCorner,
-        sheetMaxWidth = UiConsts.SheetMaxWidth,
-        outsideMargin = DpSize(sheetSideMargin(), 0.dp),
-        insideMargin = DpSize(UiConsts.SheetPadding, 0.dp),
     ) {
         Column(
             modifier =
@@ -131,7 +126,7 @@ fun ApprovalDialog(
                     .heightIn(
                         max =
                             LocalWindowInfo.current.containerDpSize.height *
-                                UiConsts.SheetHeightFraction
+                                sheetHeightFraction()
                     )
         ) {
             Column(

@@ -2183,13 +2183,8 @@ fun CodexRoot() {
  * Mirrors `codex-rs/tui/src/app.rs`: the chat surface is always mounted and every other screen is
  * pushed on top of it, so dismissing a page always lands back on the live transcript.
  *
- * The page stack is a `miuix-nav` back stack, and the transition is `NavTransitions.Modal` — the
- * entering page slides up from the bottom edge over the chat, which is exactly the bottom-sheet
- * motion this shell used to hand-roll out of one `WindowBottomSheet` per stack level. Handing the
- * stack to the navigation runtime instead buys three things the hand-rolled version could not have:
- * a real transition (a window that is created already-shown never animates in), one continuous
- * sweep when several pages pop at once, and a predictive-back gesture that drives the same
- * transition rather than a second animation written to look like it.
+ * Compact pages use the standard push transition; expanded pages keep the modal frame.
+ * The navigation runtime owns predictive back and continuous multi-page pops.
  *
  * The shell also owns the sidebar's persisted view state, which is the same job
  * `local_settings.rs` does for the TUI.
@@ -2205,6 +2200,8 @@ fun CodexScreen(
     val preferences = remember { context.getSharedPreferences("codex_ui", android.content.Context.MODE_PRIVATE) }
     val colors = MiuixTheme.colorScheme
     val shortcutsHelp = remember { ShortcutsHelpState() }
+    val compact = shellWidth() == ShellWidth.Compact
+    val pageSwipe = if (compact) NavSwipeDirection.LeftToRight else NavSwipeDirection.TopToBottom
 
     var sidebarExpanded by remember { mutableStateOf(false) }
     var projectsCollapsed by remember {
@@ -2244,13 +2241,11 @@ fun CodexScreen(
                 backStack = app.surfaces,
                 modifier = Modifier.fillMaxSize(),
                 onBack = app::closeSurface,
-                // Bottom-up modal: the layer underneath stays visible and untouched, so the chat
-                // keeps its place while a page rides over it.
-                transition = NavTransitions.Modal,
+                // Phone destinations push horizontally; framed tablet pages retain the modal motion.
+                transition = if (compact) NavTransitions.MiuixDefault else NavTransitions.Modal,
                 effects = NavDisplayEffects(
-                    // The runtime rounds the moving page for the duration of the animation; the page
-                    // draws the same silhouette itself once it settles (see [SheetPage]).
-                    cornerClipRadius = UiConsts.DrawerCorner,
+                    // Match the resting page geometry during navigation and predictive back.
+                    cornerClipRadius = pageCornerFor(shellWidth()),
                     cornerClipMode = NavCornerClipMode.All,
                     // The same dim a modal sheet draws, so opening a picker over a page does not
                     // darken the app in two steps.
@@ -2330,7 +2325,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.Settings>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.Settings>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         SettingsScreen(
                             catalog = app.catalog,
@@ -2345,7 +2340,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.Account>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.Account>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         AccountScreen(
                             catalog = app.catalog,
@@ -2355,7 +2350,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.McpServers>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.McpServers>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         McpScreen(catalog = app.catalog, onBack = app::closeSurface,
                             onOpenServer = { app.openSurface(Surface.McpToolbox(it)) },
@@ -2363,11 +2358,11 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.Skills>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.Skills>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) { SkillsScreen(catalog = app.catalog, onEvent = app::onAppEvent, onBack = app::closeSurface) }
                 }
 
-                entry<Surface.Plugins>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.Plugins>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         PluginsScreen(
                             catalog = app.catalog,
@@ -2378,19 +2373,19 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.Apps>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.Apps>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) { AppsScreen(catalog = app.catalog, client = app.client, onEvent = app::onAppEvent, onBack = app::closeSurface) }
                 }
 
-                entry<Surface.Hooks>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.Hooks>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) { HooksScreen(catalog = app.catalog, onEvent = app::onAppEvent, onBack = app::closeSurface) }
                 }
 
-                entry<Surface.Sessions>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.Sessions>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) { SessionListScreen(app = app, onBack = app::closeSurface) }
                 }
 
-                entry<Surface.WorkspacePicker>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.WorkspacePicker>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         WorkspacePickerScreen(
                             client = app.client,
@@ -2406,7 +2401,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.Projects>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.Projects>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         ProjectsScreen(
                             catalog = app.catalog,
@@ -2419,7 +2414,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.EnvironmentDetail>(swipeDismiss = NavSwipeDirection.TopToBottom) { route ->
+                entry<Surface.EnvironmentDetail>(swipeDismiss = pageSwipe) { route ->
                     SheetPage(onDismiss = app::closeSurface) {
                         EnvironmentDetailScreen(
                             environmentId = route.environmentId,
@@ -2429,7 +2424,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.RemoteControl>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.RemoteControl>(swipeDismiss = pageSwipe) {
                     // The page is a report on state another client can change, so it re-reads on
                     // entry rather than trusting whatever the last notification left behind.
                     LaunchedEffect(Unit) { app.onAppEvent(AppEvent.ReloadRemoteControl) }
@@ -2442,7 +2437,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.UserVerification>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.UserVerification>(swipeDismiss = pageSwipe) {
                     LaunchedEffect(Unit) { app.onAppEvent(AppEvent.ReloadUserVerification) }
                     SheetPage(onDismiss = app::closeSurface) {
                         UserVerificationScreen(
@@ -2453,7 +2448,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.PluginShares>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.PluginShares>(swipeDismiss = pageSwipe) {
                     LaunchedEffect(Unit) { app.onAppEvent(AppEvent.ReloadPluginShares) }
                     SheetPage(onDismiss = app::closeSurface) {
                         PluginSharesScreen(
@@ -2464,7 +2459,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.Memories>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.Memories>(swipeDismiss = pageSwipe) {
                     LaunchedEffect(Unit) { app.onAppEvent(AppEvent.ReloadMemories) }
                     SheetPage(onDismiss = app::closeSurface) {
                         MemoriesScreen(
@@ -2475,13 +2470,13 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.SessionStatus>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.SessionStatus>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         SessionStatusScreen(app = app, onBack = app::closeSurface)
                     }
                 }
 
-                entry<Surface.Diagnostics>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.Diagnostics>(swipeDismiss = pageSwipe) {
                     LaunchedEffect(Unit) { app.onAppEvent(AppEvent.ReloadDiagnostics) }
                     SheetPage(onDismiss = app::closeSurface) {
                         DiagnosticsScreen(
@@ -2492,7 +2487,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.ExternalAgentImport>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.ExternalAgentImport>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         ExternalAgentImportScreen(
                             catalog = app.catalog,
@@ -2502,7 +2497,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.Bedrock>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.Bedrock>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         BedrockScreen(
                             client = app.client,
@@ -2512,7 +2507,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.WindowsSandbox>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.WindowsSandbox>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         WindowsSandboxScreen(
                             catalog = app.catalog,
@@ -2523,7 +2518,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.FileBrowser>(swipeDismiss = NavSwipeDirection.TopToBottom) { route ->
+                entry<Surface.FileBrowser>(swipeDismiss = pageSwipe) { route ->
                     SheetPage(onDismiss = app::closeSurface) {
                         FileBrowserScreen(
                             path = route.path,
@@ -2540,7 +2535,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.ExecCommand>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.ExecCommand>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         ExecCommandScreen(
                             threadId = app.widget.state.threadId,
@@ -2552,7 +2547,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.BackgroundTerminals>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.BackgroundTerminals>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         BackgroundTerminalsScreen(
                             threadId = app.widget.state.threadId,
@@ -2564,7 +2559,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.Realtime>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.Realtime>(swipeDismiss = pageSwipe) {
                     LaunchedEffect(Unit) { app.onAppEvent(AppEvent.ReloadRealtimeVoices) }
                     SheetPage(onDismiss = app::closeSurface) {
                         RealtimeScreen(
@@ -2576,7 +2571,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.Worktrees>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.Worktrees>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         WorktreesScreen(
                             client = app.client,
@@ -2587,7 +2582,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.Review>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.Review>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         ReviewScreen(
                             threadId = app.widget.state.threadId,
@@ -2597,7 +2592,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.Diff>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.Diff>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         GitDiffScreen(
                             cwd = app.widget.state.config.cwd.ifBlank { app.defaultWorkspace },
@@ -2607,13 +2602,13 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.ThreadHistory>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.ThreadHistory>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         ThreadHistoryScreen(app = app, onBack = app::closeSurface)
                     }
                 }
 
-                entry<Surface.McpToolbox>(swipeDismiss = NavSwipeDirection.TopToBottom) { route ->
+                entry<Surface.McpToolbox>(swipeDismiss = pageSwipe) { route ->
                     SheetPage(onDismiss = app::closeSurface) {
                         McpToolboxScreen(
                             server = route.server,
@@ -2624,13 +2619,13 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.Agents>(swipeDismiss = NavSwipeDirection.TopToBottom) {
+                entry<Surface.Agents>(swipeDismiss = pageSwipe) {
                     SheetPage(onDismiss = app::closeSurface) {
                         AgentsScreen(app = app, onBack = app::closeSurface)
                     }
                 }
 
-                entry<Surface.SubAgentThread>(swipeDismiss = NavSwipeDirection.TopToBottom) { route ->
+                entry<Surface.SubAgentThread>(swipeDismiss = pageSwipe) { route ->
                     SheetPage(onDismiss = app::closeSurface) {
                         // The roster is folded once per visited agent rather than observed: the
                         // parent transcript keeps streaming behind this page, and subscribing to it
@@ -2662,7 +2657,7 @@ fun CodexScreen(
                     }
                 }
 
-                entry<Surface.SubAgent>(swipeDismiss = NavSwipeDirection.TopToBottom) { route ->
+                entry<Surface.SubAgent>(swipeDismiss = pageSwipe) { route ->
                     SheetPage(onDismiss = app::closeSurface) {
                         SubAgentScreen(
                             threadId = route.threadId,
@@ -2765,6 +2760,8 @@ private fun SheetPage(
     content: @Composable () -> Unit,
 ) {
     val outsideInteraction = remember { MutableInteractionSource() }
+    val topGap = pageTopGapFor(shellWidth())
+    val topCorner = pageCornerFor(shellWidth())
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val pageWidth = minOf(
             (maxWidth - sheetSideMargin() * 2).coerceAtLeast(0.dp),
@@ -2794,17 +2791,17 @@ private fun SheetPage(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .height(UiConsts.SheetTopGap),
+                .height(topGap),
         )
         MiuixSurface(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = UiConsts.SheetTopGap)
+                .padding(top = topGap)
                 .width(pageWidth)
                 .fillMaxHeight(),
             shape = RoundedCornerShape(
-                topStart = UiConsts.DrawerCorner,
-                topEnd = UiConsts.DrawerCorner,
+                topStart = topCorner,
+                topEnd = topCorner,
             ),
             color = panelColor(),
             shadowElevation = UiConsts.SheetElevation,
