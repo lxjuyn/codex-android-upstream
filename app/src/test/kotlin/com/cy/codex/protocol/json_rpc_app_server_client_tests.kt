@@ -510,6 +510,26 @@ class JsonRpcAppServerClientTest {
     }
 
     @Test
+    fun `a user verification elicitation decodes its challenge`() = runTest {
+        val transport = HarnessTransport()
+        val client = JsonRpcAppServerClient(transport, backgroundScope)
+        client.initialize(ClientInfo("android", version = "1")).getOrThrow()
+        val approval = async { client.requests.first() }
+        transport.push(
+            """{"id":"verify","method":"mcpServer/elicitation/request","params":{"threadId":"t","serverName":"codex_apps","mode":"openai/userVerification","title":"Confirm your identity","description":"Signing proves the request came from this device","challenge":"AAAA"}}""",
+        )
+        val received = assertIs<ApprovalRequest.Elicitation>(approval.await())
+        val payload =
+            assertIs<com.cy.codex.protocol.protocol.v2.McpElicitationRequest.UserVerification>(
+                received.params,
+            )
+        assertEquals("Confirm your identity", payload.title)
+        assertEquals("Signing proves the request came from this device", payload.description)
+        assertEquals("AAAA", payload.challenge)
+        client.close()
+    }
+
+    @Test
     fun `project creation sends roots and idempotency and goals decode nested response`() = runTest {
         val transport = HarnessTransport()
         val client = JsonRpcAppServerClient(transport, backgroundScope)

@@ -1314,10 +1314,13 @@ class JsonRpcAppServerClient(
                 // The union flattens `_meta` next to `mode`/`message`; it carries the
                 // `_codex_apps.connector_auth_failure` payload the app-link flow reads.
                 val meta = p["_meta"]
-                val payload = if (p.text("mode") == "url") {
-                    McpElicitationRequest.Url(serverName, message, p.required("url"), p.required("elicitationId"), meta)
-                } else {
-                    McpElicitationRequest.Form(serverName, message, McpElicitationSchema(schema.text("title").orEmpty(), fields), meta)
+                val payload = when (p.text("mode")) {
+                    "url" -> McpElicitationRequest.Url(serverName, message, p.required("url"), p.required("elicitationId"), meta)
+                    // A device-authenticated approval: no schema, the challenge is the payload, and
+                    // the signed proof goes back as the accept's content.
+                    "openai/userVerification" -> McpElicitationRequest.UserVerification(serverName,
+                        p.required("title"), p.text("description").orEmpty(), p.required("challenge"), meta)
+                    else -> McpElicitationRequest.Form(serverName, message, McpElicitationSchema(schema.text("title").orEmpty(), fields), meta)
                 }
                 ApprovalRequest.Elicitation(requestId, thread, p.text("turnId"), item, time, payload)
             }

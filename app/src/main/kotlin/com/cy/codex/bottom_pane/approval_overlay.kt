@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,9 +60,12 @@ import com.cy.codex.protocol.protocol.v2.McpApprovalMeta
 import com.cy.codex.protocol.protocol.v2.McpElicitationRequest
 import com.cy.codex.protocol.protocol.v2.PermissionsApprovalDecision
 import com.cy.codex.protocol.protocol.v2.PermissionsApprovalParams
+import com.cy.codex.protocol.protocol.v2.UserVerificationProof
+import com.cy.codex.protocol.protocol.v2.UserVerificationVerifyParams
 import com.cy.codex.sheetColor
 import com.cy.codex.sheetSideMargin
 import com.cy.codex.theme.HideStatusBarInWindow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import top.yukonga.miuix.kmp.basic.Icon
@@ -91,6 +95,8 @@ fun ApprovalDialog(
     error: String? = null,
     /** Resolves the patch behind a file-change request, which names its item but not its diff. */
     patchChanges: (ApprovalRequest) -> List<FileUpdateChange> = { emptyList() },
+    /** Signs a user-verification challenge; the dialog owns when, the caller owns how. */
+    verify: (suspend (UserVerificationVerifyParams) -> Result<UserVerificationProof>)? = null,
 ) {
     // The dialog outlives the request by one exit animation, so the last one is kept mounted:
     // clearing it would blank the card out from under the transition.
@@ -147,6 +153,7 @@ fun ApprovalDialog(
                         remainingQueue = remainingQueue,
                         busy = busy,
                         patchChanges = lastChanges,
+                        verify = verify,
                     )
                     error?.let {
                         Text(it, color = MiuixTheme.colorScheme.error, fontSize = UiType.Meta)
@@ -201,6 +208,7 @@ private fun ApprovalBody(
     remainingQueue: Int,
     busy: Boolean,
     patchChanges: List<FileUpdateChange>,
+    verify: (suspend (UserVerificationVerifyParams) -> Result<UserVerificationProof>)?,
 ) {
     // Every family keeps its answer pinned under the scrolling body: on a two-question form or a
     // sixty-line patch the button that unblocks the turn must not be the thing that scrolled away.
@@ -218,9 +226,18 @@ private fun ApprovalBody(
 
             // An approval arrives as an empty-schema elicitation whose decisions live in `_meta`, so
             // it takes the same header / body / footer as every other family; only a genuine form
-            // keeps the elicitation chrome.
-            is ApprovalRequest.Elicitation ->
-                if (request.isApprovalAction) {
+            // keeps the elicitation chrome. A device-authenticated approval has no schema at all —
+            // the challenge is signed and the proof is the accept's content.
+            is ApprovalRequest.Elicitation -> {
+                val payload = request.params
+                if (payload is McpElicitationRequest.UserVerification) {
+                    UserVerificationBody(
+                        payload = payload,
+                        verify = verify,
+                        decide = decide,
+                        busy = busy,
+                    )
+                } else if (request.isApprovalAction) {
                     ApprovalHeader(request = request, patchChanges = patchChanges)
                     Spacer(Modifier.height(UiConsts.DialogHeaderGap))
                     ApprovalScrollBody { McpApprovalDetails(request.params) }
@@ -239,6 +256,7 @@ private fun ApprovalBody(
                         busy = busy,
                     )
                 }
+            }
 
             else -> {
                 ApprovalHeader(request = request, patchChanges = patchChanges)
@@ -641,6 +659,99 @@ private fun McpApprovalDetails(params: McpElicitationRequest) {
     approval.paramsDisplay.forEachIndexed { index, param ->
         if (index > 0) Spacer(Modifier.height(UiConsts.DialogFieldGap))
         FieldBlock(label = param.displayName ?: param.name, value = param.value)
+    }
+}
+
+/**
+ * A device-authenticated approval.
+ *
+ * Mirrors `openai/userVerification`: the server names what it is asking about and hands over a
+ * challenge; accepting signs that challenge with the local credential and returns the proof as the
+ * accept's content. Nothing is signed until the user says so, and a failed signature leaves the
+ * request pending rather than cancelling it.
+ */
+@Composable
+private fun UserVerificationBody(
+    payload: McpElicitationRequest.UserVerification,
+    verify: (suspend (UserVerificationVerifyParams) -> Result<UserVerificationProof>)?,
+    decide: (ApprovalResponse) -> Unit,
+    busy: Boolean,
+) {
+    val colors = MiuixTheme.colorScheme
+    val scope = rememberCoroutineScope()
+    var signing by remember(payload.challenge) { mutableStateOf(false) }
+    var failed by remember(payload.challenge) { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        ApprovalScrollBody {
+            Text(
+                text = payload.title,
+                modifier = Modifier.fillMaxWidth(),
+                fontSize = UiType.DialogTitle,
+                lineHeight = UiType.DialogTitleLine,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.onSurface,
+            )
+            if (payload.description.isNotBlank()) {
+                Spacer(Modifier.height(UiConsts.DialogFieldGap))
+                Text(
+                    text = payload.description,
+                    modifier = Modifier.fillMaxWidth(),
+                    fontSize = UiType.Body,
+                    lineHeight = UiType.BodyLine,
+                    color = colors.onSurfaceSecondary,
+                )
+            }
+        }
+        Spacer(Modifier.height(UiConsts.DialogFooterGap))
+        FormButtons(
+            confirmLabel = stringResource(R.string.approval_overlay_user_verification_sign),
+            enabled = verify != null && !signing,
+            busy = signing || busy,
+            onConfirm = {
+                if (verify != null) {
+                    signing = true
+                    failed = false
+                    scope.launch {
+                        verify(
+                                UserVerificationVerifyParams(
+                                    challenge = payload.challenge,
+                                    title = payload.title,
+                                    description = payload.description,
+                                ),
+                            )
+                            .onSuccess { proof ->
+                                signing = false
+                                decide(
+                                    ApprovalResponse.Elicitation(
+                                        action = ElicitationAction.Accept,
+                                        content =
+                                            mapOf(
+                                                "credentialId" to proof.credentialId,
+                                                "signature" to proof.signature,
+                                            ),
+                                    ),
+                                )
+                            }
+                            .onFailure {
+                                signing = false
+                                failed = true
+                            }
+                    }
+                }
+            },
+            onCancel = { decide(ApprovalResponse.Elicitation(ElicitationAction.Cancel)) },
+        )
+        if (failed) {
+            Text(
+                text = stringResource(R.string.approval_overlay_user_verification_failed),
+                modifier =
+                    Modifier.padding(horizontal = UiConsts.Space4, vertical = UiConsts.Space7),
+                fontSize = UiType.Footnote,
+                lineHeight = UiType.FootnoteLine,
+                color = colors.error,
+            )
+        }
     }
 }
 
