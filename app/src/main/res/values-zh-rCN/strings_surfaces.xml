@@ -96,6 +96,31 @@
 
     <!-- SettingsScreen -->
     <string name="settings_screen_title">设置</string>
+    <string name="settings_home_subtitle">选择一个分类来配置 Codex</string>
+    <string name="settings_home_group">设置</string>
+    <string name="settings_nav_model">模型与记忆</string>
+    <string name="settings_nav_model_summary">模型、思考强度、记忆与实验特性</string>
+    <string name="settings_nav_permissions">权限与安全</string>
+    <string name="settings_nav_permissions_summary">审批策略、审批者与沙箱行为</string>
+    <string name="settings_nav_workspace">工作区与会话</string>
+    <string name="settings_nav_workspace_summary">工作目录、可写根目录与会话状态</string>
+    <string name="settings_nav_appearance">外观与输入</string>
+    <string name="settings_nav_appearance_summary">主题、动效、提示与键盘快捷键</string>
+    <string name="settings_nav_notifications">通知与自动化</string>
+    <string name="settings_nav_notifications_summary">系统通知与自动回顾</string>
+    <string name="settings_nav_extensions">扩展</string>
+    <string name="settings_nav_extensions_summary">MCP、Skill、插件、App 与 Hook</string>
+    <string name="settings_nav_data">账户与数据</string>
+    <string name="settings_nav_data_summary">账户、记忆内容与维护</string>
+    <string name="settings_nav_system">系统</string>
+    <string name="settings_nav_system_summary">配置来源、诊断与应用信息</string>
+    <string name="settings_group_memory">记忆</string>
+    <string name="settings_group_shortcuts">键盘与快捷键</string>
+    <string name="settings_shortcuts_summary">打开硬件键盘快捷键参考</string>
+    <string name="settings_group_extensions">扩展</string>
+    <string name="settings_group_data">账户与数据</string>
+    <string name="settings_notifications_enabled">已启用</string>
+    <string name="settings_notifications_disabled">已关闭</string>
     <string name="settings_tab_general">通用</string>
     <string name="settings_tab_model">模型</string>
     <string name="settings_tab_approval">权限</string>
@@ -140,7 +165,7 @@
     <string name="notification_approval_elicitation">%1$s 请求审批</string>
     <string name="notification_approval_other">请求审批</string>
     <string name="settings_screen_experimental_empty">暂无可用的实验功能。</string>
-    <string name="settings_group_model">模型</string>
+    <string name="settings_group_model">默认模型与思考强度</string>
     <string name="settings_screen_models_empty">还没有可用模型，等待 model/list 返回。</string>
     <string name="settings_screen_model_default">默认</string>
     <string name="settings_group_oss_provider">OSS 提供方</string>
@@ -151,8 +176,8 @@
     <string name="settings_group_effort">思考强度</string>
     <string name="settings_screen_effort_title">思考强度</string>
     <string name="settings_screen_effort_summary">模型在回答前可以花多少思考预算</string>
-    <string name="settings_group_approval">审批策略</string>
-    <string name="settings_group_reviewer">审批者</string>
+    <string name="settings_group_approval">默认审批策略</string>
+    <string name="settings_group_reviewer">默认审批者</string>
     <string name="settings_screen_sandbox_mode">沙箱模式</string>
     <string name="settings_screen_network_access">网络访问</string>
     <string name="settings_screen_network_allowed">允许</string>
@@ -178,7 +203,6 @@
     <string name="settings_screen_context_window">上下文窗口</string>
     <string name="settings_screen_context_usage">%1$s / %2$s · %3$d%%</string>
     <string name="settings_screen_io_cached">输入 / 输出 / 缓存</string>
-    <string name="settings_group_library">库与集成</string>
     <string name="settings_screen_back">返回</string>
 
     <!-- SkillsScreen -->

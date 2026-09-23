@@ -121,6 +121,31 @@
 
     <!-- SettingsScreen -->
     <string name="settings_screen_title">Settings</string>
+    <string name="settings_home_subtitle">Choose a category to configure Codex</string>
+    <string name="settings_home_group">Settings</string>
+    <string name="settings_nav_model">Model and memory</string>
+    <string name="settings_nav_model_summary">Model, reasoning effort, memory and experiments</string>
+    <string name="settings_nav_permissions">Permissions and safety</string>
+    <string name="settings_nav_permissions_summary">Approval policy, reviewer and sandbox behavior</string>
+    <string name="settings_nav_workspace">Workspace and session</string>
+    <string name="settings_nav_workspace_summary">Working directory, writable roots and session status</string>
+    <string name="settings_nav_appearance">Appearance and input</string>
+    <string name="settings_nav_appearance_summary">Theme, motion, tips and keyboard shortcuts</string>
+    <string name="settings_nav_notifications">Notifications and automation</string>
+    <string name="settings_nav_notifications_summary">System notifications and automatic recaps</string>
+    <string name="settings_nav_extensions">Extensions</string>
+    <string name="settings_nav_extensions_summary">MCP, skills, plugins, apps and hooks</string>
+    <string name="settings_nav_data">Account and data</string>
+    <string name="settings_nav_data_summary">Account, memory contents and maintenance</string>
+    <string name="settings_nav_system">System</string>
+    <string name="settings_nav_system_summary">Config sources, diagnostics and app information</string>
+    <string name="settings_group_memory">Memory</string>
+    <string name="settings_group_shortcuts">Keyboard and shortcuts</string>
+    <string name="settings_shortcuts_summary">Open the shortcut reference for hardware keyboards</string>
+    <string name="settings_group_extensions">Extensions</string>
+    <string name="settings_group_data">Account and data</string>
+    <string name="settings_notifications_enabled">Enabled</string>
+    <string name="settings_notifications_disabled">Disabled</string>
     <string name="settings_tab_general">General</string>
     <string name="settings_tab_model">Model</string>
     <string name="settings_tab_approval">Permissions</string>
@@ -165,7 +190,7 @@
     <string name="notification_approval_elicitation">Approval requested by %1$s</string>
     <string name="notification_approval_other">Approval requested</string>
     <string name="settings_screen_experimental_empty">No server experiments available.</string>
-    <string name="settings_group_model">Model</string>
+    <string name="settings_group_model">Default model and reasoning</string>
     <string name="settings_screen_models_empty">No models are available right now.</string>
     <string name="settings_screen_model_default">(default)</string>
     <string name="settings_group_oss_provider">OSS provider</string>
@@ -176,8 +201,8 @@
     <string name="settings_group_effort">Reasoning effort</string>
     <string name="settings_screen_effort_title">Reasoning effort</string>
     <string name="settings_screen_effort_summary">How much thinking budget the model may spend before answering.</string>
-    <string name="settings_group_approval">Approval policy</string>
-    <string name="settings_group_reviewer">Approvals reviewer</string>
+    <string name="settings_group_approval">Default approval policy</string>
+    <string name="settings_group_reviewer">Default approvals reviewer</string>
     <string name="settings_screen_sandbox_mode">Sandbox mode</string>
     <string name="settings_screen_network_access">Network access</string>
     <string name="settings_screen_network_allowed">Enabled</string>
@@ -203,7 +228,6 @@
     <string name="settings_screen_context_window">Context window</string>
     <string name="settings_screen_context_usage">%1$s / %2$s · %3$d%%</string>
     <string name="settings_screen_io_cached">Input / output / cached</string>
-    <string name="settings_group_library">Library and integrations</string>
     <string name="settings_screen_back">Back</string>
 
     <!-- SkillsScreen -->

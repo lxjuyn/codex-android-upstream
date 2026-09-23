@@ -56,7 +56,6 @@ import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Notes
 import top.yukonga.miuix.kmp.icon.extended.Refresh
-import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -133,12 +132,6 @@ fun MemoriesScreen(
             verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
         ) {
             MemoriesStatusCard(memories = memories, onRead = { onEvent(AppEvent.ReloadMemories) })
-            MemoriesSettingsCard(
-                // Absent `[memories]` means the server's defaults (both on), not "off".
-                useMemories = catalog.configSnapshot.useMemories ?: true,
-                generateMemories = catalog.configSnapshot.generateMemories ?: true,
-                onEvent = onEvent,
-            )
             MemoriesResetCard(onReset = { resetting = true })
         }
     }
@@ -337,56 +330,6 @@ private fun MemoriesStatusCard(
             Spacer(Modifier.height(UiConsts.Space8))
             MemoriesNote(stringResource(R.string.memories_screen_count_only))
         }
-    }
-}
-
-/**
- * The two persisted memory settings.
- *
- * Both writes go through one [AppEvent.SetMemorySettings], because upstream saves them together
- * (`build_memory_settings_edits`) and only re-applies the thread mode when generation changed.
- */
-@Composable
-private fun MemoriesSettingsCard(
-    useMemories: Boolean,
-    generateMemories: Boolean,
-    onEvent: (AppEvent) -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        cornerRadius = UiConsts.SectionCorner,
-        insideMargin = PaddingValues(horizontal = 11.dp, vertical = 8.dp),
-        colors =
-            CardDefaults.defaultColors(
-                color = raisedSurface(),
-                contentColor = MiuixTheme.colorScheme.onSurface,
-            ),
-    ) {
-        BasicComponent(
-            title = stringResource(R.string.memories_screen_section_settings),
-            startAction = {
-                Icon(
-                    imageVector = MiuixIcons.Notes,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = MiuixTheme.colorScheme.primary,
-                )
-            },
-            insideMargin = PaddingValues(0.dp),
-        )
-        Spacer(Modifier.height(8.dp))
-        SwitchPreference(
-            title = stringResource(R.string.memories_screen_use),
-            summary = stringResource(R.string.memories_screen_use_detail),
-            checked = useMemories,
-            onCheckedChange = { onEvent(AppEvent.SetMemorySettings(it, generateMemories)) },
-        )
-        SwitchPreference(
-            title = stringResource(R.string.memories_screen_generate),
-            summary = stringResource(R.string.memories_screen_generate_detail),
-            checked = generateMemories,
-            onCheckedChange = { onEvent(AppEvent.SetMemorySettings(useMemories, it)) },
-        )
     }
 }
 

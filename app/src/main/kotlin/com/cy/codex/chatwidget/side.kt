@@ -8,6 +8,7 @@ import androidx.compose.ui.res.stringResource
 import com.cy.codex.R
 import com.cy.codex.SlashCommands
 import com.cy.codex.ThreadListState
+import com.cy.codex.DestinationCatalog
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.AddFolder
 import top.yukonga.miuix.kmp.icon.extended.Blocklist
@@ -62,43 +63,33 @@ data class SidebarProject(
 
 object SidebarModel {
 
-    /**
-     * Drawer actions, in the order the TUI lists them.
-     *
-     * One entry only: the drawer is for *getting somewhere in this session* — a new workspace, or a
-     * thread under a project. Everything else it used to hold (MCP, Skill, 插件, Hook, App, 账户,
-     * 已归档, 设置) is configuration, and configuration now lives on the settings page, where the
-     * full labels fit instead of being squeezed into a 252dp drawer.
-     */
+    /** Navigation destinations. Configuration stays in Settings; tools belong to the open session. */
     @Composable
     @ReadOnlyComposable
     fun actions(): List<SidebarEntry> = listOf(
-        SidebarEntry("new", stringResource(R.string.runtime_new_thread), MiuixIcons.Messages),
-        SidebarEntry("workspace", stringResource(R.string.sidebar_add_workspace), MiuixIcons.AddFolder),
+        SidebarEntry(DestinationCatalog.Id.New, stringResource(R.string.runtime_new_thread), MiuixIcons.Messages),
+        SidebarEntry(DestinationCatalog.Id.Sessions, stringResource(R.string.sidebar_library_all_sessions), MiuixIcons.Messages),
+        SidebarEntry(DestinationCatalog.Id.Archived, stringResource(R.string.sidebar_library_archived), MiuixIcons.Blocklist),
+        SidebarEntry(DestinationCatalog.Id.Projects, stringResource(R.string.sidebar_library_projects), MiuixIcons.Folder),
+        SidebarEntry(DestinationCatalog.Id.Workspace, stringResource(R.string.sidebar_add_workspace), MiuixIcons.AddFolder),
     )
 
     /**
-     * The pages the drawer used to list, now rows on the settings page.
-     *
-     * Ids are the same ones [com.cy.codex.chatwidget.SidebarPanel]'s action handler switches
-     * on, so a row opens exactly what the drawer entry opened.
+     * Tools that act on the open thread. They stay out of Settings because their result and their
+     * availability are session-scoped, unlike account, model and integration preferences.
      */
     @Composable
     @ReadOnlyComposable
-    fun libraryEntries(): List<SidebarEntry> = listOf(
-        SidebarEntry("sessions", stringResource(R.string.sidebar_library_all_sessions), MiuixIcons.Messages),
-        SidebarEntry("mcp", stringResource(R.string.sidebar_library_mcp_servers), MiuixIcons.Link),
-        SidebarEntry("skills", stringResource(R.string.sidebar_library_skills), MiuixIcons.Tasks),
-        SidebarEntry("plugins", stringResource(R.string.sidebar_library_plugins), MiuixIcons.Store),
-        SidebarEntry("apps", stringResource(R.string.sidebar_library_apps), MiuixIcons.Community),
-        SidebarEntry("account", stringResource(R.string.sidebar_library_account), MiuixIcons.Info),
-        SidebarEntry("archived", stringResource(R.string.sidebar_library_archived), MiuixIcons.Blocklist),
-        SidebarEntry("projects", stringResource(R.string.sidebar_library_projects), MiuixIcons.Folder),
-        SidebarEntry("files", stringResource(R.string.sidebar_library_files), MiuixIcons.File),
-        SidebarEntry("exec", stringResource(R.string.sidebar_library_exec), MiuixIcons.Th1),
-        SidebarEntry("review", stringResource(R.string.sidebar_library_review), MiuixIcons.Search),
-        SidebarEntry("goal", stringResource(R.string.goal_sheet_title), MiuixIcons.Tasks),
-        SidebarEntry("memories", stringResource(R.string.sidebar_library_memories), MiuixIcons.Notes),
+    fun sessionEntries(): List<SidebarEntry> = listOf(
+        SidebarEntry(DestinationCatalog.Id.History, stringResource(R.string.sidebar_library_history), MiuixIcons.Refresh),
+        SidebarEntry(DestinationCatalog.Id.Files, stringResource(R.string.sidebar_library_files), MiuixIcons.File),
+        SidebarEntry(DestinationCatalog.Id.Exec, stringResource(R.string.sidebar_library_exec), MiuixIcons.Th1),
+        SidebarEntry(DestinationCatalog.Id.Terminals, stringResource(R.string.sidebar_library_terminals), MiuixIcons.Timer),
+        SidebarEntry(DestinationCatalog.Id.Review, stringResource(R.string.sidebar_library_review), MiuixIcons.Search),
+        SidebarEntry(DestinationCatalog.Id.Worktree, stringResource(R.string.worktrees_title), MiuixIcons.Folder),
+        SidebarEntry(DestinationCatalog.Id.Diff, stringResource(R.string.git_diff_screen_title), MiuixIcons.File),
+        SidebarEntry(DestinationCatalog.Id.Goal, stringResource(R.string.goal_sheet_title), MiuixIcons.Tasks),
+        SidebarEntry(DestinationCatalog.Id.Realtime, stringResource(R.string.sidebar_library_realtime), MiuixIcons.Mic),
     )
 
     /** Turn the thread list into the sidebar's project groups. */

@@ -520,6 +520,7 @@ fun ChatScreen(
             onExpandedChange = onSidebarExpandedChange,
             actions = SidebarModel.actions(),
             onAction = { entry -> openSurfaceFor(app, entry.id) },
+            sessionActions = SidebarModel.sessionEntries(),
             projects = SidebarModel.projects(threads, includeArchived = false),
             projectsCollapsed = projectsCollapsed,
             onToggleProjects = onToggleProjects,
@@ -902,8 +903,8 @@ private fun onApprovalDecision(
  * One routing table for every "go to this page" id in the app.
  *
  * The drawer and the settings page both name destinations by id, and both have to land on the same
- * page: the entries moved out of the drawer into settings, and a routing table per caller is how
- * the two drift apart.
+ * page. Navigation and session tools live in the drawer; configuration lives in Settings; this is
+ * the shared route table that keeps the two placements from drifting.
  */
 internal fun openSurfaceFor(app: CodexApp, id: String) {
     // The three routes that need a subject take it from the open session rather than from the id:
@@ -943,8 +944,11 @@ internal fun openSurfaceFor(app: CodexApp, id: String) {
         "terminals" -> app.openSurface(Surface.BackgroundTerminals)
         "realtime" -> app.openSurface(Surface.Realtime)
         "review" -> app.onAppEvent(AppEvent.SubmitSlashCommand("review", ""))
+        "worktree" -> app.openSurface(Surface.Worktrees)
+        "diff" -> app.openSurface(Surface.Diff)
         "goal" -> app.onAppEvent(AppEvent.SubmitSlashCommand("goal", ""))
         "history" -> app.openSurface(Surface.ThreadHistory)
+        "status" -> app.openSurface(Surface.SessionStatus)
         else -> Unit
     }
     // `threadId` is read for the same reason the routes above are: a page that needs the open

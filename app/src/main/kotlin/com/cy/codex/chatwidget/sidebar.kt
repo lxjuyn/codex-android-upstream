@@ -78,6 +78,7 @@ fun SidebarPanel(
     onExpandedChange: (Boolean) -> Unit,
     actions: List<SidebarEntry>,
     onAction: (SidebarEntry) -> Unit,
+    sessionActions: List<SidebarEntry>,
     projects: List<SidebarProject>,
     projectsCollapsed: Boolean,
     onToggleProjects: () -> Unit,
@@ -126,9 +127,26 @@ fun SidebarPanel(
             label = "sidebarListAlpha",
         )
     val projectsTitle = stringResource(R.string.sidebar_projects_header)
+    val sessionToolsTitle = stringResource(R.string.sidebar_session_tools_header)
     val items =
-        remember(actions, projects, projectsCollapsed, expandedProjects, projectsTitle) {
-            sidebarItems(actions, projects, projectsCollapsed, expandedProjects, projectsTitle)
+        remember(
+            actions,
+            sessionActions,
+            projects,
+            projectsCollapsed,
+            expandedProjects,
+            projectsTitle,
+            sessionToolsTitle,
+        ) {
+            sidebarItems(
+                actions,
+                sessionActions,
+                projects,
+                projectsCollapsed,
+                expandedProjects,
+                projectsTitle,
+                sessionToolsTitle,
+            )
         }
     // The list never scrolls itself: every move happens under the finger that asked for it.
     // Scrolling the selected session into view used to run while the bar was still growing — with a
@@ -165,7 +183,8 @@ fun SidebarPanel(
                             SectionHeader(
                                 title = item.title,
                                 collapsed = item.collapsed,
-                                onClick = onToggleProjects,
+                                collapsible = item.collapsible,
+                                onClick = if (item.collapsible) onToggleProjects else ({ }),
                             )
 
                         is SidebarItem.Gap -> Spacer(Modifier.height(sectionGap))
@@ -310,6 +329,7 @@ private fun SidebarHeader(
 private fun SectionHeader(
     title: String,
     collapsed: Boolean,
+    collapsible: Boolean = true,
     onClick: () -> Unit,
     corner: Dp = UiConsts.CornerControl,
     horizontalPadding: Dp = 6.dp,
@@ -344,10 +364,16 @@ private fun SectionHeader(
             Modifier.fillMaxWidth()
                 .padding(horizontal = horizontalPadding)
                 .clip(RoundedCornerShape(corner))
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = onClick,
+                .then(
+                    if (collapsible) {
+                        Modifier.clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = onClick,
+                        )
+                    } else {
+                        Modifier
+                    },
                 )
                 .background(pressOverlay, RoundedCornerShape(corner))
                 .padding(contentPadding),
@@ -360,17 +386,19 @@ private fun SectionHeader(
             lineHeight = titleLineHeight,
             color = colors.onSurfaceVariantSummary,
         )
-        Icon(
-            imageVector = MiuixIcons.ChevronForward,
-            contentDescription =
-                if (collapsed) {
-                    stringResource(R.string.sidebar_expand_section, title)
-                } else {
-                    stringResource(R.string.sidebar_collapse_section, title)
-                },
-            modifier = Modifier.size(chevronSize).graphicsLayer { rotationZ = chevronRotation },
-            tint = colors.onSurfaceVariantSummary,
-        )
+        if (collapsible) {
+            Icon(
+                imageVector = MiuixIcons.ChevronForward,
+                contentDescription =
+                    if (collapsed) {
+                        stringResource(R.string.sidebar_expand_section, title)
+                    } else {
+                        stringResource(R.string.sidebar_collapse_section, title)
+                    },
+                modifier = Modifier.size(chevronSize).graphicsLayer { rotationZ = chevronRotation },
+                tint = colors.onSurfaceVariantSummary,
+            )
+        }
     }
 }
 
@@ -555,8 +583,13 @@ private sealed interface SidebarItem {
         override val key: String = "action-${entry.id}"
     }
 
-    data class Header(val title: String, val collapsed: Boolean) : SidebarItem {
-        override val key: String = "header-projects"
+    data class Header(
+        val id: String,
+        val title: String,
+        val collapsed: Boolean,
+        val collapsible: Boolean,
+    ) : SidebarItem {
+        override val key: String = "header-$id"
     }
 
     data class Gap(val position: Int) : SidebarItem {
@@ -574,14 +607,19 @@ private sealed interface SidebarItem {
 
 private fun sidebarItems(
     actions: List<SidebarEntry>,
+    sessionActions: List<SidebarEntry>,
     projects: List<SidebarProject>,
     projectsCollapsed: Boolean,
     expandedProjects: Set<String>,
     projectsTitle: String,
+    sessionToolsTitle: String,
 ): List<SidebarItem> = buildList {
     actions.forEach { add(SidebarItem.Action(it)) }
     add(SidebarItem.Gap(0))
-    add(SidebarItem.Header(projectsTitle, projectsCollapsed))
+    add(SidebarItem.Header("tools", sessionToolsTitle, collapsed = false, collapsible = false))
+    sessionActions.forEach { add(SidebarItem.Action(it)) }
+    add(SidebarItem.Gap(1))
+    add(SidebarItem.Header("projects", projectsTitle, projectsCollapsed, collapsible = true))
     if (!projectsCollapsed) {
         projects.forEach { project ->
             val expanded = project.id in expandedProjects

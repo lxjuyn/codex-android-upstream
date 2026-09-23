@@ -7,7 +7,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -23,18 +22,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cy.codex.AppEvent
 import com.cy.codex.BuildConfig
 import com.cy.codex.CatalogState
+import com.cy.codex.DestinationCatalog
 import com.cy.codex.R
 import com.cy.codex.SessionState
 import com.cy.codex.UiConsts
@@ -47,11 +53,7 @@ import com.cy.codex.protocol.protocol.v2.AskForApproval
 import com.cy.codex.protocol.protocol.v2.ModelPreset
 import com.cy.codex.protocol.protocol.v2.ReasoningEffort
 import com.cy.codex.protocol.protocol.v2.ThreadSessionState
-import com.cy.codex.protocol.protocol.v2.ThreadTokenUsage
-import com.cy.codex.status.formatTokens
 import com.cy.codex.theme.Appearance
-import com.cy.codex.usageColor
-import kotlin.math.roundToInt
 import kotlinx.serialization.json.JsonPrimitive
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
@@ -59,22 +61,23 @@ import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
-import top.yukonga.miuix.kmp.basic.NavigationBar
-import top.yukonga.miuix.kmp.basic.NavigationBarItem
-import top.yukonga.miuix.kmp.basic.NavigationRail
-import top.yukonga.miuix.kmp.basic.NavigationRailItem
-import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
 import top.yukonga.miuix.kmp.icon.extended.ConvertFile
+import top.yukonga.miuix.kmp.icon.extended.Community
 import top.yukonga.miuix.kmp.icon.extended.FolderFill
 import top.yukonga.miuix.kmp.icon.extended.Info
+import top.yukonga.miuix.kmp.icon.extended.Link
 import top.yukonga.miuix.kmp.icon.extended.Lock
 import top.yukonga.miuix.kmp.icon.extended.MindMap
+import top.yukonga.miuix.kmp.icon.extended.Notes
+import top.yukonga.miuix.kmp.icon.extended.Refresh
+import top.yukonga.miuix.kmp.icon.extended.Search
+import top.yukonga.miuix.kmp.icon.extended.Share
 import top.yukonga.miuix.kmp.icon.extended.Store
+import top.yukonga.miuix.kmp.icon.extended.Tasks
 import top.yukonga.miuix.kmp.icon.extended.Tune
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlaySpinnerPreference
@@ -98,10 +101,10 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * differently from the library, and the settings page was the only place in the app where a miuix
  * control was *not* the real thing.
  *
- * The page is split into tabs with miuix's navigation components — a rail when the window is wide
- * enough for one, a bottom bar otherwise. A single scroll of six cards made the page long enough
- * that the workspace and the model were never on screen together, which is exactly the pair a user
- * comes here to check.
+ * The page is a two-level settings surface: a small home of categories, then one focused detail
+ * page per question. The old rail plus one long list mixed navigation with editing and forced every
+ * choice into the first viewport. Rows are `miuix-preference` controls, so touch, mouse and hardware
+ * focus all use the same click target and the same state change.
  */
 @Composable
 fun SettingsScreen(
@@ -111,45 +114,80 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenWorkspacePicker: () -> Unit,
     onOpenEntry: (String) -> Unit,
+    onOpenShortcuts: () -> Unit,
     configPath: String,
     modifier: Modifier = Modifier,
 ) {
     val config = session.config
-    val preset = catalog.modelPreset(config.model) ?: catalog.models.firstOrNull { it.isDefault }
-    var tab by remember { mutableStateOf(SettingsTab.General) }
+    var section by remember { mutableStateOf<SettingsSection?>(null) }
+    val currentSection = section
+    val preset =
+        catalog.modelPreset(config.model)
+            ?: catalog.models.firstOrNull { it.isDefault && !it.hidden }
+    val focusManager = LocalFocusManager.current
 
-    BoxWithConstraints(
-        modifier = modifier.fillMaxSize().background(MiuixTheme.colorScheme.background)
-    ) {
-        // Rail or bar, decided by the window rather than by the device: the same build runs on a
-        // phone and on a tablet in a split screen.
-        val wide = maxWidth >= UiConsts.WideContentBreakpoint
-        val content: @Composable (Modifier) -> Unit = { contentModifier ->
-            Column(
-                modifier =
-                    contentModifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = UiConsts.ScreenMargin)
-                        .padding(top = UiConsts.Space4, bottom = UiConsts.PageBottomInset),
-                verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
-            ) {
-                when (tab) {
-                    SettingsTab.General -> {
-                        SettingsAppearanceSection()
-                        SettingsNotificationSection()
-                        SettingsRecapSection()
-                        SettingsWorkspaceSection(
-                            config.cwd,
-                            config.workspaceRoots,
-                            onOpenWorkspacePicker,
-                        )
-                        SettingsConfigSourcesSection(catalog, configPath)
-                        SettingsExperimentalSection(catalog, onEvent)
-                        SettingsAboutSection()
+    Column(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(MiuixTheme.colorScheme.background)
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.Escape, Key.Back -> {
+                            if (section == null) onBack() else section = null
+                            true
+                        }
+
+                        Key.Tab -> {
+                            focusManager.moveFocus(
+                                if (event.isShiftPressed) FocusDirection.Previous else FocusDirection.Next,
+                            )
+                            true
+                        }
+
+                        else -> false
                     }
-
-                    SettingsTab.Model ->
+                },
+    ) {
+        BasicComponent(
+            title =
+                if (currentSection == null) {
+                    stringResource(R.string.settings_screen_title)
+                } else {
+                    stringResource(currentSection.titleRes)
+                },
+            summary =
+                if (currentSection == null) {
+                    stringResource(R.string.settings_home_subtitle)
+                } else {
+                    stringResource(currentSection.descriptionRes)
+                },
+                startAction = {
+                    SettingsBackButton(
+                        onBack = { if (section == null) onBack() else section = null },
+                    )
+                },
+            insideMargin = PaddingValues(14.dp, 10.dp),
+        )
+        Column(
+            modifier =
+                Modifier.weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = UiConsts.ScreenMargin)
+                    .padding(top = UiConsts.Space4, bottom = UiConsts.PageBottomInset),
+            verticalArrangement = Arrangement.spacedBy(UiConsts.SectionGap),
+        ) {
+            if (currentSection == null) {
+                SettingsHome(
+                    catalog = catalog,
+                    session = session,
+                    onSelect = { section = it },
+                )
+            } else {
+                when (currentSection) {
+                    SettingsSection.Model -> {
                         SettingsModelSection(
                             catalog,
                             preset,
@@ -157,68 +195,110 @@ fun SettingsScreen(
                             config.reasoningEffort,
                             onEvent,
                         )
-                    SettingsTab.Approval -> {
-                        SettingsApprovalSection(config, catalog.autoReviewAvailable, onEvent)
+                        SettingsMemorySection(catalog, onEvent)
+                        SettingsExperimentalSection(catalog, onEvent)
                     }
 
-                    SettingsTab.Session -> SettingsSessionSection(config, session.usage)
-                    SettingsTab.Library -> SettingsLibrarySection(onOpenEntry)
-                }
-            }
-        }
+                    SettingsSection.Permissions ->
+                        SettingsApprovalSection(config, catalog.autoReviewAvailable, onEvent)
 
-        Column(modifier = Modifier.fillMaxSize()) {
-            BasicComponent(
-                title = stringResource(R.string.settings_screen_title),
-                summary = stringResource(tab.labelRes),
-                startAction = { SettingsBackButton(onBack) },
-                insideMargin = PaddingValues(14.dp, 10.dp),
-            )
-            if (wide) {
-                Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    SettingsRail(tab, onSelect = { tab = it })
-                    content(Modifier.weight(1f))
+                    SettingsSection.Workspace -> {
+                        SettingsWorkspaceSection(config.cwd, config.workspaceRoots, onOpenWorkspacePicker)
+                        SettingsSessionLink(config, onOpenEntry)
+                    }
+
+                    SettingsSection.Appearance -> {
+                        SettingsAppearanceSection()
+                        SettingsShortcutsSection(onOpenShortcuts)
+                    }
+
+                    SettingsSection.Notifications -> {
+                        SettingsNotificationSection()
+                        SettingsRecapSection()
+                    }
+
+                    SettingsSection.Extensions -> SettingsExtensionsSection(onOpenEntry)
+                    SettingsSection.Data -> SettingsDataSection(onOpenEntry)
+                    SettingsSection.System -> {
+                        SettingsConfigSourcesSection(catalog, configPath)
+                        SettingsAboutSection()
+                    }
+
                 }
-            } else {
-                content(Modifier.weight(1f))
-                SettingsBar(tab, onSelect = { tab = it })
             }
         }
     }
 }
 
-/** The page's sections, in the order they appear in the rail and the bar. */
-private enum class SettingsTab(@StringRes val labelRes: Int, val icon: ImageVector) {
-    General(R.string.settings_tab_general, MiuixIcons.Tune),
-    Model(R.string.settings_tab_model, MiuixIcons.MindMap),
-    Approval(R.string.settings_tab_approval, MiuixIcons.Lock),
-    Session(R.string.settings_tab_session, MiuixIcons.Info),
-    Library(R.string.settings_tab_library, MiuixIcons.Store),
+/** Settings categories. Each category owns one question and opens one focused detail page. */
+private enum class SettingsSection(
+    @StringRes val titleRes: Int,
+    @StringRes val descriptionRes: Int,
+    val icon: ImageVector,
+) {
+    Model(R.string.settings_nav_model, R.string.settings_nav_model_summary, MiuixIcons.MindMap),
+    Permissions(R.string.settings_nav_permissions, R.string.settings_nav_permissions_summary, MiuixIcons.Lock),
+    Workspace(R.string.settings_nav_workspace, R.string.settings_nav_workspace_summary, MiuixIcons.FolderFill),
+    Appearance(R.string.settings_nav_appearance, R.string.settings_nav_appearance_summary, MiuixIcons.Tune),
+    Notifications(R.string.settings_nav_notifications, R.string.settings_nav_notifications_summary, MiuixIcons.Refresh),
+    Extensions(R.string.settings_nav_extensions, R.string.settings_nav_extensions_summary, MiuixIcons.Store),
+    Data(R.string.settings_nav_data, R.string.settings_nav_data_summary, MiuixIcons.Notes),
+    System(R.string.settings_nav_system, R.string.settings_nav_system_summary, MiuixIcons.Info),
 }
 
 @Composable
-private fun SettingsRail(tab: SettingsTab, onSelect: (SettingsTab) -> Unit) {
-    NavigationRail {
-        SettingsTab.entries.forEach { entry ->
-            NavigationRailItem(
-                selected = entry == tab,
-                onClick = { onSelect(entry) },
-                icon = entry.icon,
-                label = stringResource(entry.labelRes),
-            )
-        }
-    }
-}
+private fun SettingsHome(
+    catalog: CatalogState,
+    session: SessionState,
+    onSelect: (SettingsSection) -> Unit,
+) {
+    val config = session.config
+    SettingsGroup(stringResource(R.string.settings_home_group)) {
+        SettingsSection.entries.forEach { section ->
+            ArrowPreference(
+                title = stringResource(section.titleRes),
+                summary =
+                    when (section) {
+                        SettingsSection.Model ->
+                            catalog.modelPreset(config.model)?.displayName
+                                ?: stringResource(R.string.settings_screen_models_empty)
 
-@Composable
-private fun SettingsBar(tab: SettingsTab, onSelect: (SettingsTab) -> Unit) {
-    NavigationBar {
-        SettingsTab.entries.forEach { entry ->
-            NavigationBarItem(
-                selected = entry == tab,
-                onClick = { onSelect(entry) },
-                icon = entry.icon,
-                label = stringResource(entry.labelRes),
+                        SettingsSection.Permissions -> config.approvalPolicy.label()
+                        SettingsSection.Workspace ->
+                            config.cwd.ifEmpty { stringResource(R.string.settings_screen_no_directory) }
+
+                        SettingsSection.Appearance ->
+                            stringResource(
+                                when (Appearance.themeMode) {
+                                    ColorSchemeMode.System -> R.string.settings_theme_system
+                                    ColorSchemeMode.Light -> R.string.settings_theme_light
+                                    ColorSchemeMode.Dark -> R.string.settings_theme_dark
+                                    else -> R.string.settings_theme_system
+                                },
+                            )
+
+                        SettingsSection.Notifications ->
+                            if (NotificationSettings.enabled) {
+                                stringResource(R.string.settings_notifications_enabled)
+                            } else {
+                                stringResource(R.string.settings_notifications_disabled)
+                            }
+
+                        SettingsSection.Extensions ->
+                            stringResource(R.string.settings_nav_extensions_summary)
+
+                        SettingsSection.Data -> stringResource(R.string.settings_nav_data_summary)
+                        SettingsSection.System -> stringResource(R.string.settings_nav_system_summary)
+                    },
+                startAction = {
+                    Icon(
+                        section.icon,
+                        null,
+                        Modifier.size(UiConsts.IconPreference),
+                        MiuixTheme.colorScheme.primary,
+                    )
+                },
+                onClick = { onSelect(section) },
             )
         }
     }
@@ -247,7 +327,7 @@ private fun SettingsGroup(
     }
 }
 
-/** 1. 工作目录: the current `cwd`, the writable roots, and the way to the picker. */
+/** The current `cwd`, the writable roots, and the way to the picker. */
 @Composable
 private fun SettingsWorkspaceSection(
     cwd: String,
@@ -300,7 +380,7 @@ private fun SettingsWorkspaceSection(
     }
 }
 
-/** 2. 配置来源: which layer each effective value came from (`config/read`'s `layers` + `origins`). */
+/** Which layer each effective value came from (`config/read`'s `layers` + `origins`). */
 @Composable
 private fun SettingsConfigSourcesSection(catalog: CatalogState, configPath: String) {
     val colors = MiuixTheme.colorScheme
@@ -389,7 +469,7 @@ private fun SettingsConfigSourcesSection(catalog: CatalogState, configPath: Stri
 }
 
 /**
- * 2. 外观: theme mode and motion, the two client-side choices the app-server has no opinion on.
+ * Theme mode and motion, the two client-side choices the app-server has no opinion on.
  *
  * The TUI reads these from `[tui]` config and the terminal; on Android they are app preferences, so
  * they are written straight into [Appearance] instead of through an [AppEvent].
@@ -421,7 +501,7 @@ private fun SettingsAppearanceSection() {
 }
 
 /**
- * 2.5 通知: the Android counterpart of `tui.notifications`.
+ * The Android counterpart of `tui.notifications`.
  *
  * The master switch gates the runtime permission: turning it on with no grant asks for one, and a
  * denial leaves the switch off rather than pretending notifications will arrive. The per-type rows
@@ -468,7 +548,7 @@ private fun SettingsNotificationSection() {
 }
 
 /**
- * 2.6 回顾: the Android value of `tui.auto_recap`.
+ * The Android value of `tui.auto_recap`.
  *
  * A client-side toggle rather than a `config/value/write`, because the automatic recap is
  * orchestrated entirely in the widget and the server has no recap method.
@@ -487,7 +567,7 @@ private fun SettingsRecapSection() {
 }
 
 /**
- * 2.7 关于: the packaged app version.
+ * The packaged app version.
  *
  * Read from [BuildConfig] rather than a hand-written string: the same value initializes the
  * app-server client, so the version the user sees here is the version the server was told.
@@ -502,13 +582,141 @@ private fun SettingsAboutSection() {
     }
 }
 
+/** Memory policy is a preference; the memory page remains a read-only store browser and reset tool. */
+@Composable
+private fun SettingsMemorySection(catalog: CatalogState, onEvent: (AppEvent) -> Unit) {
+    val snapshot = catalog.configSnapshot
+    SettingsGroup(stringResource(R.string.settings_group_memory)) {
+        SwitchPreference(
+            title = stringResource(R.string.memories_screen_use),
+            summary = stringResource(R.string.memories_screen_use_detail),
+            checked = snapshot.useMemories ?: true,
+            onCheckedChange = {
+                onEvent(AppEvent.SetMemorySettings(it, snapshot.generateMemories ?: true))
+            },
+        )
+        SwitchPreference(
+            title = stringResource(R.string.memories_screen_generate),
+            summary = stringResource(R.string.memories_screen_generate_detail),
+            checked = snapshot.generateMemories ?: true,
+            onCheckedChange = {
+                onEvent(AppEvent.SetMemorySettings(snapshot.useMemories ?: true, it))
+            },
+        )
+    }
+}
+
+/** A discoverable route to the keymap overlay instead of duplicating key rows in settings. */
+@Composable
+private fun SettingsShortcutsSection(onOpenShortcuts: () -> Unit) {
+    SettingsGroup(stringResource(R.string.settings_group_shortcuts)) {
+        ArrowPreference(
+            title = stringResource(R.string.shortcuts_overlay_title),
+            summary = stringResource(R.string.settings_shortcuts_summary),
+            startAction = {
+                Icon(
+                    MiuixIcons.Search,
+                    null,
+                    Modifier.size(UiConsts.IconPreference),
+                    MiuixTheme.colorScheme.primary,
+                )
+            },
+            onClick = onOpenShortcuts,
+        )
+    }
+}
+
+/** Session identity is read-only status. The status surface owns it; settings only links there. */
+@Composable
+private fun SettingsSessionLink(config: ThreadSessionState, onOpenEntry: (String) -> Unit) {
+    SettingsGroup(stringResource(R.string.settings_group_session)) {
+        ArrowPreference(
+            title = stringResource(R.string.settings_tab_session),
+            summary =
+                listOfNotNull(
+                        config.threadId.ifEmpty { null },
+                        config.gitBranch,
+                    )
+                    .joinToString(" · ")
+                    .ifEmpty { stringResource(R.string.settings_screen_session_not_started) },
+            startAction = {
+                Icon(
+                    MiuixIcons.Info,
+                    null,
+                    Modifier.size(UiConsts.IconPreference),
+                    MiuixTheme.colorScheme.primary,
+                )
+            },
+            onClick = { onOpenEntry(DestinationCatalog.Id.Status) },
+        )
+    }
+}
+
+private data class SettingsLinkSpec(val id: String, val titleRes: Int, val icon: ImageVector)
+
+/** Integrations configure the agent; content and account data stay in [SettingsDataSection]. */
+@Composable
+private fun SettingsExtensionsSection(onOpenEntry: (String) -> Unit) {
+    val links =
+        listOf(
+            SettingsLinkSpec(DestinationCatalog.Id.Mcp, R.string.sidebar_library_mcp_servers, MiuixIcons.Link),
+            SettingsLinkSpec(DestinationCatalog.Id.Skills, R.string.sidebar_library_skills, MiuixIcons.Tasks),
+            SettingsLinkSpec(DestinationCatalog.Id.Plugins, R.string.sidebar_library_plugins, MiuixIcons.Store),
+            SettingsLinkSpec(DestinationCatalog.Id.Apps, R.string.sidebar_library_apps, MiuixIcons.Community),
+            SettingsLinkSpec(DestinationCatalog.Id.Hooks, R.string.sidebar_library_hooks, MiuixIcons.Refresh),
+            SettingsLinkSpec(DestinationCatalog.Id.PluginShares, R.string.sidebar_library_shares, MiuixIcons.Share),
+        )
+    SettingsLinksGroup(stringResource(R.string.settings_group_extensions), links, onOpenEntry)
+}
+
+/** Account, memory contents and maintenance are data operations, not editor preferences. */
+@Composable
+private fun SettingsDataSection(onOpenEntry: (String) -> Unit) {
+    val links =
+        listOf(
+            SettingsLinkSpec(DestinationCatalog.Id.Account, R.string.sidebar_library_account, MiuixIcons.Info),
+            SettingsLinkSpec(DestinationCatalog.Id.Memories, R.string.sidebar_library_memories, MiuixIcons.Notes),
+            SettingsLinkSpec(DestinationCatalog.Id.Migration, R.string.sidebar_library_migration, MiuixIcons.ConvertFile),
+            SettingsLinkSpec(DestinationCatalog.Id.RemoteControl, R.string.sidebar_library_remote, MiuixIcons.Link),
+            SettingsLinkSpec(DestinationCatalog.Id.Verification, R.string.sidebar_library_verification, MiuixIcons.Lock),
+            SettingsLinkSpec(DestinationCatalog.Id.Bedrock, R.string.sidebar_library_bedrock, MiuixIcons.Store),
+            SettingsLinkSpec(DestinationCatalog.Id.Sandbox, R.string.sidebar_library_sandbox, MiuixIcons.Tune),
+            SettingsLinkSpec(DestinationCatalog.Id.Diagnostics, R.string.sidebar_library_diagnostics, MiuixIcons.Search),
+        )
+    SettingsLinksGroup(stringResource(R.string.settings_group_data), links, onOpenEntry)
+}
+
+@Composable
+private fun SettingsLinksGroup(
+    title: String,
+    links: List<SettingsLinkSpec>,
+    onOpenEntry: (String) -> Unit,
+) {
+    SettingsGroup(title) {
+        links.forEach { link ->
+            ArrowPreference(
+                title = stringResource(link.titleRes),
+                startAction = {
+                    Icon(
+                        link.icon,
+                        null,
+                        Modifier.size(UiConsts.IconPreference),
+                        MiuixTheme.colorScheme.onSurfaceSecondary,
+                    )
+                },
+                onClick = { onOpenEntry(link.id) },
+            )
+        }
+    }
+}
+
 private enum class ThemeOption(@StringRes val labelRes: Int, val mode: ColorSchemeMode) {
     System(R.string.settings_theme_system, ColorSchemeMode.System),
     Light(R.string.settings_theme_light, ColorSchemeMode.Light),
     Dark(R.string.settings_theme_dark, ColorSchemeMode.Dark),
 }
 
-/** 3. 实验特性: `experimentalFeature/list`, written back through `SetExperimentalFeature`. */
+/** `experimentalFeature/list`, written back through `SetExperimentalFeature`. */
 @Composable
 private fun SettingsExperimentalSection(catalog: CatalogState, onEvent: (AppEvent) -> Unit) {
     // The Android runtime fixes these features off, regardless of the persisted config.
@@ -538,7 +746,7 @@ private fun SettingsExperimentalSection(catalog: CatalogState, onEvent: (AppEven
     }
 }
 
-/** 3. 模型: `model/list` presets as a radio group, plus the effort of the selected one. */
+/** Defaults for new threads: `model/list` presets and the effort of the selected one. */
 @Composable
 private fun SettingsModelSection(
     catalog: CatalogState,
@@ -555,7 +763,7 @@ private fun SettingsModelSection(
             )
             return@SettingsGroup
         }
-        catalog.models.forEach { model ->
+        catalog.models.filterNot { it.hidden }.forEach { model ->
             RadioButtonPreference(
                 title = model.displayName,
                 summary =
@@ -567,7 +775,9 @@ private fun SettingsModelSection(
                         )
                         .joinToString(" · "),
                 selected = model.model == currentModel,
-                onClick = { onEvent(AppEvent.SetModel(model.model)) },
+                onClick = {
+                    onEvent(AppEvent.WriteConfigValue("model", JsonPrimitive(model.model)))
+                },
             )
         }
     }
@@ -609,13 +819,20 @@ private fun SettingsModelSection(
                 selectedIndex = selectedIndex,
                 title = stringResource(R.string.settings_screen_effort_title),
                 summary = stringResource(R.string.settings_screen_effort_summary),
-                onSelectedIndexChange = { onEvent(AppEvent.SetReasoningEffort(efforts[it])) },
+                onSelectedIndexChange = {
+                    onEvent(
+                        AppEvent.WriteConfigValue(
+                            "model_reasoning_effort",
+                            JsonPrimitive(efforts[it].wire),
+                        ),
+                    )
+                },
             )
         }
     }
 }
 
-/** 4. 审批与沙箱: the policy radio group, the effective sandbox, and the granular switches. */
+/** Default policy for new threads, the effective sandbox, and the granular switches. */
 @Composable
 private fun SettingsApprovalSection(
     config: ThreadSessionState,
@@ -628,7 +845,9 @@ private fun SettingsApprovalSection(
                 title = option.label(),
                 summary = option.description(),
                 selected = option == config.approvalPolicy,
-                onClick = { onEvent(AppEvent.SetApprovalPolicy(option)) },
+                onClick = {
+                    onEvent(AppEvent.WriteConfigValue("approval_policy", JsonPrimitive(option.wire)))
+                },
             )
         }
         BasicComponent(
@@ -658,7 +877,14 @@ private fun SettingsApprovalSection(
                     title = option.label(),
                     summary = option.description(),
                     selected = option == config.approvalsReviewer,
-                    onClick = { onEvent(AppEvent.SetApprovalsReviewer(option)) },
+                    onClick = {
+                        onEvent(
+                            AppEvent.WriteConfigValue(
+                                "approvals_reviewer",
+                                JsonPrimitive(option.wire),
+                            ),
+                        )
+                    },
                 )
             }
     }
@@ -700,127 +926,6 @@ private fun SettingsApprovalSection(
     }
 }
 
-/** 6. 会话信息: thread identity, the instruction sources, and the context meter. */
-@Composable
-private fun SettingsSessionSection(config: ThreadSessionState, usage: ThreadTokenUsage) {
-    SettingsGroup(stringResource(R.string.settings_group_session)) {
-        BasicComponent(
-            title = stringResource(R.string.settings_screen_session_id),
-            endActions = {
-                MonoValue(
-                    config.threadId.ifEmpty {
-                        stringResource(R.string.settings_screen_session_not_started)
-                    }
-                )
-            },
-        )
-        BasicComponent(
-            title = stringResource(R.string.settings_screen_branch),
-            endActions = {
-                MonoValue(config.gitBranch ?: stringResource(R.string.settings_screen_no_git))
-            },
-        )
-    }
-
-    SettingsGroup(stringResource(R.string.settings_group_instructions)) {
-        if (config.instructionSourcePaths.isEmpty()) {
-            BasicComponent(
-                title = stringResource(R.string.settings_screen_no_agents_md),
-                enabled = false,
-            )
-        } else {
-            config.instructionSourcePaths.forEach { path ->
-                BasicComponent(
-                    title = path,
-                    startAction = {
-                        Icon(
-                            MiuixIcons.Info,
-                            null,
-                            Modifier.size(UiConsts.IconPreference),
-                            MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
-                    },
-                )
-            }
-        }
-    }
-
-    val window = usage.modelContextWindow ?: 0
-    if (window > 0) {
-        val fraction = (usage.total.totalTokens.toFloat() / window.toFloat()).coerceIn(0f, 1f)
-        SettingsGroup(stringResource(R.string.settings_group_context)) {
-            // The meter rides the row's own bottom slot, so it stays attached to the number it
-            // describes instead of floating in a section of its own.
-            BasicComponent(
-                title = stringResource(R.string.settings_screen_context_window),
-                summary =
-                    stringResource(
-                        R.string.settings_screen_context_usage,
-                        formatTokens(usage.total.totalTokens),
-                        formatTokens(window),
-                        (fraction * 100).roundToInt(),
-                    ),
-                bottomAction = {
-                    LinearProgressIndicator(
-                        progress = fraction,
-                        modifier = Modifier.fillMaxWidth().padding(top = UiConsts.Space6),
-                        colors =
-                            ProgressIndicatorDefaults.progressIndicatorColors(
-                                foregroundColor = usageColor(fraction),
-                                backgroundColor =
-                                    MiuixTheme.colorScheme.onBackground.copy(alpha = 0.08f),
-                            ),
-                        height = UiConsts.ProgressHeight,
-                    )
-                },
-            )
-            if (usage.total.cachedInputTokens > 0) {
-                BasicComponent(
-                    title = stringResource(R.string.settings_screen_io_cached),
-                    endActions = {
-                        MonoValue(
-                            "${formatTokens(usage.total.inputTokens)} / " +
-                                "${formatTokens(usage.total.outputTokens)} / " +
-                                formatTokens(usage.total.cachedInputTokens)
-                        )
-                    },
-                )
-            }
-        }
-    }
-}
-
-/**
- * 7. 库与集成: everything the drawer used to list below 添加工作区, as rows on one page.
- *
- * These were drawer entries, which made the drawer do two jobs at once — navigate this session, and
- * configure the app. As rows here they get their full names (MCP 服务器 instead of MCP, 已归档会话 instead
- * of 已归档) and the drawer goes back to being navigation. The ids are the ones the drawer used, so a
- * row opens exactly the page the old entry opened.
- */
-@Composable
-private fun SettingsLibrarySection(onOpenEntry: (String) -> Unit) {
-    SettingsGroup(stringResource(R.string.settings_group_library)) {
-        // Not `remember`ed: the titles are string resources, and a resource read is already cheap —
-        // caching them in a remember block would freeze the locale the page happened to open in.
-        val entries = SidebarModel.libraryEntries()
-        entries.forEach { entry ->
-            ArrowPreference(
-                title = entry.title,
-                startAction = {
-                    Icon(
-                        entry.icon,
-                        null,
-                        Modifier.size(UiConsts.IconPreference),
-                        MiuixTheme.colorScheme.onSurfaceSecondary,
-                    )
-                },
-                onClick = { onOpenEntry(entry.id) },
-            )
-        }
-    }
-}
-
 // ---- row vocabulary, private to this page ------------------------------------------------------
 
 /** A right-aligned monospace value: ids, paths and counts line up when they share a font. */
@@ -852,15 +957,3 @@ private fun SettingsBackButton(onBack: () -> Unit) {
         )
     }
 }
-
-/** Kept for the unused-import sweep: the stage chip used to live here, the label carries it now. */
-private val unusedFontWeight = FontWeight.Medium
-
-/** Kept for the unused-import sweep: the section corner is read through the card. */
-private val unusedSpacerHeight = 0.dp
-
-/** Kept for the unused-import sweep. */
-private val unusedBox = @Composable {}
-
-/** Kept for the unused-import sweep. */
-private val unusedAlignment = Alignment.Center

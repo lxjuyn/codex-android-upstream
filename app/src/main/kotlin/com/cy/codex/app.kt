@@ -2275,6 +2275,7 @@ fun CodexScreen(
                             onBack = app::closeSurface,
                             onOpenWorkspacePicker = { app.openSurface(Surface.WorkspacePicker) },
                             onOpenEntry = { id -> openSurfaceFor(app, id) },
+                            onOpenShortcuts = { shortcutsHelp.toggle() },
                             configPath = runtime.configPath,
                         )
                     }
