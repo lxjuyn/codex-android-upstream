@@ -60,6 +60,9 @@
     <string name="mcp_cell_dynamic_status_calling">Calling</string>
     <string name="mcp_cell_dynamic_status_completed">Completed</string>
     <string name="mcp_cell_dynamic_status_failed">Failed</string>
+    <string name="mcp_cell_badge_app">App · %1$s</string>
+    <string name="mcp_cell_badge_plugin">Plugin · %1$s</string>
+    <string name="mcp_cell_badge_read_only">Read-only</string>
 
     <!-- NoticesCell.kt -->
     <string name="notices_cell_context_compacted">Context compacted</string>
