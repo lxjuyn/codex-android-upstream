@@ -104,6 +104,7 @@ import com.cy.codex.protocol.ApprovalResponse
 import com.cy.codex.protocol.protocol.item.AgentMessageItem
 import com.cy.codex.protocol.protocol.item.CommandExecutionItem
 import com.cy.codex.protocol.protocol.item.ThreadItem
+import com.cy.codex.protocol.protocol.v2.Account
 import com.cy.codex.protocol.protocol.v2.AddCreditsNudgeCreditType
 import com.cy.codex.protocol.protocol.v2.AttachmentType
 import com.cy.codex.protocol.protocol.v2.RateLimitUpsellBanner
@@ -733,8 +734,16 @@ private fun RateLimitUpsellNotice(
     val colors = MiuixTheme.colorScheme
     val uriHandler = LocalUriHandler.current
     val shape = remember { RoundedCornerShape(UiConsts.PanelCorner) }
+    // The banner's own `plan_type` / `account_id` are `serde(skip)` and never reach the wire, so
+    // they come from what the client already knows about the account.
+    val planType =
+        (app.catalog.account.account as? Account.Chatgpt)?.planType
+            ?: app.catalog.rateLimits.rateLimits.planType
+    val accountId = app.catalog.rateLimits.accountId
     val actionable =
-        banner.ctas.mapNotNull { cta -> bannerAction(banner, cta.action)?.let { cta to it } }
+        banner.ctas.mapNotNull { cta ->
+            bannerAction(banner, cta.action, planType, accountId)?.let { cta to it }
+        }
     Column(
         modifier =
             modifier
@@ -772,6 +781,9 @@ private fun RateLimitUpsellNotice(
                                     app.onAppEvent(
                                         AppEvent.SendAddCreditsNudgeEmail(intent.creditType),
                                     )
+
+                                // The reset picker and its confirmation live on the account page.
+                                BannerIntent.ResetUsage -> app.openSurface(Surface.Account)
                             }
                         },
                         colors = ButtonDefaults.buttonColorsPrimary(),
