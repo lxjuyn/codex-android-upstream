@@ -8,6 +8,13 @@
     <string name="approval_overlay_elicitation_title_fallback">MCP form</string>
     <string name="approval_overlay_dynamic_tool_title">Tool call approval</string>
 
+    <!-- ApprovalOverlay.kt: an MCP tool approval's decisions, gated by the server's `persist`. -->
+    <string name="mcp_approval_allow">Allow</string>
+    <string name="mcp_approval_allow_session">Allow for this session</string>
+    <string name="mcp_approval_allow_always">Always allow</string>
+    <string name="mcp_approval_cancel">Cancel</string>
+    <string name="mcp_approval_field_tool">Tool</string>
+
     <!-- ApprovalOverlay.kt: dialog summaries, shown when the server sent no reason. -->
     <string name="approval_overlay_exec_summary_fallback">Codex wants to run a command in your workspace</string>
     <string name="approval_overlay_patch_summary">Codex wants to change %1$d files</string>

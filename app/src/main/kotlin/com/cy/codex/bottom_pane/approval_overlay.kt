@@ -55,12 +55,15 @@ import com.cy.codex.protocol.protocol.v2.DynamicToolCallResponse
 import com.cy.codex.protocol.protocol.v2.FileChangeApprovalDecision
 import com.cy.codex.protocol.protocol.v2.FileChangeApprovalParams
 import com.cy.codex.protocol.protocol.v2.FileUpdateChange
+import com.cy.codex.protocol.protocol.v2.McpApprovalMeta
 import com.cy.codex.protocol.protocol.v2.McpElicitationRequest
 import com.cy.codex.protocol.protocol.v2.PermissionsApprovalDecision
 import com.cy.codex.protocol.protocol.v2.PermissionsApprovalParams
 import com.cy.codex.sheetColor
 import com.cy.codex.sheetSideMargin
 import com.cy.codex.theme.HideStatusBarInWindow
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -213,15 +216,29 @@ private fun ApprovalBody(
                     busy = busy,
                 )
 
+            // An approval arrives as an empty-schema elicitation whose decisions live in `_meta`, so
+            // it takes the same header / body / footer as every other family; only a genuine form
+            // keeps the elicitation chrome.
             is ApprovalRequest.Elicitation ->
-                McpElicitationForm(
-                    request = request,
-                    onSubmit = {
-                        decide(ApprovalResponse.Elicitation(ElicitationAction.Accept, it))
-                    },
-                    onDecline = { decide(ApprovalResponse.Elicitation(ElicitationAction.Decline)) },
-                    busy = busy,
-                )
+                if (request.isApprovalAction) {
+                    ApprovalHeader(request = request, patchChanges = patchChanges)
+                    Spacer(Modifier.height(UiConsts.DialogHeaderGap))
+                    ApprovalScrollBody { McpApprovalDetails(request.params) }
+                    Spacer(Modifier.height(UiConsts.DialogFooterGap))
+                    DecisionRow(decisionsFor(request, decide), busy = busy)
+                    RemainingQueueLine(remainingQueue)
+                } else {
+                    McpElicitationForm(
+                        request = request,
+                        onSubmit = {
+                            decide(ApprovalResponse.Elicitation(ElicitationAction.Accept, it))
+                        },
+                        onDecline = {
+                            decide(ApprovalResponse.Elicitation(ElicitationAction.Decline))
+                        },
+                        busy = busy,
+                    )
+                }
 
             else -> {
                 ApprovalHeader(request = request, patchChanges = patchChanges)
@@ -514,14 +531,118 @@ private fun decisionsFor(
                 },
             )
 
-        is ApprovalRequest.UserInput,
-        is ApprovalRequest.Elicitation -> emptyList()
+        is ApprovalRequest.UserInput -> emptyList()
+
+        is ApprovalRequest.Elicitation -> elicitationApprovalDecisions(request, decide)
 
         // Host handshakes have no user-facing decision; see `approvalTitle`.
         is ApprovalRequest.ChatgptAuthTokensRefresh,
         is ApprovalRequest.AttestationGenerate,
         is ApprovalRequest.CurrentTimeRead -> emptyList()
     }
+
+/**
+ * Whether this elicitation is really a tool approval.
+ *
+ * The server sends approvals as an empty-schema form whose content is the `_meta`
+ * (`codex_approval_kind`); a form with a real schema, or one without the kind, is a genuine prompt
+ * and keeps the form chrome.
+ */
+private val ApprovalRequest.Elicitation.isApprovalAction: Boolean
+    get() =
+        (params as? McpElicitationRequest.Form)?.let { form ->
+            form.approval?.isToolCall == true && form.fields.isEmpty()
+        } == true
+
+/**
+ * The approval's decisions: run the tool, optionally remembering it, or cancel.
+ *
+ * `persist` gates the two remembering variants — the server only honours `session` / `always` when
+ * it listed them, so offering them otherwise would send a `_meta` it ignores. Mirrors the option
+ * list `mcp_server_elicitation.rs` builds for `APPROVAL_KIND_MCP_TOOL_CALL`.
+ */
+@Composable
+private fun elicitationApprovalDecisions(
+    request: ApprovalRequest.Elicitation,
+    decide: (ApprovalResponse) -> Unit,
+): List<DecisionAction> {
+    val approval = (request.params as? McpElicitationRequest.Form)?.approval ?: return emptyList()
+    if (!approval.isToolCall) return emptyList()
+    fun respond(action: ElicitationAction, persist: String?) =
+        decide(
+            ApprovalResponse.Elicitation(
+                action = action,
+                meta = persist?.let { JsonObject(mapOf("persist" to JsonPrimitive(it))) },
+            ),
+        )
+    return buildList {
+        add(
+            DecisionAction(
+                label = stringResource(R.string.mcp_approval_allow),
+                role = DecisionRole.Primary,
+            ) {
+                respond(ElicitationAction.Accept, null)
+            },
+        )
+        if (approval.allowsSession) {
+            add(
+                DecisionAction(label = stringResource(R.string.mcp_approval_allow_session)) {
+                    respond(ElicitationAction.Accept, McpApprovalMeta.PersistSession)
+                },
+            )
+        }
+        if (approval.allowsAlways) {
+            add(
+                DecisionAction(label = stringResource(R.string.mcp_approval_allow_always)) {
+                    respond(ElicitationAction.Accept, McpApprovalMeta.PersistAlways)
+                },
+            )
+        }
+        add(
+            DecisionAction(
+                label = stringResource(R.string.mcp_approval_cancel),
+                role = DecisionRole.Destructive,
+            ) {
+                respond(ElicitationAction.Cancel, null)
+            },
+        )
+    }
+}
+
+/** What the tool call is about: the server's display params, then the tool's own copy. */
+@Composable
+private fun McpApprovalDetails(params: McpElicitationRequest) {
+    val form = params as? McpElicitationRequest.Form ?: return
+    val approval = form.approval ?: return
+    if (form.message.isNotBlank()) {
+        Text(
+            text = form.message,
+            modifier = Modifier.fillMaxWidth(),
+            fontSize = UiType.Body,
+            lineHeight = UiType.BodyLine,
+            color = MiuixTheme.colorScheme.onSurfaceSecondary,
+        )
+        Spacer(Modifier.height(UiConsts.DialogFieldGap))
+    }
+    (approval.toolTitle ?: approval.toolName)?.takeIf { it.isNotBlank() }?.let { tool ->
+        FieldBlock(label = stringResource(R.string.mcp_approval_field_tool), value = tool)
+        Spacer(Modifier.height(UiConsts.DialogFieldGap))
+    }
+    approval.toolDescription?.takeIf { it.isNotBlank() }?.let { description ->
+        Text(
+            text = description,
+            modifier = Modifier.fillMaxWidth(),
+            fontSize = UiType.Body,
+            lineHeight = UiType.BodyLine,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        )
+        Spacer(Modifier.height(UiConsts.DialogFieldGap))
+    }
+    approval.paramsDisplay.forEachIndexed { index, param ->
+        if (index > 0) Spacer(Modifier.height(UiConsts.DialogFieldGap))
+        FieldBlock(label = param.displayName ?: param.name, value = param.value)
+    }
+}
 
 /**
  * One `label: value` pair, stacked.

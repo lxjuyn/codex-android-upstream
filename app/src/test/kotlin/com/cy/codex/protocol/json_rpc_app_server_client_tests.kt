@@ -439,6 +439,57 @@ class JsonRpcAppServerClientTest {
     }
 
     @Test
+    fun `an MCP tool approval exposes its persist modes and display params`() = runTest {
+        val transport = HarnessTransport()
+        val client = JsonRpcAppServerClient(transport, backgroundScope)
+        client.initialize(ClientInfo("android", version = "1")).getOrThrow()
+        val approval = async { client.requests.first() }
+        transport.push(
+            """{"id":"approve","method":"mcpServer/elicitation/request","params":{"threadId":"t","serverName":"github","mode":"form","message":"Codex wants to call create_issue","requestedSchema":{"properties":{}},"_meta":{"codex_approval_kind":"mcp_tool_call","persist":["session","always"],"tool_name":"create_issue","tool_title":"Create issue","tool_params_display":[{"name":"repo","value":"openai/codex","display_name":"Repository"}]}}}""",
+        )
+        val received = assertIs<ApprovalRequest.Elicitation>(approval.await())
+        val form = received.params as com.cy.codex.protocol.protocol.v2.McpElicitationRequest.Form
+        assertTrue(form.fields.isEmpty())
+        val meta = form.approval!!
+        assertEquals("mcp_tool_call", meta.kind)
+        assertTrue(meta.isToolCall)
+        assertTrue(meta.allowsSession)
+        assertTrue(meta.allowsAlways)
+        assertEquals("Create issue", meta.toolTitle)
+        assertEquals("Repository", meta.paramsDisplay.single().displayName)
+        assertEquals("openai/codex", meta.paramsDisplay.single().value)
+
+        // Choosing the session option echoes only that persist mode back, which is what makes the
+        // server remember the choice instead of asking again.
+        client.respond(
+            received.requestId,
+            ApprovalResponse.Elicitation(
+                ElicitationAction.Accept,
+                meta = obj("persist" to "session"),
+            ),
+        )
+        val result = transport.sentResponse().objectOrNull("result")!!
+        assertEquals("accept", result.required("action"))
+        assertEquals("session", result.objectOrNull("_meta")!!.required("persist"))
+        client.close()
+    }
+
+    @Test
+    fun `an elicitation without the approval kind carries no approval`() = runTest {
+        val transport = HarnessTransport()
+        val client = JsonRpcAppServerClient(transport, backgroundScope)
+        client.initialize(ClientInfo("android", version = "1")).getOrThrow()
+        val approval = async { client.requests.first() }
+        transport.push(
+            """{"id":"plain","method":"mcpServer/elicitation/request","params":{"threadId":"t","serverName":"test","mode":"form","message":"Settings","requestedSchema":{"properties":{"enabled":{"type":"boolean"}}}}}""",
+        )
+        val received = assertIs<ApprovalRequest.Elicitation>(approval.await())
+        val form = received.params as com.cy.codex.protocol.protocol.v2.McpElicitationRequest.Form
+        assertNull(form.approval)
+        client.close()
+    }
+
+    @Test
     fun `project creation sends roots and idempotency and goals decode nested response`() = runTest {
         val transport = HarnessTransport()
         val client = JsonRpcAppServerClient(transport, backgroundScope)
