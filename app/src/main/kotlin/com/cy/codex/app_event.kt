@@ -197,6 +197,9 @@ sealed interface AppEvent {
     data object ReloadRateLimits : AppEvent
     data object ReloadUsage : AppEvent
 
+    /** Re-read `account/workspaceMessages/read` for the workspace headline. */
+    data object ReloadWorkspaceMessages : AppEvent
+
     /** Start sign-in. The browser/device-code flow completes through `account/login/completed`. */
     data class Login(val params: LoginAccountParams) : AppEvent
 

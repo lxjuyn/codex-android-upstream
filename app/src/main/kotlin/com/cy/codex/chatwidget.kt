@@ -829,6 +829,7 @@ class ChatWidget(
             is AppEvent.ReloadAccount,
             is AppEvent.ReloadRateLimits,
             is AppEvent.ReloadUsage,
+            is AppEvent.ReloadWorkspaceMessages,
             is AppEvent.ReloadConfig,
             is AppEvent.ReloadAgentThreads,
             is AppEvent.StopThreadTurn,

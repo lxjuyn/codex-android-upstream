@@ -1127,12 +1127,27 @@ class JsonRpcAppServerClientTest {
         val client = JsonRpcAppServerClient(transport, backgroundScope)
         client.initialize(ClientInfo("android", version = "1")).getOrThrow()
         val messages = async { client.readWorkspaceMessages().getOrThrow() }
-        transport.response(transport.request(), obj("messages" to listOf(obj("messageId" to "m1", "messageType" to "headline",
+        transport.response(transport.request(), obj("featureEnabled" to true, "messages" to listOf(obj("messageId" to "m1", "messageType" to "headline",
             "messageBody" to "hi", "createdAt" to 5))))
-        val message = messages.await().single()
+        val response = messages.await()
+        assertEquals(true, response.featureEnabled)
+        val message = response.messages.single()
         assertEquals("m1", message.messageId)
         assertEquals(com.cy.codex.protocol.protocol.v2.WorkspaceMessageType.Headline, message.messageType)
         assertEquals(5_000L, message.createdAt)
+        client.close()
+    }
+
+    @Test
+    fun `a disabled workspace-message route still decodes`() = runTest {
+        val transport = HarnessTransport()
+        val client = JsonRpcAppServerClient(transport, backgroundScope)
+        client.initialize(ClientInfo("android", version = "1")).getOrThrow()
+        val messages = async { client.readWorkspaceMessages().getOrThrow() }
+        transport.response(transport.request(), obj("featureEnabled" to false, "messages" to emptyList<Any>()))
+        val response = messages.await()
+        assertEquals(false, response.featureEnabled)
+        assertEquals(emptyList<com.cy.codex.protocol.protocol.v2.WorkspaceMessage>(), response.messages)
         client.close()
     }
 

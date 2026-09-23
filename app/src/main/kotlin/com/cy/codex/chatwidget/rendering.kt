@@ -331,6 +331,25 @@ fun ChatScreen(
             )
         }
 
+        // The workspace headline is account state, not conversation, so it rides above the composer
+        // like the connection notice rather than scrolling away with the transcript. It yields the
+        // slot whenever the connection banner is up: a real problem outranks a standing notice.
+        if (app.connectionLostMessage == null) {
+            app.catalog.workspaceHeadline?.let { headline ->
+                WorkspaceHeadlineBanner(
+                    headline = headline,
+                    modifier =
+                        Modifier.align(Alignment.BottomCenter)
+                            .padding(
+                                start = UiConsts.ScreenMargin,
+                                end = UiConsts.ScreenMargin,
+                                bottom =
+                                    bottomInset + UiConsts.PromptBarHeight + UiConsts.ScreenMargin,
+                            ),
+                )
+            }
+        }
+
         StatusCardButton(
             open = panelState.open,
             onClick = { panelState.toggle() },
@@ -680,6 +699,35 @@ private fun TranscriptPane(
  * Mirrors the backend banner the TUI shows on disconnect: the session stays readable, and the one
  * action that helps — reconnect — is on the notice instead of replacing the screen.
  */
+/**
+ * The account backend's workspace headline, as a passive notice.
+ *
+ * The TUI prints this in its configurable status line, which this client does not have; a banner in
+ * the slot the connection notice uses keeps a one-line, non-scrolling notice without a status line
+ * to hang it on.
+ */
+@Composable
+private fun WorkspaceHeadlineBanner(headline: String, modifier: Modifier = Modifier) {
+    val shape = remember { RoundedCornerShape(UiConsts.PanelCorner) }
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(glassTint(0.94f), shape)
+                .padding(horizontal = UiConsts.Space12, vertical = UiConsts.Space10),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = headline,
+            fontSize = UiType.Body,
+            lineHeight = UiType.BodyLine,
+            color = MiuixTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
 @Composable
 private fun ConnectionBanner(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MiuixTheme.colorScheme
