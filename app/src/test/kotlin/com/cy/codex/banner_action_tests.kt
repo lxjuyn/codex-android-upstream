@@ -53,18 +53,19 @@ class BannerActionTest {
     }
 
     @Test
-    fun `known usage actions open their fixed pages`() {
+    fun `reset_usage keeps this client's own picker`() {
+        assertEquals(BannerIntent.ResetUsage, bannerAction(banner(), "reset_usage"))
+    }
+
+    @Test
+    fun `personal usage actions open their fixed pages`() {
         assertEquals(
             BannerIntent.OpenUrl("https://chatgpt.com/codex/settings/usage?credits_modal=true"),
-            bannerAction(banner(), "add_credits"),
+            bannerAction(banner(), "add_credits", planType = "plus"),
         )
         assertEquals(
             BannerIntent.OpenUrl("https://chatgpt.com/codex/settings/usage"),
             bannerAction(banner(), "view_usage"),
-        )
-        assertEquals(
-            BannerIntent.OpenUrl("https://chatgpt.com/admin/usage-limits/workspace"),
-            bannerAction(banner(), "view_workspace_usage"),
         )
         assertEquals(
             BannerIntent.OpenUrl("https://chatgpt.com/explore/pro"),
@@ -73,11 +74,45 @@ class BannerActionTest {
     }
 
     @Test
-    fun `actions this build cannot carry out show no button`() {
-        // `reset_usage` keeps this client's own picker; `open_pricing_dialog` needs the plan type,
-        // which BackendBanner never puts on the wire; anything unknown is left alone.
-        assertNull(bannerAction(banner(), "reset_usage"))
-        assertNull(bannerAction(banner(), "open_pricing_dialog"))
+    fun `workspace plans get the admin destination and its account id`() {
+        assertEquals(
+            BannerIntent.OpenUrl(
+                "https://chatgpt.com/admin/billing?codex_credit_action=add_credits&account_id=acct",
+            ),
+            bannerAction(banner(), "add_credits", planType = "business", accountId = "acct"),
+        )
+        assertEquals(
+            BannerIntent.OpenUrl("https://chatgpt.com/admin/usage-limits/workspace?account_id=acct"),
+            bannerAction(banner(), "view_workspace_usage", planType = "edu", accountId = "acct"),
+        )
+    }
+
+    @Test
+    fun `an admin route without an account id is dropped`() {
+        assertNull(bannerAction(banner(), "view_workspace_usage", planType = "team", accountId = null))
+        assertNull(bannerAction(banner(), "view_workspace_usage", planType = "team", accountId = " "))
+    }
+
+    @Test
+    fun `the pricing dialog is rewritten from the plan`() {
+        assertEquals(
+            BannerIntent.OpenUrl("https://chatgpt.com/?cta_tab=personal&highlight_plan=pro#pricing"),
+            bannerAction(banner(), "open_pricing_dialog", planType = "plus"),
+        )
+        assertEquals(
+            BannerIntent.OpenUrl("https://chatgpt.com/?cta_tab=personal&highlight_plan=plus#pricing"),
+            bannerAction(banner(), "open_pricing_dialog", planType = "free"),
+        )
+        assertEquals(
+            BannerIntent.OpenUrl(
+                "https://chatgpt.com/?cta_tab=personal&highlight_plan=pro&pro_variant=2x#pricing",
+            ),
+            bannerAction(banner(), "open_pricing_dialog", planType = "prolite"),
+        )
+    }
+
+    @Test
+    fun `an unknown action shows no button`() {
         assertNull(bannerAction(banner(), "something_new"))
     }
 }
