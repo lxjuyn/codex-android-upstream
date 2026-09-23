@@ -393,6 +393,8 @@ class CodexApp(
                 warnRateLimits()
             }
             AppEvent.ReloadUsage -> load({ client.readUsage() }) { catalog.usage = it; catalog.usageLoaded = true }
+            AppEvent.ReloadWorkspaceMessages ->
+                load({ client.readWorkspaceMessages() }) { catalog.workspaceHeadline = workspaceHeadline(it) }
 
             AppEvent.ReloadConfig -> request { reloadConfig() }
             AppEvent.ReloadSkills -> load({ client.listSkills() }) { catalog.skills = it }
@@ -1132,6 +1134,20 @@ class CodexApp(
      * every 15 s, ≥75% every 30 s, otherwise once a minute. The loop re-reads the interval after
      * every result, so a window that empties slows back down by itself.
      */
+    /**
+     * Refresh the workspace headline on the TUI's cadence.
+     *
+     * Mirrors `WORKSPACE_HEADLINE_REFRESH_INTERVAL` in `codex-rs/tui/src/workspace_messages.rs`; the
+     * banner is slow-moving, so a five-minute poll is enough and never races the rate-limit loop.
+     */
+    private suspend fun pollWorkspaceHeadline() {
+        while (true) {
+            delay(5 * 60 * 1000L)
+            if (!startupReady || catalog.account.account == null) continue
+            client.readWorkspaceMessages().onSuccess { catalog.workspaceHeadline = workspaceHeadline(it) }
+        }
+    }
+
     private suspend fun pollRateLimits() {
         while (true) {
             delay(rateLimitRefreshIntervalMs())
@@ -1934,6 +1950,7 @@ class CodexApp(
                 }
             }
             scope.launch { pollRateLimits() }
+            scope.launch { pollWorkspaceHeadline() }
             scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 client.connection.collect { connection ->
                     when (connection) {
@@ -1969,6 +1986,9 @@ class CodexApp(
                 ).getOrThrow()
                 threads.applyListing(client.listThreads().getOrThrow())
                 catalog.account = client.readAccount().getOrThrow()
+                // Account-level notice shown as a banner; this first read is refreshed on the TUI's
+                // cadence by pollWorkspaceHeadline().
+                client.readWorkspaceMessages().onSuccess { catalog.workspaceHeadline = workspaceHeadline(it) }
                 client.listModels().onSuccess { catalog.models = it }
                 // The plan row in the composer and `/plan` both gate on this list, so it is loaded
                 // once at startup rather than lazily when the popup first opens.

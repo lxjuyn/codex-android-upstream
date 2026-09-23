@@ -604,10 +604,18 @@ class JsonRpcAppServerClient(
         val o = rpc("account/usage/read", obj("threadId" to threadId))
         WireCodec.threadUsage(o.objectOrNull("threadUsage") ?: error("account/usage/read answered without threadUsage"))
     }
-    override suspend fun readWorkspaceMessages() = result { rpc("account/workspaceMessages/read", null).array("messages").map { value -> value.objectValue().let {
-        WorkspaceMessage(it.required("messageId"), WorkspaceMessageType.fromWire(it.text("messageType")), it.required("messageBody"),
-            it.long("createdAt")?.times(1000), it.long("archivedAt")?.times(1000))
-    } } }
+    override suspend fun readWorkspaceMessages() = result {
+        val body = rpc("account/workspaceMessages/read", null)
+        WorkspaceMessagesResponse(
+            // The flag is a route-availability claim: false means the backend does not serve
+            // workspace messages at all, which is not the same as a workspace with no headline.
+            featureEnabled = body.bool("featureEnabled") == true,
+            messages = body.array("messages").map { value -> value.objectValue().let {
+                WorkspaceMessage(it.required("messageId"), WorkspaceMessageType.fromWire(it.text("messageType")), it.required("messageBody"),
+                    it.long("createdAt")?.times(1000), it.long("archivedAt")?.times(1000))
+            } },
+        )
+    }
 
     override suspend fun readConfig(cwd: String?, includeLayers: Boolean) = result { WireCodec.config(rpc("config/read", obj("cwd" to cwd, "includeLayers" to includeLayers))) }
     override suspend fun readConfigLayers() = readConfig().map { it.layers.orEmpty() }
