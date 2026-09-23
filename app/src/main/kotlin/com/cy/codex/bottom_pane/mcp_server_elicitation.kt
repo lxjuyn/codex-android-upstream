@@ -105,6 +105,10 @@ internal fun McpElicitationForm(
                     busy = busy,
                 )
             }
+
+        // A user verification has its own body in the approval dialog; reaching here would mean the
+        // dialog routed it wrong, and there is nothing to type, so this branch stays empty.
+        is McpElicitationRequest.UserVerification -> Unit
     }
 }
 

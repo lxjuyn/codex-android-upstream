@@ -20,6 +20,8 @@
     <string name="mcp_tool_suggestion_plugin">服务端建议的插件</string>
     <string name="mcp_tool_suggestion_open">打开安装页</string>
     <string name="mcp_tool_suggestion_done">已完成，继续</string>
+    <string name="approval_overlay_user_verification_sign">签名并继续</string>
+    <string name="approval_overlay_user_verification_failed">无法对挑战签名。</string>
 
     <!-- ApprovalOverlay.kt: dialog summaries, shown when the server sent no reason. -->
     <string name="approval_overlay_exec_summary_fallback">Codex 想在你的工作区运行一条命令</string>

@@ -20,6 +20,8 @@
     <string name="mcp_tool_suggestion_plugin">Plugin suggested by the server</string>
     <string name="mcp_tool_suggestion_open">Open install page</string>
     <string name="mcp_tool_suggestion_done">Done, continue</string>
+    <string name="approval_overlay_user_verification_sign">Sign and continue</string>
+    <string name="approval_overlay_user_verification_failed">Could not sign the challenge.</string>
 
     <!-- ApprovalOverlay.kt: dialog summaries, shown when the server sent no reason. -->
     <string name="approval_overlay_exec_summary_fallback">Codex wants to run a command in your workspace</string>

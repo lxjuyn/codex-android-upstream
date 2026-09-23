@@ -578,6 +578,9 @@ fun ChatScreen(
             remainingQueue = (app.widget.approvalQueueSize - 1).coerceAtLeast(0),
             // The patch is not on the request; it is recovered from the item the request names.
             patchChanges = { request -> app.widget.fileChangeChanges(request.itemId) },
+            // Signing lives behind the server's credential provider; the client only asks for the
+            // proof and hands it back as the accept's content.
+            verify = { params -> app.client.verifyUserVerification(params).map { it.proof } },
         )
         if (app.goalMenuOpen) {
             val goal = session.goal

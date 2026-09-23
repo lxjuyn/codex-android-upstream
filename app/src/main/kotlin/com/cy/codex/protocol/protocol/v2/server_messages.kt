@@ -344,6 +344,22 @@ sealed interface McpElicitationRequest {
         val elicitationId: String,
         override val meta: JsonElement? = null,
     ) : McpElicitationRequest
+
+    /**
+     * `openai/userVerification`: a device-authenticated approval.
+     *
+     * The server wants the local credential to sign [challenge]; the signed proof travels back as
+     * the accept's *content*, not as form fields, so this variant has no schema to render.
+     */
+    data class UserVerification(
+        override val serverName: String,
+        val title: String,
+        val description: String,
+        val challenge: String,
+        override val meta: JsonElement? = null,
+    ) : McpElicitationRequest {
+        override val message: String get() = title
+    }
 }
 
 /** One field of an MCP elicitation form, flattened from the requested JSON Schema. */
