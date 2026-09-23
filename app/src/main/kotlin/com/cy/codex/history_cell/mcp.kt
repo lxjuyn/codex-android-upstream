@@ -1,6 +1,8 @@
 package com.cy.codex.history_cell
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -55,6 +57,13 @@ fun McpToolCallCell(item: McpToolCallItem, modifier: Modifier = Modifier) {
         accent = statusDotColor(tone),
         trailing = { StatusChip(label = mcpLabel(item.status), tone = tone) },
     ) {
+        val badges = mcpBadges(item)
+        if (badges.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                badges.forEach { MetaChip(it) }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
         val error = item.error
         val blocks = projectMcpResult(item.result)
         Arguments(item.arguments)
@@ -64,6 +73,27 @@ fun McpToolCallCell(item: McpToolCallItem, modifier: Modifier = Modifier) {
             item.status == McpToolCallStatus.InProgress ->
                 PendingOutput(stringResource(R.string.mcp_cell_waiting_for_result))
         }
+    }
+}
+
+/**
+ * The connector/app, plugin and read-only markers a descriptor-backed call carries.
+ *
+ * Upstream renders none of these, but the fields arrive on the wire and they tell the user which
+ * app or plugin a call was routed through and whether the tool promised not to write. That is
+ * context worth a chip rather than a silent drop.
+ */
+@Composable
+private fun mcpBadges(item: McpToolCallItem): List<String> = buildList {
+    val app = item.appContext
+    (app?.appName ?: app?.connectorId)?.takeIf { it.isNotBlank() }?.let {
+        add(stringResource(R.string.mcp_cell_badge_app, it))
+    }
+    item.pluginId?.takeIf { it.isNotBlank() }?.let {
+        add(stringResource(R.string.mcp_cell_badge_plugin, it))
+    }
+    if (item.readOnlyHint == true) {
+        add(stringResource(R.string.mcp_cell_badge_read_only))
     }
 }
 

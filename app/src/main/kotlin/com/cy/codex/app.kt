@@ -110,6 +110,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import com.cy.codex.protocol.protocol.v2.CollaborationMode
+import com.cy.codex.protocol.protocol.v2.RateLimitUpsellBanner
 import com.cy.codex.protocol.protocol.v2.ConfigBatchWriteParams
 import com.cy.codex.protocol.protocol.v2.ConfigEdit
 import com.cy.codex.protocol.protocol.v2.DiagnosticSeverity
@@ -391,8 +392,11 @@ class CodexApp(
                 catalog.rateLimits = it
                 catalog.rateLimitsUpdatedAtMs = System.currentTimeMillis()
                 warnRateLimits()
+                applyLunaReserve()
             }
             AppEvent.ReloadUsage -> load({ client.readUsage() }) { catalog.usage = it; catalog.usageLoaded = true }
+            AppEvent.ReloadWorkspaceMessages ->
+                load({ client.readWorkspaceMessages() }) { catalog.workspaceHeadline = workspaceHeadline(it) }
 
             AppEvent.ReloadConfig -> request { reloadConfig() }
             AppEvent.ReloadSkills -> load({ client.listSkills() }) { catalog.skills = it }
@@ -1132,6 +1136,57 @@ class CodexApp(
      * every 15 s, ≥75% every 30 s, otherwise once a minute. The loop re-reads the interval after
      * every result, so a window that empties slows back down by itself.
      */
+    /**
+     * Refresh the workspace headline on the TUI's cadence.
+     *
+     * Mirrors `WORKSPACE_HEADLINE_REFRESH_INTERVAL` in `codex-rs/tui/src/workspace_messages.rs`; the
+     * banner is slow-moving, so a five-minute poll is enough and never races the rate-limit loop.
+     */
+    /**
+     * Model to return to when the reserved model releases the account, keyed by thread.
+     *
+     * The target belongs to the task, not the account: one thread may be mid-reserve while another
+     * runs normally.
+     */
+    private val reserveReturn = mutableMapOf<String, String>()
+
+    /**
+     * Move the open thread onto — or back off — the reserved model.
+     *
+     * Mirrors `backend_banner_fallback` in `codex-rs/tui/src/chatwidget/backend_banners.rs`. The
+     * backend sends the `luna_reserve` banner only once ordinary usage is spent, so the banner is
+     * the switch signal, and the reserved model must be one the server still offers. Recovery needs
+     * `ordinaryUsageAllowed == true` because the schema forbids inferring it from percentages or
+     * reset times.
+     */
+    private fun applyLunaReserve() {
+        val threadId = widget.state.threadId
+        if (threadId.isBlank()) return
+        val current = widget.state.config.model
+        if (current == LunaReserveModel) {
+            if (catalog.rateLimits.ordinaryUsageAllowed != true) return
+            val returnTo = reserveReturn.remove(threadId) ?: return
+            if (catalog.models.any { it.model == returnTo }) {
+                widget.action(AppEvent.SetModel(returnTo))
+            }
+            return
+        }
+        if (catalog.rateLimits.rateLimitUpsell?.bannerType != RateLimitUpsellBanner.LunaReserve) {
+            return
+        }
+        if (catalog.models.none { it.model == LunaReserveModel }) return
+        reserveReturn[threadId] = current
+        widget.action(AppEvent.SetModel(LunaReserveModel))
+    }
+
+    private suspend fun pollWorkspaceHeadline() {
+        while (true) {
+            delay(5 * 60 * 1000L)
+            if (!startupReady || catalog.account.account == null) continue
+            client.readWorkspaceMessages().onSuccess { catalog.workspaceHeadline = workspaceHeadline(it) }
+        }
+    }
+
     private suspend fun pollRateLimits() {
         while (true) {
             delay(rateLimitRefreshIntervalMs())
@@ -1140,6 +1195,7 @@ class CodexApp(
                 catalog.rateLimits = fresh
                 catalog.rateLimitsUpdatedAtMs = System.currentTimeMillis()
                 warnRateLimits()
+                applyLunaReserve()
             }
         }
     }
@@ -1211,6 +1267,7 @@ class CodexApp(
                 catalog.rateLimits = fresh
                 catalog.rateLimitsUpdatedAtMs = System.currentTimeMillis()
                 warnRateLimits()
+                applyLunaReserve()
             }
             delay(RateLimitRecoveryDelayMs)
             val held = recoverySubmission
@@ -1934,6 +1991,7 @@ class CodexApp(
                 }
             }
             scope.launch { pollRateLimits() }
+            scope.launch { pollWorkspaceHeadline() }
             scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 client.connection.collect { connection ->
                     when (connection) {
@@ -1969,6 +2027,9 @@ class CodexApp(
                 ).getOrThrow()
                 threads.applyListing(client.listThreads().getOrThrow())
                 catalog.account = client.readAccount().getOrThrow()
+                // Account-level notice shown as a banner; this first read is refreshed on the TUI's
+                // cadence by pollWorkspaceHeadline().
+                client.readWorkspaceMessages().onSuccess { catalog.workspaceHeadline = workspaceHeadline(it) }
                 client.listModels().onSuccess { catalog.models = it }
                 // The plan row in the composer and `/plan` both gate on this list, so it is loaded
                 // once at startup rather than lazily when the popup first opens.
@@ -2044,6 +2105,9 @@ class CodexApp(
  * A model the catalog does not list produces no prompt rather than a row that cannot be selected.
  */
 private const val RateLimitNudgeModel = "gpt-5.6-luna"
+
+/** The reserved model the account falls back to once ordinary usage is spent (`model_catalog.rs`). */
+private const val LunaReserveModel = "gpt-reserve"
 
 /** Used share of the codex window at which the prompt may appear. */
 private const val RateLimitNudgeThresholdPercent = 90L

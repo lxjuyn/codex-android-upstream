@@ -132,7 +132,7 @@ import com.cy.codex.protocol.protocol.v2.WindowsSandboxReadinessResponse
 import com.cy.codex.protocol.protocol.v2.WindowsSandboxSetupCompletedNotification
 import com.cy.codex.protocol.protocol.v2.WindowsSandboxSetupMode
 import com.cy.codex.protocol.protocol.v2.WindowsSandboxSetupStartResponse
-import com.cy.codex.protocol.protocol.v2.WorkspaceMessage
+import com.cy.codex.protocol.protocol.v2.WorkspaceMessagesResponse
 import com.cy.codex.protocol.protocol.v2.WorldWritableWarningNotification
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonElement
@@ -788,7 +788,7 @@ interface AppServerClient {
 
     /** Estimated credits/USD for one thread; `account/usage/read` with a `threadId`. */
     suspend fun readThreadUsage(threadId: String): Result<ThreadUsage> = unsupported("readThreadUsage")
-    suspend fun readWorkspaceMessages(): Result<List<WorkspaceMessage>> = unsupported("readWorkspaceMessages")
+    suspend fun readWorkspaceMessages(): Result<WorkspaceMessagesResponse> = unsupported("readWorkspaceMessages")
     suspend fun consumeRateLimitResetCredit(creditId: String? = null): Result<ConsumeRateLimitResetCreditResponse> = unsupported("consumeRateLimitResetCredit")
     suspend fun sendAddCreditsNudgeEmail(
         creditType: com.cy.codex.protocol.protocol.v2.AddCreditsNudgeCreditType,

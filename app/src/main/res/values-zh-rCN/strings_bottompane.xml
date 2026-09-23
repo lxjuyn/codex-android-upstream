@@ -8,6 +8,21 @@
     <string name="approval_overlay_elicitation_title_fallback">MCP 表单</string>
     <string name="approval_overlay_dynamic_tool_title">工具调用审批</string>
 
+    <!-- ApprovalOverlay.kt: an MCP tool approval's decisions, gated by the server's `persist`. -->
+    <string name="mcp_approval_allow">允许</string>
+    <string name="mcp_approval_allow_session">本会话内允许</string>
+    <string name="mcp_approval_allow_always">始终允许</string>
+    <string name="mcp_approval_cancel">取消</string>
+    <string name="mcp_approval_field_tool">工具</string>
+    <string name="mcp_tool_suggestion_install_title">安装 %1$s</string>
+    <string name="mcp_tool_suggestion_enable_title">启用 %1$s</string>
+    <string name="mcp_tool_suggestion_connector">服务端建议的连接器</string>
+    <string name="mcp_tool_suggestion_plugin">服务端建议的插件</string>
+    <string name="mcp_tool_suggestion_open">打开安装页</string>
+    <string name="mcp_tool_suggestion_done">已完成，继续</string>
+    <string name="approval_overlay_user_verification_sign">签名并继续</string>
+    <string name="approval_overlay_user_verification_failed">无法对挑战签名。</string>
+
     <!-- ApprovalOverlay.kt: dialog summaries, shown when the server sent no reason. -->
     <string name="approval_overlay_exec_summary_fallback">Codex 想在你的工作区运行一条命令</string>
     <string name="approval_overlay_patch_summary">Codex 想写入 %1$d 个文件</string>

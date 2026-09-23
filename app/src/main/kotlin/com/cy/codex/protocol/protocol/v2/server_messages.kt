@@ -1,6 +1,11 @@
 package com.cy.codex.protocol.protocol.v2
 
+import com.cy.codex.protocol.protocol.array
+import com.cy.codex.protocol.protocol.stringOrNull
+import com.cy.codex.protocol.protocol.text
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 /**
  * `ServerNotification` — the 82 methods the server pushes at the client.
@@ -215,6 +220,99 @@ data class UserInputAnswer(val questionId: String, val answers: List<String>)
  * flavours collapse into [Form] because this client renders the flattened schema either way, while
  * [Url] must stay its own variant: it has no fields to submit, only a page to open and an accept.
  */
+/**
+ * The typed view of an elicitation's `_meta` when the server is really asking for an approval.
+ *
+ * These keys are snake_case on purpose: the object is `codex-rs/protocol/src/mcp_approval_meta.rs`
+ * handed through verbatim, unlike the camelCase of the v2 protocol around it, so it has to be read
+ * by its own names. [persist] decides which allow variants the server will honour.
+ */
+data class McpApprovalMeta(
+    /** `codex_approval_kind`: `mcp_tool_call`, `tool_suggestion` or `browser_auth`. */
+    val kind: String?,
+    val persist: Set<String> = emptySet(),
+    val toolName: String? = null,
+    val toolTitle: String? = null,
+    val toolDescription: String? = null,
+    val paramsDisplay: List<McpApprovalParamDisplay> = emptyList(),
+    // `tool_suggestion` only.
+    val toolType: String? = null,
+    val suggestType: String? = null,
+    val suggestReason: String? = null,
+    val toolId: String? = null,
+    val installUrl: String? = null,
+) {
+    /** A tool call awaiting a decision, as opposed to a suggestion card or a browser hand-off. */
+    val isToolCall: Boolean get() = kind == KindMcpToolCall
+    val allowsSession: Boolean get() = PersistSession in persist
+    val allowsAlways: Boolean get() = PersistAlways in persist
+
+    /**
+     * A suggestion to install or enable a connector/plugin before the call can run.
+     *
+     * The TUI drops a suggestion missing any required field (`parse_tool_suggestion_request`), so
+     * an incomplete payload stays a plain elicitation rather than a half-filled card.
+     */
+    val isToolSuggestion: Boolean
+        get() =
+            kind == KindToolSuggestion &&
+                toolType in ToolTypes &&
+                suggestType in SuggestTypes &&
+                !suggestReason.isNullOrBlank() &&
+                !toolId.isNullOrBlank() &&
+                !toolName.isNullOrBlank()
+
+    val isInstall: Boolean get() = suggestType == SuggestInstall
+
+    companion object {
+        const val KindMcpToolCall = "mcp_tool_call"
+        const val KindToolSuggestion = "tool_suggestion"
+        const val SuggestInstall = "install"
+        const val SuggestEnable = "enable"
+        const val PersistSession = "session"
+        const val PersistAlways = "always"
+
+        private val ToolTypes = setOf("connector", "plugin")
+        private val SuggestTypes = setOf(SuggestInstall, SuggestEnable)
+
+        /** Null when the meta carries no approval kind, which is every elicitation but an approval. */
+        fun from(meta: JsonElement?): McpApprovalMeta? {
+            val o = meta as? JsonObject ?: return null
+            val kind = o.text("codex_approval_kind") ?: return null
+            return McpApprovalMeta(
+                kind = kind,
+                persist = o.persistValues(),
+                toolName = o.text("tool_name"),
+                toolTitle = o.text("tool_title"),
+                toolDescription = o.text("tool_description"),
+                paramsDisplay =
+                    o.array("tool_params_display").mapNotNull { it as? JsonObject }.map { entry ->
+                        McpApprovalParamDisplay(
+                            name = entry.text("name").orEmpty(),
+                            value = entry.text("value").orEmpty(),
+                            displayName = entry.text("display_name"),
+                        )
+                    },
+                toolType = o.text("tool_type"),
+                suggestType = o.text("suggest_type"),
+                suggestReason = o.text("suggest_reason"),
+                toolId = o.text("tool_id"),
+                installUrl = o.text("install_url"),
+            )
+        }
+    }
+}
+
+/** One `tool_params_display` row: the parameter's name, its raw value and an optional label. */
+data class McpApprovalParamDisplay(val name: String, val value: String, val displayName: String?)
+
+/** `persist` arrives as a single value or an array; both mean "these modes are allowed". */
+private fun JsonObject.persistValues(): Set<String> =
+    when (val raw = this["persist"]) {
+        is JsonArray -> raw.mapNotNull { it.stringOrNull() }.toSet()
+        else -> raw?.stringOrNull()?.let { setOf(it) } ?: emptySet()
+    }
+
 sealed interface McpElicitationRequest {
     val serverName: String
     val message: String
@@ -234,6 +332,9 @@ sealed interface McpElicitationRequest {
         override val meta: JsonElement? = null,
     ) : McpElicitationRequest {
         val fields: List<McpElicitationField> get() = requestedSchema.fields
+
+        /** The approval this elicitation really is, when [_meta] marks one; see [McpApprovalMeta]. */
+        val approval: McpApprovalMeta? = McpApprovalMeta.from(meta)
     }
 
     data class Url(
@@ -243,6 +344,22 @@ sealed interface McpElicitationRequest {
         val elicitationId: String,
         override val meta: JsonElement? = null,
     ) : McpElicitationRequest
+
+    /**
+     * `openai/userVerification`: a device-authenticated approval.
+     *
+     * The server wants the local credential to sign [challenge]; the signed proof travels back as
+     * the accept's *content*, not as form fields, so this variant has no schema to render.
+     */
+    data class UserVerification(
+        override val serverName: String,
+        val title: String,
+        val description: String,
+        val challenge: String,
+        override val meta: JsonElement? = null,
+    ) : McpElicitationRequest {
+        override val message: String get() = title
+    }
 }
 
 /** One field of an MCP elicitation form, flattened from the requested JSON Schema. */

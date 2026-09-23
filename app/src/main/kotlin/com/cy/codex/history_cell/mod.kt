@@ -141,6 +141,11 @@ private fun diagnosticText(code: DiagnosticCode, args: List<String>): String = w
         args.firstOrNull().orEmpty(),
     )
 
+    DiagnosticCode.HookOutput -> stringResource(
+        R.string.chatwidget_diagnostic_hook_output,
+        args.firstOrNull().orEmpty(),
+    )
+
     DiagnosticCode.McpLoginFailed -> stringResource(
         R.string.chatwidget_diagnostic_mcp_login_failed,
         args.firstOrNull().orEmpty(),

@@ -604,10 +604,18 @@ class JsonRpcAppServerClient(
         val o = rpc("account/usage/read", obj("threadId" to threadId))
         WireCodec.threadUsage(o.objectOrNull("threadUsage") ?: error("account/usage/read answered without threadUsage"))
     }
-    override suspend fun readWorkspaceMessages() = result { rpc("account/workspaceMessages/read", null).array("messages").map { value -> value.objectValue().let {
-        WorkspaceMessage(it.required("messageId"), WorkspaceMessageType.fromWire(it.text("messageType")), it.required("messageBody"),
-            it.long("createdAt")?.times(1000), it.long("archivedAt")?.times(1000))
-    } } }
+    override suspend fun readWorkspaceMessages() = result {
+        val body = rpc("account/workspaceMessages/read", null)
+        WorkspaceMessagesResponse(
+            // The flag is a route-availability claim: false means the backend does not serve
+            // workspace messages at all, which is not the same as a workspace with no headline.
+            featureEnabled = body.bool("featureEnabled") == true,
+            messages = body.array("messages").map { value -> value.objectValue().let {
+                WorkspaceMessage(it.required("messageId"), WorkspaceMessageType.fromWire(it.text("messageType")), it.required("messageBody"),
+                    it.long("createdAt")?.times(1000), it.long("archivedAt")?.times(1000))
+            } },
+        )
+    }
 
     override suspend fun readConfig(cwd: String?, includeLayers: Boolean) = result { WireCodec.config(rpc("config/read", obj("cwd" to cwd, "includeLayers" to includeLayers))) }
     override suspend fun readConfigLayers() = readConfig().map { it.layers.orEmpty() }
@@ -659,7 +667,7 @@ class JsonRpcAppServerClient(
         (value as? JsonPrimitive)?.takeIf { !it.isString }?.booleanOrNull?.let { name to it }
     }.toMap() }
     override suspend fun listPermissionProfiles() = result {
-        catalog("permissionProfile/list").map { o -> PermissionProfileEntry(o.required("id"), o.required("id"), o.text("description").orEmpty()) }
+        catalog("permissionProfile/list").map { o -> PermissionProfileEntry(o.required("id"), o.text("description").orEmpty(), o.bool("allowed") == true) }
     }
     override suspend fun listExperimentalFeatures() = result {
         catalog("experimentalFeature/list").map { o -> ExperimentalFeatureEntry(o.required("name"), o.text("displayName") ?: o.required("name"),
@@ -1076,7 +1084,8 @@ class JsonRpcAppServerClient(
                     settings.text("effort")?.let(ReasoningEffort::fromWire), settings.text("approvalPolicy")?.let(AskForApproval::fromWire),
                     settings.text("approvalsReviewer")?.let(ApprovalsReviewer::fromWire),
                     settings.objectOrNull("collaborationMode")?.text("mode")?.let(CollaborationMode::fromWire),
-                    settings.text("serviceTier")))
+                    settings.text("serviceTier"),
+                    settings.objectOrNull("activePermissionProfile")?.text("id")?.let { PermissionProfileEntry(it) }))
             }
             "thread/tokenUsage/updated" -> {
                 val usage = p.objectOrNull("tokenUsage")!!
@@ -1305,10 +1314,13 @@ class JsonRpcAppServerClient(
                 // The union flattens `_meta` next to `mode`/`message`; it carries the
                 // `_codex_apps.connector_auth_failure` payload the app-link flow reads.
                 val meta = p["_meta"]
-                val payload = if (p.text("mode") == "url") {
-                    McpElicitationRequest.Url(serverName, message, p.required("url"), p.required("elicitationId"), meta)
-                } else {
-                    McpElicitationRequest.Form(serverName, message, McpElicitationSchema(schema.text("title").orEmpty(), fields), meta)
+                val payload = when (p.text("mode")) {
+                    "url" -> McpElicitationRequest.Url(serverName, message, p.required("url"), p.required("elicitationId"), meta)
+                    // A device-authenticated approval: no schema, the challenge is the payload, and
+                    // the signed proof goes back as the accept's content.
+                    "openai/userVerification" -> McpElicitationRequest.UserVerification(serverName,
+                        p.required("title"), p.text("description").orEmpty(), p.required("challenge"), meta)
+                    else -> McpElicitationRequest.Form(serverName, message, McpElicitationSchema(schema.text("title").orEmpty(), fields), meta)
                 }
                 ApprovalRequest.Elicitation(requestId, thread, p.text("turnId"), item, time, payload)
             }

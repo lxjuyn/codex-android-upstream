@@ -360,12 +360,18 @@ enum class InputModality(val wire: String) {
     Audio("audio"),
 }
 
-/** `permissionProfile/list` entry. */
+/**
+ * A permission profile, from `permissionProfile/list` or the active profile in `thread/settings/updated`.
+ *
+ * The wire never carries a display name — a profile *is* its id (`:workspace`, `:read-only`, or a
+ * user `[permissions.<id>]` key) — so the id is what clients show, exactly as the TUI's permissions
+ * menu does. [allowed] is the requirements gate: a listed profile the effective policy forbids must
+ * not be selectable. It defaults to true because the active-profile shape does not carry the flag.
+ */
 data class PermissionProfileEntry(
     val id: String,
-    val name: String,
     val description: String = "",
-    val active: Boolean = false,
+    val allowed: Boolean = true,
 )
 
 /** `experimentalFeature/list` entry. */
@@ -557,12 +563,40 @@ sealed interface Account {
  * [rateLimits] is the backward-compatible single bucket; [rateLimitsByLimitId] keys the same shape
  * by metered `limit_id` (for example `codex`), which is what multi-bucket UIs read.
  */
+/**
+ * The backend-owned banner that rides along with a rate-limit read.
+ *
+ * The wire leaves it untyped (`rate_limit_upsell`), but the contract is the TUI's `BackendBanner`
+ * (`codex-rs/tui/src/backend_banners.rs`), whose nested keys stay snake_case rather than the v2
+ * protocol's camelCase.
+ */
+data class RateLimitUpsellBanner(
+    val bannerType: String,
+    val title: String,
+    val description: String,
+    val ctas: List<RateLimitUpsellCta> = emptyList(),
+    val modelSlug: String? = null,
+    val blockedModelSlug: String? = null,
+    val fallbackModelSlugs: List<String> = emptyList(),
+    /** Destination for a `request_increase` cta; absent means "ask the owner instead". */
+    val requestUrl: String? = null,
+) {
+    companion object {
+        /** The banner that means "ordinary usage is spent — run on the reserved model". */
+        const val LunaReserve = "luna_reserve"
+    }
+}
+
+/** One call to action on a [RateLimitUpsellBanner]. */
+data class RateLimitUpsellCta(val action: String, val label: String)
+
 data class AccountRateLimits(
     val rateLimits: RateLimitSnapshot = RateLimitSnapshot(),
     val rateLimitsByLimitId: Map<String, RateLimitSnapshot>? = null,
     val accountId: String? = null,
     val rateLimitResetCredits: RateLimitResetCreditsSummary? = null,
     val ordinaryUsageAllowed: Boolean? = null,
+    val rateLimitUpsell: RateLimitUpsellBanner? = null,
 )
 
 /** One rate-limit bucket. Mirrors `RateLimitSnapshot`; every field is optional. */

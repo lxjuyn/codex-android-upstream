@@ -55,6 +55,7 @@
     <string name="chatwidget_diagnostic_world_writable">%1$s 对机器上所有用户可写（另有 %2$d 处）</string>
     <string name="chatwidget_diagnostic_strict_review">本轮需要先经过严格审查才能继续。</string>
     <string name="chatwidget_diagnostic_hook_failed">钩子 %1$s 执行失败</string>
+    <string name="chatwidget_diagnostic_hook_output">钩子 %1$s 的输出</string>
     <string name="chatwidget_diagnostic_mcp_login_failed">MCP 服务 %1$s 登录失败</string>
     <string name="chatwidget_diagnostic_image_too_large">%1$s 超过附件图片 32 MiB 的上限。</string>
     <string name="chatwidget_diagnostic_recap_no_history">还没有可回顾的对话内容。</string>

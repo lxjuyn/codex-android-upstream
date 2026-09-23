@@ -90,12 +90,109 @@ internal fun McpElicitationForm(
             )
 
         is McpElicitationRequest.Form ->
-            McpElicitationFields(
-                payload = payload,
-                onSubmit = onSubmit,
-                onDecline = onDecline,
-                busy = busy,
+            if (payload.approval?.isToolSuggestion == true) {
+                McpToolSuggestion(
+                    payload = payload,
+                    onAccept = { onSubmit(emptyMap()) },
+                    onDecline = onDecline,
+                    busy = busy,
+                )
+            } else {
+                McpElicitationFields(
+                    payload = payload,
+                    onSubmit = onSubmit,
+                    onDecline = onDecline,
+                    busy = busy,
+                )
+            }
+
+        // A user verification has its own body in the approval dialog; reaching here would mean the
+        // dialog routed it wrong, and there is nothing to type, so this branch stays empty.
+        is McpElicitationRequest.UserVerification -> Unit
+    }
+}
+
+/**
+ * A connector or plugin the server wants installed or enabled before the call can run.
+ *
+ * Mirrors `bottom_pane/app_link_view.rs` for a tool suggestion: the body says what is being
+ * installed and why, the page is opened only when the server sent a safe URL, and the accept is
+ * the "I have done it" — the browser trip itself does not answer the request.
+ */
+@Composable
+private fun McpToolSuggestion(
+    payload: McpElicitationRequest.Form,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+    busy: Boolean,
+) {
+    val approval = payload.approval ?: return
+    val colors = MiuixTheme.colorScheme
+    val uriHandler = LocalUriHandler.current
+    val install = approval.isInstall
+    val url = approval.installUrl?.let { validateAppLinkUrl(it, requireChatgptHost = false) }
+    var opened by remember(payload) { mutableStateOf(false) }
+    val openFirst = url != null && !opened
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        ApprovalScrollBody {
+            Text(
+                text =
+                    stringResource(
+                        if (install) R.string.mcp_tool_suggestion_install_title
+                        else R.string.mcp_tool_suggestion_enable_title,
+                        approval.toolName.orEmpty(),
+                    ),
+                modifier = Modifier.fillMaxWidth(),
+                fontSize = UiType.DialogTitle,
+                lineHeight = UiType.DialogTitleLine,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.onSurface,
             )
+            Spacer(Modifier.height(UiConsts.Space4))
+            Text(
+                text =
+                    stringResource(
+                        if (approval.toolType == "plugin") R.string.mcp_tool_suggestion_plugin
+                        else R.string.mcp_tool_suggestion_connector
+                    ),
+                modifier = Modifier.fillMaxWidth(),
+                fontSize = UiType.Meta,
+                lineHeight = UiType.MetaLine,
+                color = colors.onSurfaceVariantSummary,
+            )
+            Spacer(Modifier.height(UiConsts.DialogFieldGap))
+            Text(
+                text = approval.suggestReason.orEmpty(),
+                modifier = Modifier.fillMaxWidth(),
+                fontSize = UiType.Body,
+                lineHeight = UiType.BodyLine,
+                color = colors.onSurfaceSecondary,
+            )
+            if (url != null) {
+                Spacer(Modifier.height(UiConsts.DialogFieldGap))
+                UrlSurface(url)
+            }
+        }
+        Spacer(Modifier.height(UiConsts.DialogFooterGap))
+        FormButtons(
+            confirmLabel =
+                stringResource(
+                    if (openFirst) R.string.mcp_tool_suggestion_open
+                    else R.string.mcp_tool_suggestion_done
+                ),
+            enabled = true,
+            busy = busy,
+            onConfirm = {
+                if (openFirst) {
+                    opened = true
+                    uriHandler.openUri(url)
+                } else {
+                    onAccept()
+                }
+            },
+            onCancel = onDecline,
+        )
     }
 }
 

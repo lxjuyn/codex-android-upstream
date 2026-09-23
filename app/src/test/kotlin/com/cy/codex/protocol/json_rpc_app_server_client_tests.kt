@@ -439,6 +439,97 @@ class JsonRpcAppServerClientTest {
     }
 
     @Test
+    fun `an MCP tool approval exposes its persist modes and display params`() = runTest {
+        val transport = HarnessTransport()
+        val client = JsonRpcAppServerClient(transport, backgroundScope)
+        client.initialize(ClientInfo("android", version = "1")).getOrThrow()
+        val approval = async { client.requests.first() }
+        transport.push(
+            """{"id":"approve","method":"mcpServer/elicitation/request","params":{"threadId":"t","serverName":"github","mode":"form","message":"Codex wants to call create_issue","requestedSchema":{"properties":{}},"_meta":{"codex_approval_kind":"mcp_tool_call","persist":["session","always"],"tool_name":"create_issue","tool_title":"Create issue","tool_params_display":[{"name":"repo","value":"openai/codex","display_name":"Repository"}]}}}""",
+        )
+        val received = assertIs<ApprovalRequest.Elicitation>(approval.await())
+        val form = received.params as com.cy.codex.protocol.protocol.v2.McpElicitationRequest.Form
+        assertTrue(form.fields.isEmpty())
+        val meta = form.approval!!
+        assertEquals("mcp_tool_call", meta.kind)
+        assertTrue(meta.isToolCall)
+        assertTrue(meta.allowsSession)
+        assertTrue(meta.allowsAlways)
+        assertEquals("Create issue", meta.toolTitle)
+        assertEquals("Repository", meta.paramsDisplay.single().displayName)
+        assertEquals("openai/codex", meta.paramsDisplay.single().value)
+
+        // Choosing the session option echoes only that persist mode back, which is what makes the
+        // server remember the choice instead of asking again.
+        client.respond(
+            received.requestId,
+            ApprovalResponse.Elicitation(
+                ElicitationAction.Accept,
+                meta = obj("persist" to "session"),
+            ),
+        )
+        val result = transport.sentResponse().objectOrNull("result")!!
+        assertEquals("accept", result.required("action"))
+        assertEquals("session", result.objectOrNull("_meta")!!.required("persist"))
+        client.close()
+    }
+
+    @Test
+    fun `an elicitation without the approval kind carries no approval`() = runTest {
+        val transport = HarnessTransport()
+        val client = JsonRpcAppServerClient(transport, backgroundScope)
+        client.initialize(ClientInfo("android", version = "1")).getOrThrow()
+        val approval = async { client.requests.first() }
+        transport.push(
+            """{"id":"plain","method":"mcpServer/elicitation/request","params":{"threadId":"t","serverName":"test","mode":"form","message":"Settings","requestedSchema":{"properties":{"enabled":{"type":"boolean"}}}}}""",
+        )
+        val received = assertIs<ApprovalRequest.Elicitation>(approval.await())
+        val form = received.params as com.cy.codex.protocol.protocol.v2.McpElicitationRequest.Form
+        assertNull(form.approval)
+        client.close()
+    }
+
+    @Test
+    fun `a tool suggestion exposes its install target`() = runTest {
+        val transport = HarnessTransport()
+        val client = JsonRpcAppServerClient(transport, backgroundScope)
+        client.initialize(ClientInfo("android", version = "1")).getOrThrow()
+        val approval = async { client.requests.first() }
+        transport.push(
+            """{"id":"suggest","method":"mcpServer/elicitation/request","params":{"threadId":"t","serverName":"codex_apps","mode":"form","message":"Calendar needs installing","requestedSchema":{"properties":{}},"_meta":{"codex_approval_kind":"tool_suggestion","tool_type":"connector","suggest_type":"install","suggest_reason":"Calendar is not installed","tool_id":"calendar","tool_name":"Calendar","install_url":"https://chatgpt.com/apps/calendar"}}}""",
+        )
+        val received = assertIs<ApprovalRequest.Elicitation>(approval.await())
+        val meta = (received.params as com.cy.codex.protocol.protocol.v2.McpElicitationRequest.Form).approval!!
+        assertEquals(true, meta.isToolSuggestion)
+        assertEquals(false, meta.isToolCall)
+        assertEquals(true, meta.isInstall)
+        assertEquals("Calendar", meta.toolName)
+        assertEquals("Calendar is not installed", meta.suggestReason)
+        assertEquals("https://chatgpt.com/apps/calendar", meta.installUrl)
+        client.close()
+    }
+
+    @Test
+    fun `a user verification elicitation decodes its challenge`() = runTest {
+        val transport = HarnessTransport()
+        val client = JsonRpcAppServerClient(transport, backgroundScope)
+        client.initialize(ClientInfo("android", version = "1")).getOrThrow()
+        val approval = async { client.requests.first() }
+        transport.push(
+            """{"id":"verify","method":"mcpServer/elicitation/request","params":{"threadId":"t","serverName":"codex_apps","mode":"openai/userVerification","title":"Confirm your identity","description":"Signing proves the request came from this device","challenge":"AAAA"}}""",
+        )
+        val received = assertIs<ApprovalRequest.Elicitation>(approval.await())
+        val payload =
+            assertIs<com.cy.codex.protocol.protocol.v2.McpElicitationRequest.UserVerification>(
+                received.params,
+            )
+        assertEquals("Confirm your identity", payload.title)
+        assertEquals("Signing proves the request came from this device", payload.description)
+        assertEquals("AAAA", payload.challenge)
+        client.close()
+    }
+
+    @Test
     fun `project creation sends roots and idempotency and goals decode nested response`() = runTest {
         val transport = HarnessTransport()
         val client = JsonRpcAppServerClient(transport, backgroundScope)
@@ -883,10 +974,32 @@ class JsonRpcAppServerClientTest {
         // The legacy `guardian_subagent` alias is the same mode and must fold into AutoReview.
         val settings = async(UnconfinedTestDispatcher(testScheduler)) { client.events.first() }
         transport.push(
-            """{"method":"thread/settings/updated","params":{"threadId":"t","threadSettings":{"model":"gpt","approvalPolicy":"on-request","approvalsReviewer":"guardian_subagent"}}}""",
+            """{"method":"thread/settings/updated","params":{"threadId":"t","threadSettings":{"model":"gpt","approvalPolicy":"on-request","approvalsReviewer":"guardian_subagent","activePermissionProfile":{"id":":workspace"}}}}""",
         )
         val event = assertIs<AppServerEvent.ThreadSettingsUpdatedEvent>(settings.await())
         assertEquals(ApprovalsReviewer.AutoReview, event.delta.approvalsReviewer)
+        assertEquals(":workspace", event.delta.activePermissionProfile?.id)
+        client.close()
+    }
+
+    @Test
+    fun `permission profiles decode id, description and the allowed gate`() = runTest {
+        val transport = HarnessTransport()
+        val client = JsonRpcAppServerClient(transport, backgroundScope)
+        client.initialize(ClientInfo("android", version = "1")).getOrThrow()
+        val profiles = async { client.listPermissionProfiles().getOrThrow() }
+        transport.response(
+            transport.request(),
+            obj("data" to listOf(
+                obj("id" to ":workspace", "allowed" to true, "description" to "Default workspace"),
+                obj("id" to ":read-only", "allowed" to false),
+            )),
+        )
+        val decoded = profiles.await()
+        assertEquals(listOf(":workspace", ":read-only"), decoded.map { it.id })
+        assertEquals("Default workspace", decoded.first().description)
+        assertEquals(true, decoded.first().allowed)
+        assertEquals(false, decoded.last().allowed)
         client.close()
     }
 
@@ -1029,6 +1142,54 @@ class JsonRpcAppServerClientTest {
     }
 
     @Test
+    fun `the rate-limit upsell banner decodes its snake_case contract`() = runTest {
+        val transport = HarnessTransport()
+        val client = JsonRpcAppServerClient(transport, backgroundScope)
+        client.initialize(ClientInfo("android", version = "1")).getOrThrow()
+        val limits = async { client.readRateLimits().getOrThrow() }
+        transport.response(
+            transport.request(),
+            obj(
+                "rateLimits" to obj("primary" to obj("usedPercent" to 100, "windowDurationMins" to 300, "resetsAt" to 99)),
+                "ordinaryUsageAllowed" to false,
+                "rateLimitUpsell" to obj(
+                    "banner_type" to "luna_reserve",
+                    "title" to "Switching to Reserve",
+                    "description" to "Ordinary usage is spent",
+                    "ctas" to listOf(obj("action" to "open_url", "label" to "Learn more")),
+                    "blocked_model_slug" to "gpt-5.6-codex",
+                    "fallback_model_slugs" to listOf("gpt-5.6-luna"),
+                ),
+            ),
+        )
+        val decoded = limits.await()
+        assertEquals(false, decoded.ordinaryUsageAllowed)
+        val banner = decoded.rateLimitUpsell!!
+        assertEquals("luna_reserve", banner.bannerType)
+        assertEquals("Switching to Reserve", banner.title)
+        assertEquals("Learn more", banner.ctas.single().label)
+        assertEquals("gpt-5.6-codex", banner.blockedModelSlug)
+        assertEquals(listOf("gpt-5.6-luna"), banner.fallbackModelSlugs)
+        client.close()
+    }
+
+    @Test
+    fun `a rate-limit read without an upsell carries no banner`() = runTest {
+        val transport = HarnessTransport()
+        val client = JsonRpcAppServerClient(transport, backgroundScope)
+        client.initialize(ClientInfo("android", version = "1")).getOrThrow()
+        val limits = async { client.readRateLimits().getOrThrow() }
+        transport.response(
+            transport.request(),
+            obj("rateLimits" to obj("primary" to obj("usedPercent" to 1, "windowDurationMins" to 300, "resetsAt" to 99))),
+        )
+        val decoded = limits.await()
+        assertNull(decoded.rateLimitUpsell)
+        assertNull(decoded.ordinaryUsageAllowed)
+        client.close()
+    }
+
+    @Test
     fun `mcp status list decodes auth status and tool counts`() = runTest {
         val transport = HarnessTransport()
         val client = JsonRpcAppServerClient(transport, backgroundScope)
@@ -1127,12 +1288,27 @@ class JsonRpcAppServerClientTest {
         val client = JsonRpcAppServerClient(transport, backgroundScope)
         client.initialize(ClientInfo("android", version = "1")).getOrThrow()
         val messages = async { client.readWorkspaceMessages().getOrThrow() }
-        transport.response(transport.request(), obj("messages" to listOf(obj("messageId" to "m1", "messageType" to "headline",
+        transport.response(transport.request(), obj("featureEnabled" to true, "messages" to listOf(obj("messageId" to "m1", "messageType" to "headline",
             "messageBody" to "hi", "createdAt" to 5))))
-        val message = messages.await().single()
+        val response = messages.await()
+        assertEquals(true, response.featureEnabled)
+        val message = response.messages.single()
         assertEquals("m1", message.messageId)
         assertEquals(com.cy.codex.protocol.protocol.v2.WorkspaceMessageType.Headline, message.messageType)
         assertEquals(5_000L, message.createdAt)
+        client.close()
+    }
+
+    @Test
+    fun `a disabled workspace-message route still decodes`() = runTest {
+        val transport = HarnessTransport()
+        val client = JsonRpcAppServerClient(transport, backgroundScope)
+        client.initialize(ClientInfo("android", version = "1")).getOrThrow()
+        val messages = async { client.readWorkspaceMessages().getOrThrow() }
+        transport.response(transport.request(), obj("featureEnabled" to false, "messages" to emptyList<Any>()))
+        val response = messages.await()
+        assertEquals(false, response.featureEnabled)
+        assertEquals(emptyList<com.cy.codex.protocol.protocol.v2.WorkspaceMessage>(), response.messages)
         client.close()
     }
 

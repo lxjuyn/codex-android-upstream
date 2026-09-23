@@ -58,6 +58,9 @@
     <string name="mcp_cell_dynamic_status_calling">调用中</string>
     <string name="mcp_cell_dynamic_status_completed">完成</string>
     <string name="mcp_cell_dynamic_status_failed">失败</string>
+    <string name="mcp_cell_badge_app">应用 · %1$s</string>
+    <string name="mcp_cell_badge_plugin">插件 · %1$s</string>
+    <string name="mcp_cell_badge_read_only">只读</string>
 
     <!-- NoticesCell.kt -->
     <string name="notices_cell_context_compacted">上下文已压缩</string>

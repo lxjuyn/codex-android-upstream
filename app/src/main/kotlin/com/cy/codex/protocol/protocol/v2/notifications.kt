@@ -102,6 +102,8 @@ data class ThreadSettingsUpdated(
     val approvalsReviewer: ApprovalsReviewer? = null,
     val collaborationMode: CollaborationMode? = null,
     val serviceTier: String? = null,
+    /** The permission profile in force; see [PermissionProfileEntry] on why the id is the label. */
+    val activePermissionProfile: PermissionProfileEntry? = null,
 )
 
 /**

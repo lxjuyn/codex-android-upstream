@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,7 +66,9 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.cy.codex.AppEvent
+import com.cy.codex.BannerIntent
 import com.cy.codex.CodexApp
+import com.cy.codex.bannerAction
 import com.cy.codex.CollapsibleSection
 import com.cy.codex.bottom_pane.ComposerHistory
 import com.cy.codex.MarkdownStream
@@ -101,7 +104,10 @@ import com.cy.codex.protocol.ApprovalResponse
 import com.cy.codex.protocol.protocol.item.AgentMessageItem
 import com.cy.codex.protocol.protocol.item.CommandExecutionItem
 import com.cy.codex.protocol.protocol.item.ThreadItem
+import com.cy.codex.protocol.protocol.v2.Account
+import com.cy.codex.protocol.protocol.v2.AddCreditsNudgeCreditType
 import com.cy.codex.protocol.protocol.v2.AttachmentType
+import com.cy.codex.protocol.protocol.v2.RateLimitUpsellBanner
 import com.cy.codex.protocol.protocol.v2.CollaborationMode
 import com.cy.codex.protocol.protocol.v2.CommandExecutionStatus
 import com.cy.codex.protocol.protocol.v2.ThreadAttachment
@@ -331,6 +337,28 @@ fun ChatScreen(
             )
         }
 
+        // Account-level notices ride above the composer rather than scrolling away with the
+        // transcript, and yield the slot to the connection banner: a real problem outranks a
+        // standing notice. The rate-limit upsell wins over the plain headline — it is the one
+        // carrying an action.
+        if (app.connectionLostMessage == null) {
+            val noticeModifier =
+                Modifier.align(Alignment.BottomCenter)
+                    .padding(
+                        start = UiConsts.ScreenMargin,
+                        end = UiConsts.ScreenMargin,
+                        bottom = bottomInset + UiConsts.PromptBarHeight + UiConsts.ScreenMargin,
+                    )
+            val upsell = app.catalog.rateLimits.rateLimitUpsell
+            if (upsell != null) {
+                RateLimitUpsellNotice(banner = upsell, app = app, modifier = noticeModifier)
+            } else {
+                app.catalog.workspaceHeadline?.let { headline ->
+                    WorkspaceHeadlineBanner(headline = headline, modifier = noticeModifier)
+                }
+            }
+        }
+
         StatusCardButton(
             open = panelState.open,
             onClick = { panelState.toggle() },
@@ -551,6 +579,9 @@ fun ChatScreen(
             remainingQueue = (app.widget.approvalQueueSize - 1).coerceAtLeast(0),
             // The patch is not on the request; it is recovered from the item the request names.
             patchChanges = { request -> app.widget.fileChangeChanges(request.itemId) },
+            // Signing lives behind the server's credential provider; the client only asks for the
+            // proof and hands it back as the accept's content.
+            verify = { params -> app.client.verifyUserVerification(params).map { it.proof } },
         )
         if (app.goalMenuOpen) {
             val goal = session.goal
@@ -680,6 +711,128 @@ private fun TranscriptPane(
  * Mirrors the backend banner the TUI shows on disconnect: the session stays readable, and the one
  * action that helps — reconnect — is on the notice instead of replacing the screen.
  */
+/**
+ * The account backend's workspace headline, as a passive notice.
+ *
+ * The TUI prints this in its configurable status line, which this client does not have; a banner in
+ * the slot the connection notice uses keeps a one-line, non-scrolling notice without a status line
+ * to hang it on.
+ */
+/**
+ * The backend's rate-limit banner, with whatever calls to action it shipped.
+ *
+ * The TUI prints this in its configurable status line, which this client does not have; a banner in
+ * the slot the connection notice uses keeps the notice and its buttons in reach. A cta this build
+ * cannot carry out ([bannerAction]) renders nothing rather than a dead button.
+ */
+@Composable
+private fun RateLimitUpsellNotice(
+    banner: RateLimitUpsellBanner,
+    app: CodexApp,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MiuixTheme.colorScheme
+    val uriHandler = LocalUriHandler.current
+    val shape = remember { RoundedCornerShape(UiConsts.PanelCorner) }
+    // The banner's own `plan_type` / `account_id` are `serde(skip)` and never reach the wire, so
+    // they come from what the client already knows about the account.
+    val planType =
+        (app.catalog.account.account as? Account.Chatgpt)?.planType
+            ?: app.catalog.rateLimits.rateLimits.planType
+    val accountId = app.catalog.rateLimits.accountId
+    val actionable =
+        banner.ctas.mapNotNull { cta ->
+            bannerAction(banner, cta.action, planType, accountId)?.let { cta to it }
+        }
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(glassTint(0.94f), shape)
+                .padding(horizontal = UiConsts.Space12, vertical = UiConsts.Space10),
+        verticalArrangement = Arrangement.spacedBy(UiConsts.Space4),
+    ) {
+        Text(
+            text = banner.title,
+            fontSize = UiType.Body,
+            lineHeight = UiType.BodyLine,
+            fontWeight = FontWeight.Medium,
+            color = colors.onSurface,
+        )
+        if (banner.description.isNotBlank()) {
+            Text(
+                text = banner.description,
+                fontSize = UiType.Meta,
+                lineHeight = UiType.MetaLine,
+                color = colors.onSurfaceVariantSummary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (actionable.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(UiConsts.Space8)) {
+                actionable.forEach { (cta, intent) ->
+                    Button(
+                        onClick = {
+                            when (intent) {
+                                is BannerIntent.OpenUrl -> uriHandler.openUri(intent.url)
+
+                                is BannerIntent.NotifyOwner ->
+                                    app.onAppEvent(
+                                        AppEvent.SendAddCreditsNudgeEmail(intent.creditType),
+                                    )
+
+                                // The reset picker and its confirmation live on the account page.
+                                BannerIntent.ResetUsage -> app.openSurface(Surface.Account)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColorsPrimary(),
+                        cornerRadius = UiConsts.ButtonHeightCompact / 2,
+                        minHeight = UiConsts.ButtonHeightCompact,
+                        insideMargin =
+                            PaddingValues(
+                                horizontal = UiConsts.ButtonPaddingHorizontalCompact,
+                                vertical = 0.dp,
+                            ),
+                    ) {
+                        Text(
+                            text = cta.label,
+                            fontSize = UiType.Action,
+                            lineHeight = UiType.ActionLine,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkspaceHeadlineBanner(headline: String, modifier: Modifier = Modifier) {
+    val shape = remember { RoundedCornerShape(UiConsts.PanelCorner) }
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(glassTint(0.94f), shape)
+                .padding(horizontal = UiConsts.Space12, vertical = UiConsts.Space10),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = headline,
+            fontSize = UiType.Body,
+            lineHeight = UiType.BodyLine,
+            color = MiuixTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
 @Composable
 private fun ConnectionBanner(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MiuixTheme.colorScheme

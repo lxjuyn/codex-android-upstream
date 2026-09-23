@@ -66,6 +66,8 @@ import com.cy.codex.protocol.protocol.v2.UserInput
 import com.cy.codex.protocol.protocol.v2.UserVerificationEnrollResponse
 import com.cy.codex.protocol.protocol.v2.UserVerificationStatusResponse
 import com.cy.codex.protocol.protocol.v2.WindowsSandboxReadiness
+import com.cy.codex.protocol.protocol.v2.WorkspaceMessagesResponse
+import com.cy.codex.protocol.protocol.v2.WorkspaceMessageType
 
 /**
  * Canonical session state, shared by the transcript, the status card and the sidebar.
@@ -617,6 +619,9 @@ enum class DiagnosticCode {
     /** A hook failed; the notice names it. */
     HookFailed,
 
+    /** A hook completed with output the user should see; the notice names it. */
+    HookOutput,
+
     /** An MCP server's OAuth flow failed; the notice names the server. */
     McpLoginFailed,
 
@@ -709,6 +714,22 @@ data class PluginInstallAuthFlow(
     val authPolicy: PluginAuthPolicy,
 )
 
+/**
+ * The headline the account backend publishes, or null when there is none to show.
+ *
+ * Mirrors `workspace_headline_from_response` in `codex-rs/tui/src/workspace_messages.rs`: a disabled
+ * route and an enabled route without a headline both read as "nothing to show", so only the first
+ * non-blank `Headline` message survives.
+ */
+fun workspaceHeadline(response: WorkspaceMessagesResponse): String? {
+    if (!response.featureEnabled) return null
+    return response.messages
+        .firstOrNull { it.messageType == WorkspaceMessageType.Headline }
+        ?.messageBody
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+}
+
 class CatalogState {
     var models by mutableStateOf<List<ModelPreset>>(emptyList())
     var experimentalFeatures by mutableStateOf<List<ExperimentalFeatureEntry>>(emptyList())
@@ -751,6 +772,14 @@ class CatalogState {
     /** Whether a debounced session update is in flight; the popup may show a spinner for it. */
     var mentionSearching by mutableStateOf(false)
     var account by mutableStateOf(AccountReadResponse(requiresOpenaiAuth = false))
+
+    /**
+     * The workspace headline the account's backend publishes, or null when there is none to show.
+     *
+     * Rendered as a banner rather than a transcript cell: it is account state, not part of the
+     * conversation, so it must not scroll away with it.
+     */
+    var workspaceHeadline by mutableStateOf<String?>(null)
     var rateLimits by mutableStateOf(AccountRateLimits())
 
     /**
