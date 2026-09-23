@@ -334,6 +334,7 @@ internal object WireCodec {
                 modelSlug = banner.text("model_slug"),
                 blockedModelSlug = banner.text("blocked_model_slug"),
                 fallbackModelSlugs = banner.strings("fallback_model_slugs"),
+                requestUrl = banner.text("request_url"),
             )
         },
     )

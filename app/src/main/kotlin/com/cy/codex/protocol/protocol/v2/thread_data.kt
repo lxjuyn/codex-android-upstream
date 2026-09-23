@@ -578,6 +578,8 @@ data class RateLimitUpsellBanner(
     val modelSlug: String? = null,
     val blockedModelSlug: String? = null,
     val fallbackModelSlugs: List<String> = emptyList(),
+    /** Destination for a `request_increase` cta; absent means "ask the owner instead". */
+    val requestUrl: String? = null,
 ) {
     companion object {
         /** The banner that means "ordinary usage is spent — run on the reserved model". */
