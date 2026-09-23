@@ -58,6 +58,7 @@
     <string name="chatwidget_diagnostic_world_writable">%1$s is writable by every user on this machine (%2$d more like it)</string>
     <string name="chatwidget_diagnostic_strict_review">This turn needs a strict review before it can continue.</string>
     <string name="chatwidget_diagnostic_hook_failed">Hook %1$s failed</string>
+    <string name="chatwidget_diagnostic_hook_output">Hook %1$s output</string>
     <string name="chatwidget_diagnostic_mcp_login_failed">Sign-in for MCP server %1$s failed</string>
     <string name="chatwidget_diagnostic_safety_buffering">Giving this request a little extra thought. No action is required.</string>
     <string name="chatwidget_diagnostic_rate_limit_warning">Heads up: less than %1$d%% of the %2$s is left. Open the account page for a breakdown.</string>
