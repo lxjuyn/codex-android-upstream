@@ -563,12 +563,38 @@ sealed interface Account {
  * [rateLimits] is the backward-compatible single bucket; [rateLimitsByLimitId] keys the same shape
  * by metered `limit_id` (for example `codex`), which is what multi-bucket UIs read.
  */
+/**
+ * The backend-owned banner that rides along with a rate-limit read.
+ *
+ * The wire leaves it untyped (`rate_limit_upsell`), but the contract is the TUI's `BackendBanner`
+ * (`codex-rs/tui/src/backend_banners.rs`), whose nested keys stay snake_case rather than the v2
+ * protocol's camelCase.
+ */
+data class RateLimitUpsellBanner(
+    val bannerType: String,
+    val title: String,
+    val description: String,
+    val ctas: List<RateLimitUpsellCta> = emptyList(),
+    val modelSlug: String? = null,
+    val blockedModelSlug: String? = null,
+    val fallbackModelSlugs: List<String> = emptyList(),
+) {
+    companion object {
+        /** The banner that means "ordinary usage is spent — run on the reserved model". */
+        const val LunaReserve = "luna_reserve"
+    }
+}
+
+/** One call to action on a [RateLimitUpsellBanner]. */
+data class RateLimitUpsellCta(val action: String, val label: String)
+
 data class AccountRateLimits(
     val rateLimits: RateLimitSnapshot = RateLimitSnapshot(),
     val rateLimitsByLimitId: Map<String, RateLimitSnapshot>? = null,
     val accountId: String? = null,
     val rateLimitResetCredits: RateLimitResetCreditsSummary? = null,
     val ordinaryUsageAllowed: Boolean? = null,
+    val rateLimitUpsell: RateLimitUpsellBanner? = null,
 )
 
 /** One rate-limit bucket. Mirrors `RateLimitSnapshot`; every field is optional. */
