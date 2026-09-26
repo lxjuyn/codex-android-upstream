@@ -24,12 +24,19 @@ import kotlinx.coroutines.withTimeout
 
 /** Exercises the production client and JNI inside the real Android application sandbox. */
 class RuntimeSmokeInstrumentation : Instrumentation() {
+    private var uiOptions: Bundle? = null
+
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
+        uiOptions = arguments?.takeIf { it.containsKey("scene") }
         start()
     }
 
     override fun onStart() {
+        uiOptions?.let {
+            runAdaptiveUiFixture(it)
+            return
+        }
         val report = StringBuilder()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {

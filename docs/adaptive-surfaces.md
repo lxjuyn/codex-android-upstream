@@ -46,14 +46,49 @@ Expanded 所有弹层维持原底部抽屉：侧边距 `clamp(宽度 × 0.055, 4
 
 `ShellWidthTest` 覆盖断点两侧、紧凑布局、用途分类、宽屏回归、侧边距上下限和概览高度。
 2026-09-23 验证：46 个测试类、318 个用例，失败/错误/跳过均为 0。
+2026-09-26 修复后重新构建应用与测试 APK：46 个测试类、319 个用例，失败和错误均为 0。
 
 ```powershell
 ./gradlew.bat :app:testDebugUnitTest -PskipToolchainBuild -PskipNativeBuild --no-parallel --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' '-Dkotlin.daemon.jvmargs=-Xmx1024m' --console=plain
 ```
 
+## 设备验证入口
+
+`RuntimeSmokeInstrumentation` 不带 `scene` 参数时仍执行原有 native 冒烟测试。
+带 `scene` 时进入仅打包在测试 APK 中的交互样例，可选 `form`、`confirmation`、
+`picker`、`approval`、`page`。这些样例调用真实生产组件，审批不会执行命令，
+表单不会写服务器数据。日志中的 `READY`/`COMPLETED` 只表示样例生命周期，
+不表示用户操作或 native 测试自动通过。
+
+```powershell
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell am instrument -w -e scene approval -e holdSeconds 600 com.cy.codex.test/com.cy.codex.runtime.RuntimeSmokeInstrumentation
+```
+
+`AdaptiveUiFixture` 日志记录关闭状态与决策计数。切换样例前先执行
+`adb shell am force-stop com.cy.codex`，避免两个 instrumentation 同时控制应用。
+
 本机沿用未提交的构建绕行（跳过 native staging、缓存 Gradle 版本和 Maven 镜像）。
-编译与 JVM 测试不代表视觉验收；仍需在可运行 native 的设备检查：
-360dp 手机、720dp 断点、宽屏、横屏键盘、长补丁/长表单、返回手势、审批队列连续切换。
+离线 APK 可以打开真实导航页面，但服务端因缺失 `toolchain/native-manifest.txt` 启动失败。
+因此这次设备检查覆盖 UI 呈现与交互，不覆盖 JNI、真实账户、工具执行和服务器审批往返。
+
+设备为 API 36 x86_64 模拟器，1536MB RAM。手机使用 720×1600 @320dpi（360×800dp），
+宽屏通过 `wm size 1280x800` / `wm density 160` 测试；断点使用 719/720×800 @160dpi。
+结束后恢复 `wm size reset` 与 `wm density reset`。构建与模拟器分开运行。
+
+2026-09-26 设备检查记录（人工操作与截图，非自动断言）：
+
+| 场景 | 结果与证据 |
+| --- | --- |
+| 断点与宽屏 | [719dp 全屏](images/adaptive/width719-settings.png)、[720dp 画框](images/adaptive/width720-settings.png)、[1280dp 画框](images/adaptive/tablet-settings.png)；窄屏右滑返回聊天 |
+| 表单 | 必填项为空时禁止提交；输入后按钮启用，键盘打开时可滚动至末尾与提交按钮，见[截图](images/adaptive/phone-form-keyboard.png) |
+| 临时选择器 | 15 项列表显示为底部抽屉；输入 Agent 15 后过滤为单项，键盘不遮挡结果 |
+| 短确认 | 目录信任显示居中卡片，返回键关闭 |
+| 阻塞审批 | [手机审批](images/adaptive/phone-approval.png)返回键不关闭；滚动后 Allow 进入下一条且滚动归零，再 Deny 关闭；日志依次为 decisions=0/1/2，最终 open=false |
+
+设备测试发现并修复：窄屏审批正文仍沿用宽屏 36% 高度，现独立使用 70%；
+连续请求曾继承上一条的滚动位置，现按 requestId 重建审批内容状态。宽屏保持原高度。
 
 参考：[Miuix 导航](https://compose-miuix-ui.github.io/miuix/guide/miuix-nav)、
 [WindowDialog](https://compose-miuix-ui.github.io/miuix/components/windowdialog)。使用仓库现有 0.9.4 依赖。

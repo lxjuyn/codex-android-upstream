@@ -60,6 +60,10 @@ fun pageTopGapFor(width: ShellWidth): Dp =
 fun pageCornerFor(width: ShellWidth): Dp =
     if (width == ShellWidth.Compact) 0.dp else UiConsts.DrawerCorner
 
+/** Full-page approvals can spend more height on evidence while retaining room for decisions. */
+fun approvalBodyHeightFractionFor(width: ShellWidth): Float =
+    if (width == ShellWidth.Compact) 0.70f else UiConsts.DialogBodyMaxHeightFraction
+
 /** Purpose is explicit so new call sites cannot accidentally turn confirmations into pages. */
 fun surfaceGeometryFor(
     width: Dp,

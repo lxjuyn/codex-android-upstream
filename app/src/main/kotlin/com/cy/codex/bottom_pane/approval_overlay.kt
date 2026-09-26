@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import com.cy.codex.FileDiffRow
 import com.cy.codex.R
 import com.cy.codex.AdaptiveSurface
+import com.cy.codex.approvalBodyHeightFractionFor
+import com.cy.codex.shellWidth
 import com.cy.codex.SurfacePurpose
 import com.cy.codex.sheetHeightFraction
 import com.cy.codex.UiConsts
@@ -120,38 +123,41 @@ fun ApprovalDialog(
         },
         onDismissRequest = {},
     ) {
-        Column(
-            modifier =
-                Modifier.fillMaxWidth()
-                    .heightIn(
-                        max =
-                            LocalWindowInfo.current.containerDpSize.height *
-                                sheetHeightFraction()
-                    )
-        ) {
+        // A new request must not inherit the previous evidence scroll or form state.
+        key(shown?.requestId) {
             Column(
                 modifier =
                     Modifier.fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(bottom = UiConsts.SheetPadding),
-                verticalArrangement = Arrangement.spacedBy(UiConsts.Space6),
+                        .heightIn(
+                            max =
+                                LocalWindowInfo.current.containerDpSize.height *
+                                    sheetHeightFraction()
+                        )
             ) {
-                HideStatusBarInWindow()
-                if (shown != null) {
-                    ApprovalBody(
-                        request = shown,
-                        decide = { response ->
-                            if (request != null && !busy) {
-                                onDecision(shown, response)
-                            }
-                        },
-                        remainingQueue = remainingQueue,
-                        busy = busy,
-                        patchChanges = lastChanges,
-                        verify = verify,
-                    )
-                    error?.let {
-                        Text(it, color = MiuixTheme.colorScheme.error, fontSize = UiType.Meta)
+                Column(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(bottom = UiConsts.SheetPadding),
+                    verticalArrangement = Arrangement.spacedBy(UiConsts.Space6),
+                ) {
+                    HideStatusBarInWindow()
+                    if (shown != null) {
+                        ApprovalBody(
+                            request = shown,
+                            decide = { response ->
+                                if (request != null && !busy) {
+                                    onDecision(shown, response)
+                                }
+                            },
+                            remainingQueue = remainingQueue,
+                            busy = busy,
+                            patchChanges = lastChanges,
+                            verify = verify,
+                        )
+                        error?.let {
+                            Text(it, color = MiuixTheme.colorScheme.error, fontSize = UiType.Meta)
+                        }
                     }
                 }
             }
@@ -167,15 +173,12 @@ fun ApprovalDialog(
  * two-question form simply lost its second question with no way to scroll to it. Bounding the
  * height against the window is what makes the scroll modifier do something.
  *
- * The bound is the dialog's own budget. A modal is a header, this body and a footer, and the footer
- * has to stay visible whatever is in the body: it carries the button that unblocks the turn. So the
- * body takes a fixed share of the window — [UiConsts.DialogBodyMaxHeightFraction] — and everything
- * else is left for the two fixed parts, which is why that share is well under half even though the
- * dialog is allowed two thirds.
+ * Full-page phone approvals use a larger evidence budget than framed tablet approvals.
+ * Both retain room for the header and decisions; the outer scroller handles short windows.
  */
 @Composable
 internal fun ApprovalScrollBody(
-    maxHeightFraction: Float = UiConsts.DialogBodyMaxHeightFraction,
+    maxHeightFraction: Float = approvalBodyHeightFractionFor(shellWidth()),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val windowHeight = LocalWindowInfo.current.containerDpSize.height

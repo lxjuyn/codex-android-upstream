@@ -8,6 +8,11 @@ import kotlin.test.assertTrue
 /** Locks the phone/tablet rule the whole shell reads through `shellWidth()` / `sheetSideMargin()`. */
 class ShellWidthTest {
     @Test
+    fun `full-page approvals use more evidence space without changing tablet approvals`() {
+        assertEquals(0.70f, approvalBodyHeightFractionFor(ShellWidth.Compact))
+        assertEquals(UiConsts.DialogBodyMaxHeightFraction, approvalBodyHeightFractionFor(ShellWidth.Expanded))
+    }
+    @Test
     fun `compact pages remove the frame and expanded pages retain it`() {
         assertEquals(0.dp, pageTopGapFor(ShellWidth.Compact))
         assertEquals(0.dp, pageCornerFor(ShellWidth.Compact))
